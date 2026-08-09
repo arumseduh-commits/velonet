@@ -91,12 +91,12 @@ export default function SessionDetailPage({
 
   useEffect(() => {
     fetchDetail();
-    // Real-time Auto-Sync Poller (Every 2.5s)
+    // Real-time Auto-Sync Poller (Every 5.0s for Cloud performance)
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         fetchDetail(true);
       }
-    }, 2500);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [sessionId]);
