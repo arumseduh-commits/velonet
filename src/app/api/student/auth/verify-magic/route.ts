@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createStudentSession } from "@/lib/student-auth";
+import { createStudentSession, STUDENT_COOKIE_NAME } from "@/lib/student-auth";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -20,22 +20,33 @@ export async function GET(req: Request) {
       !otpRecord ||
       otpRecord.isUsed ||
       new Date() > new Date(otpRecord.expiresAt) ||
+      !otpRecord.participant ||
       otpRecord.participant.isExcluded
     ) {
       return NextResponse.redirect(new URL("/student/login?error=invalid_or_expired_link", req.url));
     }
 
-    // Mark as used
+    // Mark token as used
     await prisma.otpVerification.update({
       where: { id: otpRecord.id },
       data: { isUsed: true },
     });
 
-    // Create session and set HTTP-Only cookie
+    // Create session in DB
     const userAgent = req.headers.get("user-agent") || undefined;
-    await createStudentSession(otpRecord.participant.id, userAgent);
+    const sessionToken = await createStudentSession(otpRecord.participant.id, userAgent);
 
-    return NextResponse.redirect(new URL("/student", req.url));
+    // Construct redirect response and explicitly attach HTTP-Only Cookie
+    const response = NextResponse.redirect(new URL("/student", req.url));
+    response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: "/",
+    });
+
+    return response;
   } catch (err) {
     console.error("[VerifyMagic] Error:", err);
     return NextResponse.redirect(new URL("/student/login?error=server_error", req.url));

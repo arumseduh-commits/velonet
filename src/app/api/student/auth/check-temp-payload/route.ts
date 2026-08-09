@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createStudentSession } from "@/lib/student-auth";
+import { createStudentSession, STUDENT_COOKIE_NAME } from "@/lib/student-auth";
 
 export async function GET(req: Request) {
   try {
@@ -33,13 +33,23 @@ export async function GET(req: Request) {
 
       // Create session and set cookie
       const userAgent = req.headers.get("user-agent") || undefined;
-      await createStudentSession(data.participantId, userAgent);
+      const sessionToken = await createStudentSession(data.participantId, userAgent);
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         verified: true,
         redirectUrl: "/student",
       });
+
+      response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60,
+        path: "/",
+      });
+
+      return response;
     }
 
     return NextResponse.json({ success: true, verified: false });
