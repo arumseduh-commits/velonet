@@ -14,9 +14,15 @@ import {
   Cpu,
   CalendarCheck,
   BarChart3,
+  X,
 } from "lucide-react";
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
 
   // Check if any sub-item of "Fitur Bot" is active
@@ -33,8 +39,13 @@ export function AdminSidebar() {
     }
   }, [pathname, isBotChildActive]);
 
-  return (
-    <aside className="w-64 bg-slate-900/90 border-r border-slate-800 flex flex-col justify-between h-screen sticky top-0 z-30">
+  // Auto-close mobile drawer on route change
+  useEffect(() => {
+    if (onClose) onClose();
+  }, [pathname]);
+
+  const navContent = (
+    <aside className="w-64 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col justify-between h-full sticky top-0 z-30">
       <div>
         {/* Brand Header */}
         <div className="p-6 border-b border-slate-800 flex items-center justify-between">
@@ -49,6 +60,16 @@ export function AdminSidebar() {
               <p className="text-xs text-slate-400 font-medium">Velocity Admin Panel</p>
             </div>
           </div>
+
+          {/* Close button on mobile */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Links */}
@@ -179,5 +200,27 @@ export function AdminSidebar() {
         </Link>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block h-screen sticky top-0 z-30">
+        {navContent}
+      </div>
+
+      {/* Mobile Drawer Overlay */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={onClose}
+          />
+          <div className="relative z-10 h-full animate-in slide-in-from-left duration-300">
+            {navContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
