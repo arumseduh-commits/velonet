@@ -2,8 +2,20 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const origin = url.origin;
+
+    // Automatically store the public domain URL in SystemSetting so WA bot knows the exact public link
+    if (origin && !origin.includes("localhost")) {
+      await prisma.systemSetting.upsert({
+        where: { key: "app_base_url" },
+        create: { key: "app_base_url", value: origin },
+        update: { value: origin },
+      }).catch(() => {});
+    }
+
     const payloadId = "AUTH_" + crypto.randomBytes(12).toString("hex");
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 

@@ -280,13 +280,15 @@ export async function processIncomingMessage(
       },
     });
 
-    let baseUrl = "http://localhost:3000";
+    let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000";
     try {
       const setting = await prisma.systemSetting.findUnique({
         where: { key: "app_base_url" },
       });
       if (setting && setting.value) baseUrl = setting.value;
     } catch (e) {}
+
+    baseUrl = baseUrl.replace(/\/$/, "");
 
     const directLoginUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
 
