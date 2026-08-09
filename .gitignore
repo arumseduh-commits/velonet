@@ -28,8 +28,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# SQLite Database & Baileys Auth Session (Keep local / volume)
-dev.db
+# SQLite Database & Baileys Auth Session
+# dev.db
 dev.db-journal
 /baileys_auth
 /baileys_auth_info
