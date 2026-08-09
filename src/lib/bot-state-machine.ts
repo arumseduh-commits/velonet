@@ -280,13 +280,26 @@ export async function processIncomingMessage(
       },
     });
 
-    let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000";
-    try {
-      const setting = await prisma.systemSetting.findUnique({
-        where: { key: "app_base_url" },
-      });
-      if (setting && setting.value) baseUrl = setting.value;
-    } catch (e) {}
+    // Prioritize production environment variables first
+    let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
+
+    // If env vars not set, check DB setting if it's a valid non-localhost domain
+    if (!baseUrl) {
+      try {
+        const setting = await prisma.systemSetting.findUnique({
+          where: { key: "app_base_url" },
+        });
+        if (setting && setting.value && !setting.value.includes("localhost")) {
+          baseUrl = setting.value;
+        }
+      } catch (e) {}
+    }
+
+    // Default fallback to Render production domain if still empty or localhost
+    if (!baseUrl || baseUrl.includes("localhost")) {
+      const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+      baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
+    }
 
     baseUrl = baseUrl.replace(/\/$/, "");
 
