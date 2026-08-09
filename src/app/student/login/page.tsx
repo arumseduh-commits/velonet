@@ -127,6 +127,39 @@ function StudentLoginContent() {
           </p>
         </div>
 
+        {/* 🌟 FEATURED: 1-Click WhatsApp Instant Login (No OTP Input Required!) */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+              <MessageSquareCode className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                🌟 CARA PALING PRAKTIS (1-KLIK)
+              </h2>
+              <p className="text-[11px] text-slate-400">
+                Kirim chat <code className="text-emerald-300 font-bold bg-slate-950 px-1 py-0.5 rounded">!login</code> ke Bot WA, Bot akan langsung membalas link masuk tanpa ketik OTP!
+              </p>
+            </div>
+          </div>
+
+          <a
+            href="https://wa.me/?text=!login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+          >
+            <span>💬 Buka WhatsApp & Kirim !login</span>
+            <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+
+        <div className="flex items-center gap-3 text-slate-600 text-xs">
+          <div className="flex-1 h-px bg-slate-800" />
+          <span>atau minta OTP via form</span>
+          <div className="flex-1 h-px bg-slate-800" />
+        </div>
+
         {step === "PHONE" ? (
           /* STEP 1: Phone Number Input Form */
           <form onSubmit={handleRequestOtp} className="space-y-4">

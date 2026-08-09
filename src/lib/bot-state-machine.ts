@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { processLocationCheckIn, processLeaveRequest } from "./attendance";
 
@@ -212,6 +213,57 @@ export async function processIncomingMessage(
     }
   } catch (e) {
     console.error("Error processing pending leave choice:", e);
+  }
+
+  // 1.5 Handle Instant Web Login Command (!login / login)
+  if (
+    lowerText === "!login" ||
+    lowerText === "login" ||
+    lowerText.startsWith("!login ") ||
+    lowerText.startsWith("login ")
+  ) {
+    if (participant.status !== RegistrationStatus.COMPLETED || participant.isExcluded) {
+      return {
+        newStatus: participant.status as RegistrationStatusType,
+        replyMessage: `🔴 *AKUN BELUM TERDAFTAR*\n\nNomor WhatsApp Anda (+${participant.phoneNumber}) belum menyelesaikan pendaftaran di Komunitas Velocity.\n\nSilakan daftarkan diri Anda terlebih dahulu dengan membalas *YA* pada chat ini.`,
+      };
+    }
+
+    const magicToken = crypto.randomBytes(32).toString("hex");
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await prisma.otpVerification.updateMany({
+      where: { participantId: participant.id, isUsed: false },
+      data: { isUsed: true },
+    });
+
+    await prisma.otpVerification.create({
+      data: {
+        participantId: participant.id,
+        phoneNumber: participant.phoneNumber,
+        otpCode,
+        magicToken,
+        expiresAt,
+      },
+    });
+
+    let baseUrl = "http://localhost:3000";
+    try {
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key: "app_base_url" },
+      });
+      if (setting && setting.value) baseUrl = setting.value;
+    } catch (e) {}
+
+    const directLoginUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
+
+    return {
+      newStatus: participant.status as RegistrationStatusType,
+      replyMessage: `🔓 *LINK LOGIN PORTAL SISWA VELOCITY*\n\nHalo Kak *${
+        participant.name || "Peserta"
+      }*!\n\nKlik link di bawah ini untuk *LANGSUNG MASUK* ke Portal Siswa Anda tanpa perlu mengetik password:\n\n🔗 ${directLoginUrl}\n\n_⚠️ Link ini berlaku 10 menit. Selamat belajar! 🚀_`,
+    };
   }
 
   // 2. Handle Leave / Sick Requests (!izin / !sakit)
