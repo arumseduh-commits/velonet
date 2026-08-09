@@ -79,6 +79,11 @@ class WhatsAppBotEngine extends EventEmitter {
         logger,
         auth: state,
         printQRInTerminal: false,
+        keepAliveIntervalMs: 15000, // Keeps TCP pipe active on Cloud proxies (prevents 408/428 timeouts)
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        retryRequestDelayMs: 2000,
+        markOnlineOnConnect: true,
         shouldIgnoreJid: (jid) => isJidBroadcast(jid),
       });
 
@@ -119,9 +124,10 @@ class WhatsAppBotEngine extends EventEmitter {
             this.updateStatus("CONNECTING", null, null, "Finalizing Pairing");
             setTimeout(() => this.startBot(), 500);
           } else {
-            this.emit("log", `Connection closed (code ${statusCode}). Auto reconnecting in 2s...`);
-            this.updateStatus("DISCONNECTED", null, null, `Connection Closed (Code ${statusCode})`);
-            setTimeout(() => this.startBot(), 2000);
+            // Smooth silent background reconnect without wiping state
+            this.emit("log", `Cloud network blip (code ${statusCode}). Silently reconnecting in 1.5s...`);
+            this.updateStatus("CONNECTING", null, this.userInfo, `Reconnecting (Code ${statusCode})`);
+            setTimeout(() => this.startBot(), 1500);
           }
         } else if (connection === "open") {
           this.isInitializing = false;
