@@ -37,11 +37,11 @@ export default function LandingPage() {
         </div>
 
         <Link
-          href="/admin"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-xs font-semibold transition-all shadow-md"
+          href="/student/login"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all shadow-md"
         >
-          <Bot className="w-4 h-4 text-blue-400" />
-          <span>Admin Portal</span>
+          <Sparkles className="w-4 h-4 text-white" />
+          <span>Portal Siswa</span>
         </Link>
       </header>
 
@@ -69,23 +69,13 @@ export default function LandingPage() {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-4 mt-8 w-full sm:w-auto">
-          <a
-            href="https://wa.me/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-blue-500/25 transition-all transform hover:-translate-y-0.5 cursor-pointer"
-          >
-            <MessageSquare className="w-5 h-5 fill-current" />
-            <span>Chat Bot WhatsApp Velocity</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
-
           <Link
-            href="/admin"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 font-semibold text-sm transition-all"
+            href="/student/login"
+            className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-xl shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 cursor-pointer"
           >
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Login Dashboard Admin</span>
+            <Sparkles className="w-5 h-5" />
+            <span>Masuk Portal Siswa</span>
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 
