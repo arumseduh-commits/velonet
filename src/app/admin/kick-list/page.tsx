@@ -14,12 +14,20 @@ interface KickParticipant {
   updatedAt: string;
 }
 
+interface SavedGroup {
+  id: string;
+  subject: string;
+  size: number;
+}
+
 export default function KickListPage() {
   const { confirm, toast } = useDialog();
   const [list, setList] = useState<KickParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [groups, setGroups] = useState<SavedGroup[]>([]);
   const [targetGroupId, setTargetGroupId] = useState<string>("");
+  const [customJid, setCustomJid] = useState<string>("");
   const [kickingId, setKickingId] = useState<string | null>(null);
 
   const fetchKickList = async () => {
@@ -37,17 +45,24 @@ export default function KickListPage() {
     }
   };
 
-  useEffect(() => {
-    fetchKickList();
-    // Try auto-loading saved group JID from API
-    fetch("/api/bot/groups")
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+  const fetchGroups = async () => {
+    try {
+      const res = await fetch("/api/bot/groups");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setGroups(json.data);
+        if (json.data.length > 0 && !targetGroupId) {
           setTargetGroupId(json.data[0].id);
         }
-      })
-      .catch(() => {});
+      }
+    } catch (err) {
+      console.error("Failed to fetch groups:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchKickList();
+    fetchGroups();
   }, []);
 
   const toggleKickStatus = async (id: string, currentStatus: boolean) => {
@@ -72,8 +87,9 @@ export default function KickListPage() {
   };
 
   const handleAutoKickViaBot = async (participant: KickParticipant) => {
-    if (!targetGroupId) {
-      toast.warning("Masukkan Target Group JID terlebih dahulu untuk melakukan kick via bot.");
+    const effectiveGroupId = targetGroupId === "custom" ? customJid.trim() : targetGroupId.trim();
+    if (!effectiveGroupId) {
+      toast.warning("Pilih atau masukkan Target Group terlebih dahulu untuk melakukan kick via bot.");
       return;
     }
 
@@ -95,7 +111,7 @@ export default function KickListPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           participantId: participant.id,
-          groupId: targetGroupId,
+          groupId: effectiveGroupId,
           phoneNumber: participant.phoneNumber,
         }),
       });
@@ -202,19 +218,47 @@ export default function KickListPage() {
         </div>
       </div>
 
-      {/* Target Group JID Input Banner */}
+      {/* Target Group Selector Banner */}
       <div className="p-4 rounded-2xl glass-panel border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs text-slate-300">
           <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
-          <span><b>Target Group JID untuk Kick Otomatis:</b> (Pastikan Bot adalah Admin di grup ini)</span>
+          <span><b>Pilih Grup Target untuk Kick Otomatis:</b> (Pastikan Bot adalah Admin di grup ini)</span>
         </div>
-        <input
-          type="text"
-          placeholder="120363041234567890@g.us"
-          value={targetGroupId}
-          onChange={(e) => setTargetGroupId(e.target.value)}
-          className="w-full sm:w-72 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
-        />
+
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+          {groups.length > 0 ? (
+            <select
+              value={targetGroupId}
+              onChange={(e) => setTargetGroupId(e.target.value)}
+              className="w-full sm:w-80 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-medium cursor-pointer"
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  👥 {g.subject} ({g.size || 0} Anggota)
+                </option>
+              ))}
+              <option value="custom">✍️ Ketik ID Grup Custom (JID)...</option>
+            </select>
+          ) : (
+            <input
+              type="text"
+              placeholder="120363041234567890@g.us"
+              value={targetGroupId}
+              onChange={(e) => setTargetGroupId(e.target.value)}
+              className="w-full sm:w-72 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+            />
+          )}
+
+          {targetGroupId === "custom" && (
+            <input
+              type="text"
+              placeholder="Ketik ID Grup JID..."
+              value={customJid}
+              onChange={(e) => setCustomJid(e.target.value)}
+              className="w-full sm:w-64 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+            />
+          )}
+        </div>
       </div>
 
       {/* Info Banner */}
