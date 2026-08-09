@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, Phone, ArrowRight, RefreshCw, CheckCircle2, ShieldCheck, MessageSquareCode, Sparkles } from "lucide-react";
+import { MessageSquareCode, ArrowRight, RefreshCw, ShieldCheck, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 function StudentLoginContent() {
@@ -12,99 +12,63 @@ function StudentLoginContent() {
   const searchParams = useSearchParams();
   const { toast } = useDialog();
 
-  const [step, setStep] = useState<"PHONE" | "OTP">("PHONE");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
+  const [payloadId, setPayloadId] = useState<string>("");
+  const [waLink, setWaLink] = useState<string>("");
+  const [commandText, setCommandText] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+
+  // Initialize Encrypted WA Login Payload
+  const initLoginPayload = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/student/auth/create-login-payload");
+      const json = await res.json();
+      if (json.success) {
+        setPayloadId(json.payloadId);
+        setWaLink(json.waLink);
+        setCommandText(json.commandText);
+      } else {
+        toast.error("Gagal membuat sesi login WhatsApp.");
+      }
+    } catch (err) {
+      console.error("Failed to create login payload:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
+    initLoginPayload();
+
     const errorParam = searchParams.get("error");
     if (errorParam === "invalid_or_expired_link") {
-      toast.error("Link login WhatsApp sudah kedaluwarsa atau tidak valid. Silakan minta OTP baru.");
+      toast.error("Link login WhatsApp sudah kedaluwarsa atau tidak valid.");
     } else if (errorParam === "missing_token") {
       toast.error("Token verifikasi tidak ditemukan.");
     }
-  }, [searchParams, toast]);
+  }, [searchParams]);
 
-  // Resend timer countdown
+  // Live Auto-Poll Payload Status (Checks every 2 seconds)
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (step === "OTP" && resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (resendTimer === 0) {
-      setCanResend(true);
-    }
+    if (!payloadId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/student/auth/check-temp-payload?payloadId=${payloadId}`);
+        const json = await res.json();
+
+        if (json.success && json.verified && json.redirectUrl) {
+          setVerifying(true);
+          toast.success("Verifikasi WhatsApp Berhasil! Mengalihkan...");
+          clearInterval(interval);
+          router.push(json.redirectUrl);
+        }
+      } catch (e) {}
+    }, 2000);
+
     return () => clearInterval(interval);
-  }, [step, resendTimer]);
-
-  // Handle Request OTP
-  const handleRequestOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!phoneNumber.trim()) {
-      toast.warning("Masukkan nomor WhatsApp Anda.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch("/api/student/auth/request-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: phoneNumber.trim() }),
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        toast.success("Kode OTP 6-Digit berhasil dikirim ke WhatsApp Anda!");
-        setStep("OTP");
-        setResendTimer(60);
-        setCanResend(false);
-      } else {
-        toast.error(json.error || "Gagal mengirim OTP.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Terjadi kesalahan koneksi.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle Verify OTP
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!otpCode.trim() || otpCode.length < 6) {
-      toast.warning("Masukkan 6-digit kode OTP.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch("/api/student/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phoneNumber: phoneNumber.trim(),
-          otpCode: otpCode.trim(),
-        }),
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        toast.success("Verifikasi berhasil! Mengalihkan ke Portal Siswa...");
-        router.push("/student");
-      } else {
-        toast.error(json.error || "Kode OTP salah.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Terjadi kesalahan verifikasi.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [payloadId, router, toast]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -114,180 +78,86 @@ function StudentLoginContent() {
 
       {/* Main Container Card */}
       <div className="w-full max-w-md bg-slate-900/80 border border-slate-800/80 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative z-10 space-y-6">
-        {/* Header Header Brand */}
+        {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 text-emerald-400 mb-2">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-400 mb-1">
             <Sparkles className="w-8 h-8" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Portal Siswa Velocity
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Masuk praktis tanpa password menggunakan nomor WhatsApp Anda
+            Masuk instan tanpa ketik nomor HP & tanpa ketik OTP manual
           </p>
         </div>
 
-        {/* 🌟 FEATURED: 1-Click WhatsApp Instant Login (No OTP Input Required!) */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-              <MessageSquareCode className="w-5 h-5" />
-            </span>
+        {/* Instant WhatsApp Login Card */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-4 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+              <MessageSquareCode className="w-6 h-6" />
+            </div>
             <div>
               <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-                🌟 CARA PALING PRAKTIS (1-KLIK)
+                ⚡ LOGIN INSTAN VIA WHATSAPP (1-KLIK)
               </h2>
-              <p className="text-[11px] text-slate-400">
-                Kirim chat <code className="text-emerald-300 font-bold bg-slate-950 px-1 py-0.5 rounded">!login</code> ke Bot WA, Bot akan langsung membalas link masuk tanpa ketik OTP!
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Tekan tombol di bawah untuk membuka WA & mengirim pesan verifikasi otomatis.
               </p>
             </div>
           </div>
 
-          <a
-            href="https://wa.me/?text=!login"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
-          >
-            <span>💬 Buka WhatsApp & Kirim !login</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
+          {loading ? (
+            <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+              <span>Membuat sesi login WhatsApp aman...</span>
+            </div>
+          ) : (
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all transform hover:scale-[1.02] cursor-pointer"
+            >
+              <span>📱 MASUK SEKARANG VIA WHATSAPP</span>
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          )}
         </div>
 
-        <div className="flex items-center gap-3 text-slate-600 text-xs">
-          <div className="flex-1 h-px bg-slate-800" />
-          <span>atau minta OTP via form</span>
-          <div className="flex-1 h-px bg-slate-800" />
+        {/* Live Status Detector */}
+        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-3">
+          <div className="relative shrink-0">
+            <span className="w-3 h-3 rounded-full bg-emerald-400 block" />
+            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping absolute inset-0 opacity-75" />
+          </div>
+          <div className="text-xs">
+            <p className="font-semibold text-slate-200">
+              {verifying ? "Verifikasi Sukses! Mengalihkan..." : "Menunggu pengiriman pesan WhatsApp Anda..."}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Halaman ini akan otomatis masuk begitu pesan dikirimkan di WhatsApp.
+            </p>
+          </div>
         </div>
 
-        {step === "PHONE" ? (
-          /* STEP 1: Phone Number Input Form */
-          <form onSubmit={handleRequestOtp} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Nomor WhatsApp Terdaftar</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="tel"
-                  placeholder="Contoh: 081234567890"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3 text-sm font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
-                  required
-                />
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Gunakan nomor WA yang Anda gunakan saat mendaftar ekskul Velocity.
-              </p>
-            </div>
+        {/* Instructions Box */}
+        <div className="p-3.5 rounded-2xl bg-slate-950/50 border border-slate-800/80 text-[11px] text-slate-400 space-y-1.5">
+          <p className="font-semibold text-slate-300 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Bagaimana Cara Kerjanya?</span>
+          </p>
+          <ol className="list-decimal list-inside space-y-1 text-slate-400 pl-1">
+            <li>Klik tombol **"Masuk Sekarang via WhatsApp"** di atas.</li>
+            <li>Aplikasi WhatsApp Anda akan terbuka dengan teks pesan terisi.</li>
+            <li>Tekan **Kirim (Send)** di WhatsApp.</li>
+            <li>Bot WA akan membalas dengan link atau web ini otomatis beralih!</li>
+          </ol>
+        </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold shadow-lg shadow-emerald-900/30 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Mengirim OTP ke WhatsApp...</span>
-                </>
-              ) : (
-                <>
-                  <span>🚀 Kirim Kode OTP via WhatsApp</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-        ) : (
-          /* STEP 2: OTP Verification Form */
-          <form onSubmit={handleVerifyOtp} className="space-y-5">
-            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-start gap-2.5">
-              <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-              <div>
-                <span>Kode OTP telah dikirim via WhatsApp ke </span>
-                <strong className="text-white font-mono">{phoneNumber}</strong>.
-                <button
-                  type="button"
-                  onClick={() => setStep("PHONE")}
-                  className="block mt-1 text-[11px] text-emerald-400 hover:underline font-semibold"
-                >
-                  (Ubah Nomor HP)
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <MessageSquareCode className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Masukkan 6-Digit Kode OTP</span>
-                </span>
-              </label>
-              <input
-                type="text"
-                maxLength={6}
-                placeholder="482910"
-                value={otpCode}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  setOtpCode(val);
-                  if (val.length === 6) {
-                    // Auto submit on 6 digits
-                    setTimeout(() => handleVerifyOtp(), 100);
-                  }
-                }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest text-emerald-400 focus:outline-none focus:border-emerald-500 transition-colors"
-                autoFocus
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || otpCode.length < 6}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold shadow-lg shadow-emerald-900/30 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Memverifikasi...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Verifikasi & Masuk Portal</span>
-                </>
-              )}
-            </button>
-
-            {/* Resend OTP Button */}
-            <div className="text-center pt-2 border-t border-slate-800/80">
-              {canResend ? (
-                <button
-                  type="button"
-                  onClick={() => handleRequestOtp()}
-                  className="text-xs font-semibold text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Kirim Ulang Kode OTP</span>
-                </button>
-              ) : (
-                <span className="text-xs text-slate-500 font-mono">
-                  Kirim ulang kode OTP dalam <strong>{resendTimer} detik</strong>
-                </span>
-              )}
-            </div>
-          </form>
-        )}
-
-        {/* Card Footer Info */}
-        <div className="pt-4 border-t border-slate-800/60 text-center text-xs text-slate-500">
-          <span>Belum terdaftar di WhatsApp Velocity? </span>
-          <br />
-          <span className="text-slate-400">Hubungi Pembina atau daftarkan diri lewat Bot WA.</span>
+        {/* Footer */}
+        <div className="pt-2 text-center text-[11px] text-slate-500">
+          <span>Khusus Anggota Komunitas Velocity • VeloNet Engine</span>
         </div>
       </div>
     </div>

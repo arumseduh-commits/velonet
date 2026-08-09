@@ -215,18 +215,50 @@ export async function processIncomingMessage(
     console.error("Error processing pending leave choice:", e);
   }
 
-  // 1.5 Handle Instant Web Login Command (!login / login)
+  // 1.5 Handle Instant Web Login Command (!login / login / !auth)
   if (
     lowerText === "!login" ||
     lowerText === "login" ||
     lowerText.startsWith("!login ") ||
-    lowerText.startsWith("login ")
+    lowerText.startsWith("login ") ||
+    lowerText.startsWith("!auth") ||
+    lowerText.startsWith("auth")
   ) {
     if (participant.status !== RegistrationStatus.COMPLETED || participant.isExcluded) {
       return {
         newStatus: participant.status as RegistrationStatusType,
-        replyMessage: `🔴 *AKUN BELUM TERDAFTAR*\n\nNomor WhatsApp Anda (+${participant.phoneNumber}) belum menyelesaikan pendaftaran di Komunitas Velocity.\n\nSilakan daftarkan diri Anda terlebih dahulu dengan membalas *YA* pada chat ini.`,
+        replyMessage: `🔴 *AKUN BELUM TERDAFTAR DI GRUP VELOCITY*\n\nNomor WhatsApp Anda (+${participant.phoneNumber}) belum terdaftar atau belum bergabung di Grup WhatsApp Komunitas Velocity.\n\nSilakan bergabung ke grup WhatsApp Velocity atau ikuti pendaftaran via WA terlebih dahulu dengan membalas *YA* pada chat ini.`,
       };
+    }
+
+    // Extract payloadId if provided (e.g., "!login AUTH_e8f92a10b4c7_984102")
+    const matchPayload = text.match(/AUTH_[a-f0-9]+/i);
+    if (matchPayload && matchPayload[0]) {
+      const payloadId = matchPayload[0];
+      try {
+        const payloadSetting = await prisma.systemSetting.findUnique({
+          where: { key: `login_payload:${payloadId}` },
+        });
+
+        if (payloadSetting) {
+          const payloadData = JSON.parse(payloadSetting.value);
+          if (payloadData && payloadData.status === "PENDING") {
+            await prisma.systemSetting.update({
+              where: { key: `login_payload:${payloadId}` },
+              data: {
+                value: JSON.stringify({
+                  ...payloadData,
+                  status: "VERIFIED",
+                  participantId: participant.id,
+                  verifiedAt: new Date().toISOString(),
+                }),
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error updating temp login payload:", err);
+      }
     }
 
     const magicToken = crypto.randomBytes(32).toString("hex");
@@ -260,9 +292,9 @@ export async function processIncomingMessage(
 
     return {
       newStatus: participant.status as RegistrationStatusType,
-      replyMessage: `🔓 *LINK LOGIN PORTAL SISWA VELOCITY*\n\nHalo Kak *${
+      replyMessage: `🔓 *LINK PORTAL SISWA VELOCITY*\n\nHalo Kak *${
         participant.name || "Peserta"
-      }*!\n\nKlik link di bawah ini untuk *LANGSUNG MASUK* ke Portal Siswa Anda tanpa perlu mengetik password:\n\n🔗 ${directLoginUrl}\n\n_⚠️ Link ini berlaku 10 menit. Selamat belajar! 🚀_`,
+      }*!\n\nKlik link di bawah ini untuk *LANGSUNG MASUK* ke akun Portal Siswa Anda tanpa perlu mengetik password:\n\n🔗 ${directLoginUrl}\n\n_⚠️ Link ini berlaku 10 menit. Selamat belajar! 🚀_`,
     };
   }
 
