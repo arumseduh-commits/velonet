@@ -51,16 +51,32 @@ export default function SessionsAdminPage() {
   const [broadcastCustomNote, setBroadcastCustomNote] = useState("");
   const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
 
-  // Form State
+  // Step-by-Step Wizard Form State for Mobile
+  const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("15:30");
   const [endTime, setEndTime] = useState("17:30");
   const [locationPreset, setLocationPreset] = useState("Ruang Caprice");
   const [customLocation, setCustomLocation] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  const [latitude, setLatitude] = useState("-7.9666");
+  const [longitude, setLongitude] = useState("112.6326");
   const [radiusMeter, setRadiusMeter] = useState("150");
+
+  const handleLocationPresetChange = (preset: string) => {
+    setLocationPreset(preset);
+    if (preset === "Ruang Caprice") {
+      setCustomLocation("");
+      setLatitude("-7.9666");
+      setLongitude("112.6326");
+      setRadiusMeter("150");
+    } else if (preset === "Ruang BI") {
+      setCustomLocation("");
+      setLatitude("-7.9785");
+      setLongitude("112.6315");
+      setRadiusMeter("150");
+    }
+  };
 
   // Calendar View State
   const [viewDate, setViewDate] = useState(new Date());
@@ -640,85 +656,104 @@ export default function SessionsAdminPage() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col">
-              {/* Modal Header */}
-              <div className="p-3 px-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 font-bold">
-                    <CalendarCheck className="w-5 h-5" />
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+              {/* Modal Header & Progress Indicator */}
+              <div className="p-3 px-5 border-b border-slate-800 bg-slate-950/80 shrink-0 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 font-bold">
+                      <CalendarCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-white leading-tight">
+                        Buat Sesi Pertemuan
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        {createStep === 1
+                          ? "Langkah 1 dari 3: Pilih Tanggal Pertemuan"
+                          : createStep === 2
+                          ? "Langkah 2 dari 3: Tema Pertemuan & Jam Absen"
+                          : "Langkah 3 dari 3: Lokasi & Display Peta GPS"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold text-white leading-tight">
-                      Buat Sesi Pertemuan Baru
-                    </h2>
-                    <p className="text-[11px] text-slate-400">
-                      Pilih tanggal di kalender & atur lokasi tempat kumpul sore
-                    </p>
-                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setCreateStep(1);
+                    }}
+                    className="text-slate-400 hover:text-white text-xl font-bold px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    &times;
+                  </button>
                 </div>
 
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-slate-400 hover:text-white text-xl font-bold px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
-                >
-                  &times;
-                </button>
+                {/* Progress Bar (33% / 66% / 100%) */}
+                <div className="w-full h-1.5 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
+                    style={{
+                      width: createStep === 1 ? "33%" : createStep === 2 ? "66%" : "100%",
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* Modal Form Body: 2 Columns */}
-              <form onSubmit={handleCreateSession} className="p-5 grid grid-cols-1 md:grid-cols-12 gap-5 text-xs">
-                {/* Left Column: Compact Interactive Calendar UI (5 Cols) */}
-                <div className="md:col-span-5 space-y-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80 flex flex-col justify-between">
-                  <div className="space-y-3">
+              {/* Modal Form Body: Step-by-Step Content */}
+              <form onSubmit={handleCreateSession} className="p-5 overflow-y-auto space-y-4 text-xs">
+                {/* STEP 1: Pilih Tanggal Sesi */}
+                {createStep === 1 && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
-                        Pilih Tanggal Sesi
+                      <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Calendar className="w-4 h-4" />
+                        1. Pilih Tanggal Pertemuan
                       </span>
 
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={handlePrevMonth}
-                          className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                          className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                           title="Bulan Sebelumnya"
                         >
-                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <span className="text-xs font-semibold text-white px-1.5 whitespace-nowrap">
+                        <span className="text-xs font-semibold text-white px-2 whitespace-nowrap">
                           {monthNames[month]} {year}
                         </span>
                         <button
                           type="button"
                           onClick={handleNextMonth}
-                          className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                          className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
                           title="Bulan Berikutnya"
                         >
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <ChevronRight className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
 
                     {/* Quick Preset Buttons */}
-                    <div className="grid grid-cols-3 gap-1 text-xs">
+                    <div className="grid grid-cols-3 gap-1.5 text-xs">
                       <button
                         type="button"
                         onClick={() => handleQuickDateSelect(0)}
-                        className="py-1 px-1.5 rounded-md bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 font-medium text-[11px] transition-all text-center"
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 font-medium text-xs transition-all text-center"
                       >
                         Hari Ini
                       </button>
                       <button
                         type="button"
                         onClick={() => handleQuickDateSelect(1)}
-                        className="py-1 px-1.5 rounded-md bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 font-medium text-[11px] transition-all text-center"
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 font-medium text-xs transition-all text-center"
                       >
                         Besok
                       </button>
                       <button
                         type="button"
                         onClick={() => handleQuickDateSelect(7)}
-                        className="py-1 px-1.5 rounded-md bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 font-medium text-[11px] transition-all text-center"
+                        className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 font-medium text-xs transition-all text-center"
                       >
                         +1 Minggu
                       </button>
@@ -731,12 +766,12 @@ export default function SessionsAdminPage() {
                       ))}
                     </div>
 
-                    {/* Calendar Grid (Compact 28px height cells) */}
+                    {/* Calendar Grid */}
                     <div className="grid grid-cols-7 gap-1 text-center text-xs">
                       {calendarDays.map((cd, index) => {
                         if (!cd.isCurrentMonth) {
                           return (
-                            <div key={index} className="h-7 flex items-center justify-center text-slate-700 opacity-40 text-xs">
+                            <div key={index} className="h-8 flex items-center justify-center text-slate-700 opacity-40 text-xs">
                               {cd.day}
                             </div>
                           );
@@ -747,7 +782,6 @@ export default function SessionsAdminPage() {
                         const isToday = todayStr === cd.dateStr;
                         const isPast = Boolean(cd.dateStr && cd.dateStr < todayStr);
 
-                        // Check if sessions are already scheduled on this date
                         const dateSessions = sessions.filter((s) => {
                           const sDate = new Date(s.date).toISOString().split("T")[0];
                           return sDate === cd.dateStr;
@@ -765,14 +799,7 @@ export default function SessionsAdminPage() {
                                 setSelectedDateSessions(dateSessions);
                               }
                             }}
-                            title={
-                              isPast
-                                ? "Tanggal sudah berlalu"
-                                : hasSessions
-                                ? `Ada ${dateSessions.length} sesi pertemuan pada tanggal ini`
-                                : `Pilih tanggal ${cd.dateStr}`
-                            }
-                            className={`h-7 w-full flex items-center justify-center rounded-lg text-xs font-semibold transition-all relative ${
+                            className={`h-8 w-full flex items-center justify-center rounded-lg text-xs font-semibold transition-all relative ${
                               isPast
                                 ? "opacity-30 text-slate-600 cursor-not-allowed line-through bg-slate-950/40"
                                 : isSelected
@@ -785,103 +812,59 @@ export default function SessionsAdminPage() {
                             }`}
                           >
                             <span>{cd.day}</span>
-
-                            {hasSessions && (
-                              dateSessions.length > 1 ? (
-                                <span
-                                  className="absolute -top-1 -right-1 px-1 text-[9px] font-bold rounded-full bg-emerald-400 text-slate-950 border border-slate-950 shadow-sm leading-none"
-                                  title={`Ada ${dateSessions.length} sesi`}
-                                >
-                                  {dateSessions.length}
-                                </span>
-                              ) : (
-                                <span
-                                  className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950 shadow-sm"
-                                  title={`Ada sesi: ${dateSessions[0].title}`}
-                                />
-                              )
-                            )}
                           </button>
                         );
                       })}
                     </div>
+
+                    {/* Selected Date Summary */}
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs flex items-center justify-between text-slate-300">
+                      <span className="text-slate-400">Tanggal Terpilih:</span>
+                      <strong className="text-emerald-400 font-bold text-sm">
+                        {date
+                          ? new Date(date).toLocaleDateString("id-ID", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })
+                          : "Silakan pilih tanggal di atas"}
+                      </strong>
+                    </div>
+
+                    {/* Footer Nav Step 1 */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
+                      >
+                        Batal
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!date}
+                        onClick={() => setCreateStep(2)}
+                        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <span>Lanjutkan ➔</span>
+                      </button>
+                    </div>
                   </div>
+                )}
 
-                  {/* Selected Date Output Summary */}
-                  <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] flex items-center justify-between text-slate-300 mt-2">
-                    <span className="text-slate-400">Tanggal Terpilih:</span>
-                    <strong className="text-emerald-400 font-bold text-xs">
-                      {date
-                        ? new Date(date).toLocaleDateString("id-ID", {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "Belum dipilih"}
-                    </strong>
-                  </div>
-                </div>
-
-                {/* Right Column: Form Inputs (7 Cols) */}
-                <div className="md:col-span-7 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    {/* Inline CTA Banner listing ALL sessions on this date */}
-                    {selectedDateSessions.length > 0 && (
-                      <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-950/90 via-slate-900 to-slate-900 border border-emerald-500/40 text-xs space-y-2.5 animate-in fade-in max-h-48 overflow-y-auto">
-                        <div className="flex items-center justify-between sticky top-0 bg-slate-950/80 p-1 rounded-md backdrop-blur-sm z-10">
-                          <span className="font-bold text-emerald-300 text-xs flex items-center gap-1.5">
-                            📌 Ada {selectedDateSessions.length} Sesi Terjadwal Pada Tanggal Ini
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDateSessions([])}
-                            className="text-slate-400 hover:text-white text-[11px] underline"
-                          >
-                            Tutup
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          {selectedDateSessions.map((sess) => (
-                            <div key={sess.id} className="p-2 rounded-lg bg-slate-950/70 border border-slate-800/80 space-y-1.5">
-                              <div className="flex items-center justify-between">
-                                <strong className="text-white text-xs font-bold">{sess.title}</strong>
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  {new Date(sess.startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} - {new Date(sess.endTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
-                                </span>
-                              </div>
-
-                              <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                <span>📍 {sess.locationName || "Ruang Caprice"}</span>
-                                <div className="flex items-center gap-1.5">
-                                  <Link
-                                    href={`/admin/sessions/${sess.id}`}
-                                    className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-[10px] flex items-center gap-1 transition-colors"
-                                  >
-                                    <Users className="w-3 h-3" />
-                                    <span>Rekap</span>
-                                  </Link>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleBroadcast(sess.id)}
-                                    disabled={broadcastingId === sess.id}
-                                    className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[10px] flex items-center gap-1 disabled:opacity-50 transition-colors"
-                                  >
-                                    <Send className="w-3 h-3" />
-                                    <span>Broadcast</span>
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                {/* STEP 2: Detail Pertemuan (Tema & Jam) */}
+                {createStep === 2 && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-4 h-4" />
+                      2. Tema Pertemuan & Jam Absensi
+                    </span>
 
                     <div>
-                      <label className="block font-medium text-slate-300 mb-1">
-                        Nama / Judul Sesi Pertemuan <span className="text-rose-400">*</span>
+                      <label className="block font-medium text-slate-300 mb-1.5">
+                        Judul / Tema Pertemuan <span className="text-rose-400">*</span>
                       </label>
                       <input
                         type="text"
@@ -889,26 +872,26 @@ export default function SessionsAdminPage() {
                         placeholder="Contoh: Pertemuan Sore Velocity #12"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-xs"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors text-xs font-medium"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block font-medium text-slate-300 mb-1">
-                          Jam Mulai Absen <span className="text-rose-400">*</span>
+                        <label className="block font-medium text-slate-300 mb-1.5">
+                          Jam Buka Absen <span className="text-rose-400">*</span>
                         </label>
                         <input
                           type="time"
                           required
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 text-xs font-semibold"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500 text-xs font-semibold"
                         />
                       </div>
 
                       <div>
-                        <label className="block font-medium text-slate-300 mb-1">
+                        <label className="block font-medium text-slate-300 mb-1.5">
                           Jam Selesai / Tutup <span className="text-rose-400">*</span>
                         </label>
                         <input
@@ -916,23 +899,54 @@ export default function SessionsAdminPage() {
                           required
                           value={endTime}
                           onChange={(e) => setEndTime(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 text-xs font-semibold"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500 text-xs font-semibold"
                         />
                       </div>
                     </div>
 
+                    {/* Footer Nav Step 2 */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setCreateStep(1)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors flex items-center gap-1.5"
+                      >
+                        <span>⬅ Kembali</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!title.trim()}
+                        onClick={() => setCreateStep(3)}
+                        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <span>Lanjutkan ➔</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: Lokasi, Preset Koordinat & OpenStreetMap Display Card */}
+                {createStep === 3 && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <span className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4" />
+                      3. Lokasi Perkumpulan & Preview Peta GPS
+                    </span>
+
+                    {/* Preset Selection Dropdown */}
                     <div>
-                      <label className="block font-medium text-slate-300 mb-1">
-                        Nama Tempat Perkumpulan <span className="text-rose-400">*</span>
+                      <label className="block font-medium text-slate-300 mb-1.5">
+                        Pilih Tempat Perkumpulan Preset <span className="text-rose-400">*</span>
                       </label>
                       <select
                         value={locationPreset}
-                        onChange={(e) => setLocationPreset(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 transition-colors text-xs"
+                        onChange={(e) => handleLocationPresetChange(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-purple-500 transition-colors text-xs font-medium"
                       >
-                        <option value="Ruang Caprice">Ruang Caprice (Default)</option>
-                        <option value="Ruang BI">Ruang BI (Default)</option>
-                        <option value="Lainnya">Lainnya (Ketik Custom)...</option>
+                        <option value="Ruang Caprice">📍 Ruang Caprice (Default Preset)</option>
+                        <option value="Ruang BI">📍 Ruang BI - Bank Indonesia (Default Preset)</option>
+                        <option value="Lainnya">✍️ Lainnya (Ketik Tempat & Koordinat Custom)...</option>
                       </select>
 
                       {locationPreset === "Lainnya" && (
@@ -942,17 +956,17 @@ export default function SessionsAdminPage() {
                           placeholder="Ketik nama tempat perkumpulan (contoh: Ruang 102 / Aula)"
                           value={customLocation}
                           onChange={(e) => setCustomLocation(e.target.value)}
-                          className="w-full mt-1.5 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-xs"
+                          className="w-full mt-2 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors text-xs"
                         />
                       )}
                     </div>
 
-                    {/* GPS Coordinates & Radius */}
+                    {/* GPS Coordinates Inputs */}
                     <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5">
+                        <span className="text-[11px] font-semibold text-purple-400 flex items-center gap-1.5">
                           <Navigation className="w-3.5 h-3.5" />
-                          Titik Koordinat GPS (Validasi Radius)
+                          Koordinat GPS & Radius Toleransi
                         </span>
                         <button
                           type="button"
@@ -969,10 +983,10 @@ export default function SessionsAdminPage() {
                           <input
                             type="number"
                             step="any"
-                            placeholder="-7.250445"
+                            placeholder="-7.9666"
                             value={latitude}
                             onChange={(e) => setLatitude(e.target.value)}
-                            className="w-full px-2 py-1 rounded-md bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-emerald-500"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500"
                           />
                         </div>
                         <div>
@@ -980,10 +994,10 @@ export default function SessionsAdminPage() {
                           <input
                             type="number"
                             step="any"
-                            placeholder="112.768845"
+                            placeholder="112.6326"
                             value={longitude}
                             onChange={(e) => setLongitude(e.target.value)}
-                            className="w-full px-2 py-1 rounded-md bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-emerald-500"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500"
                           />
                         </div>
                         <div>
@@ -992,32 +1006,59 @@ export default function SessionsAdminPage() {
                             type="number"
                             value={radiusMeter}
                             onChange={(e) => setRadiusMeter(e.target.value)}
-                            className="w-full px-2 py-1 rounded-md bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-emerald-500"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500"
                           />
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Form Footer Buttons */}
-                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <span>Simpan Sesi Pertemuan</span>
-                    </button>
+                    {/* NEW: OpenStreetMap Display Map Card */}
+                    {latitude && longitude && !isNaN(parseFloat(latitude)) && !isNaN(parseFloat(longitude)) && (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                          Display Preview Peta Titik Kumpul (OpenStreetMap):
+                        </span>
+                        <div className="rounded-xl overflow-hidden border border-slate-800 h-36 bg-slate-950 relative">
+                          <iframe
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            scrolling="no"
+                            marginHeight={0}
+                            marginWidth={0}
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${
+                              parseFloat(longitude) - 0.003
+                            },${parseFloat(latitude) - 0.003},${
+                              parseFloat(longitude) + 0.003
+                            },${parseFloat(latitude) + 0.003}&layer=mapnik&marker=${latitude},${longitude}`}
+                            className="w-full h-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer Nav Step 3 & Submit Button */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setCreateStep(2)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors flex items-center gap-1.5"
+                      >
+                        <span>⬅ Kembali</span>
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        <span>Simpan Sesi Pertemuan</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </form>
             </div>
           </div>
