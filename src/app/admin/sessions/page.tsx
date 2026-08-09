@@ -63,18 +63,79 @@ export default function SessionsAdminPage() {
   const [longitude, setLongitude] = useState("112.6326");
   const [radiusMeter, setRadiusMeter] = useState("150");
 
-  const handleLocationPresetChange = (preset: string) => {
-    setLocationPreset(preset);
-    if (preset === "Ruang Caprice") {
+  // Location Presets database state
+  const [dbPresets, setDbPresets] = useState<
+    Array<{ id: string; name: string; latitude: number; longitude: number; radiusMeter: number }>
+  >([
+    { id: "default-caprice", name: "Ruang Caprice", latitude: -7.9666, longitude: 112.6326, radiusMeter: 150 },
+    { id: "default-bi", name: "Ruang BI", latitude: -7.9785, longitude: 112.6315, radiusMeter: 150 },
+  ]);
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
+
+  const fetchLocationPresets = async () => {
+    try {
+      const res = await fetch("/api/location-presets");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setDbPresets(json.data);
+      }
+    } catch (err) {
+      console.error("Gagal mengambil preset lokasi:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLocationPresets();
+  }, []);
+
+  const handleLocationPresetChange = (presetName: string) => {
+    setLocationPreset(presetName);
+    const found = dbPresets.find((p) => p.name === presetName);
+    if (found) {
       setCustomLocation("");
-      setLatitude("-7.9666");
-      setLongitude("112.6326");
-      setRadiusMeter("150");
-    } else if (preset === "Ruang BI") {
+      setLatitude(found.latitude.toString());
+      setLongitude(found.longitude.toString());
+      setRadiusMeter(found.radiusMeter.toString());
+    } else if (presetName === "Lainnya") {
       setCustomLocation("");
-      setLatitude("-7.9785");
-      setLongitude("112.6315");
-      setRadiusMeter("150");
+    }
+  };
+
+  const handleSaveNewPreset = async () => {
+    const targetName = locationPreset === "Lainnya" ? customLocation.trim() : locationPreset.trim();
+    if (!targetName) {
+      toast.error("Silakan ketik Nama Tempat terlebih dahulu!");
+      return;
+    }
+    if (!latitude || !longitude || isNaN(parseFloat(latitude)) || isNaN(parseFloat(longitude))) {
+      toast.error("Koordinat GPS (Latitude & Longitude) wajib diisi dengan benar!");
+      return;
+    }
+
+    try {
+      setIsSavingPreset(true);
+      const res = await fetch("/api/location-presets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: targetName,
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          radiusMeter: parseFloat(radiusMeter) || 150,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Template tempat "${targetName}" berhasil disimpan!`);
+        await fetchLocationPresets();
+        setLocationPreset(targetName);
+      } else {
+        toast.error(json.error || "Gagal menyimpan template lokasi.");
+      }
+    } catch (err: any) {
+      toast.error("Gagal terhubung ke server.");
+    } finally {
+      setIsSavingPreset(false);
     }
   };
 
@@ -936,16 +997,31 @@ export default function SessionsAdminPage() {
 
                     {/* Preset Selection Dropdown */}
                     <div>
-                      <label className="block font-medium text-slate-300 mb-1.5">
-                        Pilih Tempat Perkumpulan Preset <span className="text-rose-400">*</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="font-medium text-slate-300">
+                          Pilih Tempat Perkumpulan Preset <span className="text-rose-400">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          disabled={isSavingPreset}
+                          onClick={handleSaveNewPreset}
+                          className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/30 transition-all cursor-pointer"
+                        >
+                          {isSavingPreset ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                          <span>Simpan Sebagai Template Preset</span>
+                        </button>
+                      </div>
+
                       <select
                         value={locationPreset}
                         onChange={(e) => handleLocationPresetChange(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-purple-500 transition-colors text-xs font-medium"
                       >
-                        <option value="Ruang Caprice">📍 Ruang Caprice (Default Preset)</option>
-                        <option value="Ruang BI">📍 Ruang BI - Bank Indonesia (Default Preset)</option>
+                        {dbPresets.map((preset) => (
+                          <option key={preset.id} value={preset.name}>
+                            📍 {preset.name} (Preset Saved)
+                          </option>
+                        ))}
                         <option value="Lainnya">✍️ Lainnya (Ketik Tempat & Koordinat Custom)...</option>
                       </select>
 
@@ -953,7 +1029,7 @@ export default function SessionsAdminPage() {
                         <input
                           type="text"
                           required
-                          placeholder="Ketik nama tempat perkumpulan (contoh: Ruang 102 / Aula)"
+                          placeholder="Ketik nama tempat perkumpulan baru (contoh: Ruang 102 / Lab Komputer)"
                           value={customLocation}
                           onChange={(e) => setCustomLocation(e.target.value)}
                           className="w-full mt-2 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors text-xs"
@@ -971,9 +1047,10 @@ export default function SessionsAdminPage() {
                         <button
                           type="button"
                           onClick={handleGetCurrentLocation}
-                          className="text-[11px] font-medium text-blue-400 hover:text-blue-300 underline"
+                          className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
                         >
-                          Gunakan GPS Saat Ini
+                          <Navigation className="w-3 h-3" />
+                          Ambil Lokasi GPS Saat Ini
                         </button>
                       </div>
 
@@ -986,7 +1063,7 @@ export default function SessionsAdminPage() {
                             placeholder="-7.9666"
                             value={latitude}
                             onChange={(e) => setLatitude(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
                           />
                         </div>
                         <div>
@@ -997,7 +1074,7 @@ export default function SessionsAdminPage() {
                             placeholder="112.6326"
                             value={longitude}
                             onChange={(e) => setLongitude(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
                           />
                         </div>
                         <div>
@@ -1006,21 +1083,61 @@ export default function SessionsAdminPage() {
                             type="number"
                             value={radiusMeter}
                             onChange={(e) => setRadiusMeter(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
                           />
                         </div>
                       </div>
                     </div>
 
-                    {/* NEW: OpenStreetMap Display Map Card */}
+                    {/* OpenStreetMap Display Map Card & Fine-Tuning Controls */}
                     {latitude && longitude && !isNaN(parseFloat(latitude)) && !isNaN(parseFloat(longitude)) && (
-                      <div className="space-y-1.5">
-                        <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                          Display Preview Peta Titik Kumpul (OpenStreetMap):
-                        </span>
-                        <div className="rounded-xl overflow-hidden border border-slate-800 h-36 bg-slate-950 relative">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                            Display Preview Peta Titik Kumpul (OpenStreetMap):
+                          </span>
+
+                          {/* Fine-Tuning Nudge Buttons */}
+                          <div className="flex items-center gap-1 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => setLatitude((prev) => (parseFloat(prev) + 0.0001).toFixed(6))}
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                              title="Geser Utara (+Lat)"
+                            >
+                              ⬆ Utara
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setLatitude((prev) => (parseFloat(prev) - 0.0001).toFixed(6))}
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                              title="Geser Selatan (-Lat)"
+                            >
+                              ⬇ Selatan
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setLongitude((prev) => (parseFloat(prev) - 0.0001).toFixed(6))}
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                              title="Geser Barat (-Lng)"
+                            >
+                              ⬅ Barat
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setLongitude((prev) => (parseFloat(prev) + 0.0001).toFixed(6))}
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                              title="Geser Timur (+Lng)"
+                            >
+                              ➔ Timur
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl overflow-hidden border border-slate-800 h-40 bg-slate-950 relative">
                           <iframe
+                            key={`${latitude}-${longitude}`}
                             width="100%"
                             height="100%"
                             frameBorder="0"
@@ -1028,10 +1145,10 @@ export default function SessionsAdminPage() {
                             marginHeight={0}
                             marginWidth={0}
                             src={`https://www.openstreetmap.org/export/embed.html?bbox=${
-                              parseFloat(longitude) - 0.003
-                            },${parseFloat(latitude) - 0.003},${
-                              parseFloat(longitude) + 0.003
-                            },${parseFloat(latitude) + 0.003}&layer=mapnik&marker=${latitude},${longitude}`}
+                              parseFloat(longitude) - 0.002
+                            },${parseFloat(latitude) - 0.002},${
+                              parseFloat(longitude) + 0.002
+                            },${parseFloat(latitude) + 0.002}&layer=mapnik&marker=${latitude},${longitude}`}
                             className="w-full h-full"
                           />
                         </div>
