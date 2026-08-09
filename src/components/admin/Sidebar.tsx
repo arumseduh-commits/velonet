@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -15,7 +15,9 @@ import {
   CalendarCheck,
   BarChart3,
   X,
+  LogOut,
 } from "lucide-react";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 interface AdminSidebarProps {
   isOpen?: boolean;
@@ -24,6 +26,29 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { confirm, toast } = useDialog();
+
+  const handleLogout = async () => {
+    const confirmed = await confirm({
+      title: "Keluar dari Admin Dashboard",
+      message: "Apakah Anda yakin ingin keluar dari sesi Admin?",
+      confirmText: "Ya, Keluar",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "warning",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await fetch("/api/admin/auth/logout", { method: "POST" });
+      toast.info("Anda telah keluar dari Admin Dashboard.");
+      router.push("/admin/login");
+    } catch (e) {
+      router.push("/admin/login");
+    }
+  };
 
   // Check if any sub-item of "Fitur Bot" is active
   const isBotChildActive =
@@ -185,8 +210,8 @@ export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
         </nav>
       </div>
 
-      {/* Footer link to public site */}
-      <div className="p-4 border-t border-slate-800/80">
+      {/* Footer link to public site & Logout */}
+      <div className="p-4 border-t border-slate-800/80 space-y-2">
         <Link
           href="/"
           target="_blank"
@@ -198,6 +223,16 @@ export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
           </span>
           <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
         </Link>
+
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-between p-3 rounded-xl bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/20 text-xs font-medium text-rose-300 transition-colors cursor-pointer"
+        >
+          <span className="flex items-center gap-2">
+            <LogOut className="w-4 h-4 text-rose-400" />
+            Keluar Admin
+          </span>
+        </button>
       </div>
     </aside>
   );

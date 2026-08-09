@@ -1,16 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BotConnectionState } from "@/lib/bot-engine";
-import { Bot, RefreshCw, AlertCircle, CheckCircle2, Menu } from "lucide-react";
+import { Bot, RefreshCw, AlertCircle, CheckCircle2, Menu, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 interface AdminHeaderProps {
   onOpenMobileSidebar?: () => void;
 }
 
 export function AdminHeader({ onOpenMobileSidebar }: AdminHeaderProps) {
+  const router = useRouter();
+  const { confirm, toast } = useDialog();
   const [botState, setBotState] = useState<BotConnectionState>("DISCONNECTED");
+
+  const handleLogout = async () => {
+    const confirmed = await confirm({
+      title: "Keluar dari Admin Dashboard",
+      message: "Apakah Anda yakin ingin keluar dari sesi Admin?",
+      confirmText: "Ya, Keluar",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "warning",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await fetch("/api/admin/auth/logout", { method: "POST" });
+      toast.info("Anda telah keluar dari Admin Dashboard.");
+      router.push("/admin/login");
+    } catch (e) {
+      router.push("/admin/login");
+    }
+  };
 
   useEffect(() => {
     const eventSource = new EventSource("/api/bot/status?stream=true");
@@ -86,6 +111,15 @@ export function AdminHeader({ onOpenMobileSidebar }: AdminHeaderProps) {
           <Bot className="w-4 h-4" />
           <span className="hidden sm:inline">Kelola Bot</span>
         </Link>
+
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition-colors cursor-pointer"
+          title="Keluar dari Admin Dashboard"
+        >
+          <LogOut className="w-4 h-4 text-rose-400" />
+          <span className="hidden sm:inline">Keluar</span>
+        </button>
       </div>
     </header>
   );
