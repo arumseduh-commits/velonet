@@ -1,0 +1,77 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Participant {
+  id              String       @id @default(uuid())
+  phoneNumber     String       @unique
+  name            String?
+  studentClass    String?
+  motivation      String?
+  hobby           String?
+  status          String       @default("NOT_STARTED")
+  isExcluded      Boolean      @default(false)
+  isKickedFromGrp Boolean      @default(false)
+  lastSentAt      DateTime?
+  attendances     Attendance[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model BaileysAuth {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   // String format for 100% SQLite & PostgreSQL compatibility
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSetting {
+  key   String @id
+  value String
+}
+
+model MeetingSession {
+  id           String       @id @default(uuid())
+  title        String       // Contoh: "Pertemuan Sore Velocity #10"
+  date         DateTime     // Tanggal pertemuan
+  startTime    DateTime     // Jam mulai (misal 15:30)
+  endTime      DateTime     // Jam selesai/tutup absen (misal 17:30)
+  locationName String?      // Nama tempat kumpul
+  latitude     Float?       // Latitude tempat kumpul
+  longitude    Float?       // Longitude tempat kumpul
+  radiusMeter  Float        @default(150) // Radius toleransi (meter)
+  isActive     Boolean      @default(true)
+  isCancelled  Boolean      @default(false)
+  customMessage String?     // Custom broadcast message note
+  attendances  Attendance[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Attendance {
+  id            String         @id @default(uuid())
+  sessionId     String
+  session       MeetingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   Participant    @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  
+  checkInTime   DateTime       @default(now())
+  status        String         @default("HADIR") // HADIR, TERLAMBAT, IZIN, SAKIT
+  method        String         @default("LOCATION_GPS") // LOCATION_GPS, MANUAL_ADMIN
+  latitude      Float?
+  longitude     Float?
+  distanceMeter Float?
+  notes         String?        // Catatan alasan izin/sakit
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([sessionId, participantId])
+}
+

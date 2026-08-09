@@ -1,0 +1,947 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import { BotConnectionState, BotStatus } from "@/lib/bot-engine";
+import { useDialog } from "@/components/ui/DialogProvider";
+import {
+  Bot,
+  QrCode,
+  LogOut,
+  Play,
+  Terminal,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Trash2,
+  Smartphone,
+  Send,
+  Users,
+  Search,
+  Check,
+  UserX,
+  Clock,
+  SendHorizontal,
+  Sparkles,
+  ShieldAlert,
+  UserPlus,
+  ShieldOff,
+  UserCheck,
+  FileText,
+  Upload,
+} from "lucide-react";
+
+interface LogItem {
+  message: string;
+  time: string;
+}
+
+interface SavedGroup {
+  id: string;
+  subject: string;
+  size: number;
+}
+
+interface GroupMember {
+  id: string | null;
+  jid: string;
+  pnJid?: string | null;
+  phoneNumber: string;
+  isLid?: boolean;
+  name: string | null;
+  studentClass: string | null;
+  status: string;
+  isExcluded: boolean;
+  isKickedFromGrp: boolean;
+  lastSentAt: string | null;
+}
+
+interface GroupInfo {
+  groupId: string;
+  groupSubject: string;
+  totalMembers: number;
+  members: GroupMember[];
+}
+
+interface ExclusionItem {
+  id: string;
+  phoneNumber: string;
+  name: string | null;
+  createdAt: string;
+}
+
+export default function BotControlPage() {
+  const { confirm, toast } = useDialog();
+  const [status, setStatus] = useState<BotStatus>({
+    state: "DISCONNECTED",
+    qrCodeUrl: null,
+    userInfo: null,
+    lastError: null,
+  });
+  const [logs, setLogs] = useState<LogItem[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  // Group Inspector & Dropdown State
+  const [savedGroups, setSavedGroups] = useState<SavedGroup[]>([]);
+  const [inputGroupJid, setInputGroupJid] = useState<string>("");
+  const [loadingGroupMembers, setLoadingGroupMembers] = useState(false);
+  const [groupData, setGroupData] = useState<GroupInfo | null>(null);
+  const [sendingSingleMember, setSendingSingleMember] = useState<string | null>(null);
+  const [sendingAllGroup, setSendingAllGroup] = useState(false);
+  const [inspectorMsg, setInspectorMsg] = useState<string | null>(null);
+
+  // Exclusion List State (Unified inside Bot Control)
+  const [exclusions, setExclusions] = useState<ExclusionItem[]>([]);
+  const [newExclusionPhone, setNewExclusionPhone] = useState("");
+  const [newExclusionName, setNewExclusionName] = useState("");
+  const [addingExclusion, setAddingExclusion] = useState(false);
+
+  // Bulk Import State
+  const [importRawText, setImportRawText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [broadcastingUncontacted, setBroadcastingUncontacted] = useState(false);
+
+  const handleBulkImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importRawText.trim()) return;
+    setImporting(true);
+    setInspectorMsg(null);
+    try {
+      const res = await fetch("/api/participants/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText: importRawText }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setInspectorMsg(`✅ ${json.message}`);
+        toast.success(json.message || "Impor nomor berhasil!");
+        setImportRawText("");
+        if (inputGroupJid) fetchMembersForJid(inputGroupJid);
+      } else {
+        toast.error(`Gagal impor: ${json.error}`);
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleBroadcastAllUncontacted = async () => {
+    const confirmed = await confirm({
+      title: "Broadcast Anggota Belum Dikontak",
+      message: "Kirim pesan konfirmasi pendaftaran secara personal (DM) ke SEMUA nomor HP hasil impor yang belum dikontak?",
+      confirmText: "Ya, Broadcast DM",
+      cancelText: "Batal",
+      variant: "info",
+      icon: "send",
+    });
+
+    if (!confirmed) return;
+
+    setBroadcastingUncontacted(true);
+    setInspectorMsg(null);
+    try {
+      const res = await fetch("/api/bot/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_all_uncontacted",
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setInspectorMsg(json.message);
+        toast.success(json.message);
+        if (inputGroupJid) fetchMembersForJid(inputGroupJid);
+      } else {
+        setInspectorMsg(`Gagal: ${json.error}`);
+        toast.error(`Gagal: ${json.error}`);
+      }
+    } catch (err: any) {
+      setInspectorMsg(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setBroadcastingUncontacted(false);
+    }
+  };
+
+  const fetchedInitialGroupsRef = useRef(false);
+
+  useEffect(() => {
+    // Connect to Server-Sent Events stream
+    const eventSource = new EventSource("/api/bot/status?stream=true");
+
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === "status") {
+          setStatus(payload.data);
+          if (payload.data.state === "CONNECTED" && !fetchedInitialGroupsRef.current) {
+            fetchedInitialGroupsRef.current = true;
+            fetchSavedGroupsList();
+          }
+        } else if (payload.type === "log") {
+          setLogs((prev) => [...prev.slice(-100), payload.data]); // Keep last 100 log items
+        }
+      } catch (err) {
+        console.error("SSE parse error:", err);
+      }
+    };
+
+    fetchSavedGroupsList();
+    fetchExclusions();
+
+    return () => {
+      eventSource.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  // Fetch list of exclusions
+  const fetchExclusions = async () => {
+    try {
+      const res = await fetch("/api/exclusions");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setExclusions(json.data);
+      }
+    } catch (e) {}
+  };
+
+  const handleAddExclusion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newExclusionPhone) return;
+    setAddingExclusion(true);
+    try {
+      const res = await fetch("/api/exclusions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: newExclusionPhone,
+          name: newExclusionName || "Pembina / Admin",
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNewExclusionPhone("");
+        setNewExclusionName("");
+        toast.success("Nomor pengecualian berhasil ditambahkan.");
+        fetchExclusions();
+        if (inputGroupJid) fetchMembersForJid(inputGroupJid);
+      } else {
+        toast.error(`Gagal: ${json.error}`);
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setAddingExclusion(false);
+    }
+  };
+
+  function formatDisplayPhoneNumber(raw: string): string {
+    if (!raw) return "-";
+    let cleaned = raw.replace(/\D/g, "");
+    if (cleaned.startsWith("0")) {
+      cleaned = "62" + cleaned.slice(1);
+    }
+    if (cleaned.startsWith("62")) {
+      return `+${cleaned}`;
+    }
+    return `+62 (ID: ${cleaned})`;
+  }
+
+  const handleExcludeMemberDirect = async (phone: string, name?: string | null) => {
+    try {
+      const res = await fetch("/api/exclusions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: phone,
+          name: name || "Anggota Grup Dikecualikan",
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Anggota berhasil dikecualikan.");
+        fetchExclusions();
+        if (inputGroupJid) fetchMembersForJid(inputGroupJid);
+      } else {
+        toast.error(`Gagal mengecualikan: ${json.error}`);
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    }
+  };
+
+  const handleRemoveExclusion = async (id: string) => {
+    try {
+      const res = await fetch(`/api/exclusions?id=${id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Pengecualian berhasil dihapus.");
+        fetchExclusions();
+        if (inputGroupJid) fetchMembersForJid(inputGroupJid);
+      }
+    } catch (e) {}
+  };
+
+  // Fetch list of saved groups for dropdown
+  const fetchSavedGroupsList = async () => {
+    try {
+      const res = await fetch("/api/bot/groups");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setSavedGroups(json.data);
+
+        const savedJid = typeof window !== "undefined" ? localStorage.getItem("velo_selected_group_jid") : null;
+        const targetJid =
+          savedJid && json.data.some((g: any) => g.id === savedJid)
+            ? savedJid
+            : json.data.length > 0
+            ? json.data[0].id
+            : "";
+
+        if (targetJid) {
+          setInputGroupJid(targetJid);
+          fetchMembersForJid(targetJid);
+        }
+      }
+    } catch (e) {}
+  };
+
+  const fetchMembersForJid = async (jidToFetch: string) => {
+    if (!jidToFetch) return;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("velo_selected_group_jid", jidToFetch);
+    }
+    setLoadingGroupMembers(true);
+    setInspectorMsg(null);
+    try {
+      const res = await fetch(`/api/bot/groups?groupId=${encodeURIComponent(jidToFetch)}`);
+      const json = await res.json();
+      if (json.success) {
+        setGroupData(json.data);
+      } else {
+        setInspectorMsg(`Gagal: ${json.error}`);
+      }
+    } catch (err: any) {
+      setInspectorMsg(`Error: ${err.message}`);
+    } finally {
+      setLoadingGroupMembers(false);
+    }
+  };
+
+  const handleFetchGroupMembersSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetchMembersForJid(inputGroupJid);
+  };
+
+  // Send confirmation DM to a single member
+  const handleSendSingleMember = async (phoneNumber: string, targetJid?: string) => {
+    setSendingSingleMember(phoneNumber);
+    try {
+      const res = await fetch("/api/bot/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_member_confirmation",
+          targetJid: targetJid || phoneNumber,
+          phoneNumber,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Pesan konfirmasi dikirim ke +${phoneNumber}`);
+        // Refresh member list
+        await fetchMembersForJid(inputGroupJid);
+      } else {
+        toast.error(`Gagal mengirim ke +${phoneNumber}: ${json.error}`);
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setSendingSingleMember(null);
+    }
+  };
+
+  // Broadcast confirmation DM to all members of the group
+  const handleSendAllMembers = async () => {
+    if (!groupData) return;
+    const confirmed = await confirm({
+      title: "Broadcast Semua Anggota Grup",
+      message: `Kirim pesan konfirmasi pendaftaran secara personal (DM) ke seluruh ${groupData.totalMembers} anggota grup "${groupData.groupSubject}"?`,
+      confirmText: "Ya, Broadcast Semua",
+      cancelText: "Batal",
+      variant: "warning",
+      icon: "send",
+    });
+
+    if (!confirmed) return;
+
+    setSendingAllGroup(true);
+    setInspectorMsg(null);
+    try {
+      const res = await fetch("/api/bot/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_all_group_members",
+          groupId: groupData.groupId,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setInspectorMsg(json.message);
+        toast.success(json.message);
+        await fetchMembersForJid(inputGroupJid);
+      } else {
+        setInspectorMsg(`Gagal: ${json.error}`);
+        toast.error(`Gagal: ${json.error}`);
+      }
+    } catch (err: any) {
+      setInspectorMsg(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setSendingAllGroup(false);
+    }
+  };
+
+  const handleStartBot = async () => {
+    setActionLoading(true);
+    try {
+      await fetch("/api/bot/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" }),
+      });
+      toast.info("Memulai koneksi bot WhatsApp...");
+    } catch (err) {
+      console.error("Failed to trigger bot start:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleLogoutBot = async () => {
+    const confirmed = await confirm({
+      title: "Logout Sesi Bot",
+      message: "Apakah Anda yakin ingin melakukan Logout Sesi Bot? Sesi di database akan dihapus dan Anda perlu melakukan Scan QR ulang.",
+      confirmText: "Ya, Logout Bot",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "warning",
+    });
+
+    if (!confirmed) return;
+
+    setActionLoading(true);
+    try {
+      await fetch("/api/bot/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      });
+      toast.success("Sesi bot WhatsApp berhasil di-logout.");
+      setLogs((prev) => [
+        ...prev,
+        { message: "Bot session logged out manually by admin.", time: new Date().toLocaleTimeString() },
+      ]);
+      setGroupData(null);
+      setSavedGroups([]);
+    } catch (err) {
+      console.error("Failed to logout bot:", err);
+      toast.error("Gagal melakukan logout bot.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const clearConsoleLogs = () => {
+    setLogs([]);
+  };
+
+  const getStatusBadge = (statusStr: string, isExcluded: boolean) => {
+    if (isExcluded) {
+      return (
+        <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-xs font-semibold inline-flex items-center gap-1">
+          <ShieldAlert className="w-3 h-3 text-amber-400" /> DIKECUALIKAN
+        </span>
+      );
+    }
+
+    switch (statusStr) {
+      case "COMPLETED":
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold inline-flex items-center gap-1">
+            <Check className="w-3 h-3" /> COMPLETED (Lanjut)
+          </span>
+        );
+      case "OPTED_OUT":
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold inline-flex items-center gap-1">
+            <UserX className="w-3 h-3" /> OPTED OUT (Menolak)
+          </span>
+        );
+      case "WAITING_CONFIRMATION":
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold inline-flex items-center gap-1">
+            <Clock className="w-3 h-3" /> WAITING CONFIRMATION
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-xs font-semibold">
+            BELUM DIKONTAK
+          </span>
+        );
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+            Bot Control Center & Exclusion List <Bot className="w-6 h-6 text-blue-400" />
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Manajemen bot WhatsApp, inspeksi grup, daftar pengecualian (Exclusion List), dan live logs
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {status.state !== "CONNECTED" && (
+            <button
+              onClick={handleStartBot}
+              disabled={actionLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {actionLoading ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 fill-current" />
+              )}
+              <span>{status.state === "CONNECTING" ? "Restart Engine" : "Mulai Service Bot"}</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleLogoutBot}
+            disabled={actionLoading || status.state === "DISCONNECTED"}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Logout Sesi Bot</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Side: Status & Group Inspector Form (5 cols) */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Connection Status Card */}
+          <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Status Koneksi Saat Ini
+            </h3>
+
+            <div className="flex items-center gap-3">
+              {status.state === "CONNECTED" && (
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+              )}
+              {status.state === "CONNECTING" && (
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <RefreshCw className="w-6 h-6 animate-spin" />
+                </div>
+              )}
+              {status.state === "DISCONNECTED" && (
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+              )}
+
+              <div>
+                <div className="font-extrabold text-lg text-white">
+                  {status.state === "CONNECTED" && "Terkoneksi (Connected)"}
+                  {status.state === "CONNECTING" && "Menghubungkan / Scan QR"}
+                  {status.state === "DISCONNECTED" && "Terputus (Disconnected)"}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {status.userInfo
+                    ? `Akun: ${status.userInfo.name || "Bot"} (+${status.userInfo.id.split(":")[0]})`
+                    : "Sesi WhatsApp Bot"}
+                </p>
+              </div>
+            </div>
+
+            {status.lastError && (
+              <div className="p-3 rounded-xl bg-rose-900/30 border border-rose-500/30 text-rose-300 text-xs">
+                Log Terakhir: {status.lastError}
+              </div>
+            )}
+          </div>
+
+          {/* Group JID Inspector Card */}
+          {status.state === "CONNECTED" && (
+            <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4">
+              <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-4 h-4" /> Inspeksi Anggota Grup WhatsApp
+              </h3>
+
+              {inspectorMsg && (
+                <div className="p-3 rounded-xl bg-blue-900/30 border border-blue-500/30 text-blue-300 text-xs leading-relaxed">
+                  {inspectorMsg}
+                </div>
+              )}
+
+              {/* Saved Groups Dropdown */}
+              {savedGroups.length > 0 && (
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Pilih Grup yang Pernah Diisi / Terdeteksi:
+                  </label>
+                  <select
+                    value={inputGroupJid}
+                    onChange={(e) => {
+                      setInputGroupJid(e.target.value);
+                      fetchMembersForJid(e.target.value);
+                    }}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    {savedGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.subject} ({g.size} Anggota) - {g.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <form onSubmit={handleFetchGroupMembersSubmit} className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    {savedGroups.length > 0 ? "Atau Masukkan Group JID Baru:" : "Masukkan Group JID *"}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="120363041234567890@g.us"
+                    value={inputGroupJid}
+                    onChange={(e) => setInputGroupJid(e.target.value)}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loadingGroupMembers || !inputGroupJid}
+                  className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {loadingGroupMembers ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  <span>{loadingGroupMembers ? "Membaca Anggota Grup..." : "Ambil & Pindai Anggota Grup"}</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Unified Exclusion List Quick Add Card */}
+          <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4">
+            <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldAlert className="w-4 h-4" /> Tambah Nomor Pengecualian (Exclusion)
+            </h3>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Nomor yang ditambahkan di sini (contoh: Pembina, Admin, Pengawas) **tidak akan pernah di-chat atau di-broadcast** oleh bot.
+            </p>
+
+            <form onSubmit={handleAddExclusion} className="space-y-3">
+              <div>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nomor WA (contoh: 08123456789)"
+                  value={newExclusionPhone}
+                  onChange={(e) => setNewExclusionPhone(e.target.value)}
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  placeholder="Nama / Jabatan (contoh: Pak Guru Pembina)"
+                  value={newExclusionName}
+                  onChange={(e) => setNewExclusionName(e.target.value)}
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={addingExclusion || !newExclusionPhone}
+                className="w-full py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {addingExclusion ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <UserPlus className="w-3.5 h-3.5" />
+                )}
+                <span>Tambah ke Exclusion List</span>
+              </button>
+            </form>
+          </div>
+
+          {/* QR Code Card */}
+          <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4 text-center">
+            <h3 className="text-sm font-semibold text-slate-200 flex items-center justify-center gap-2">
+              <QrCode className="w-4 h-4 text-blue-400" /> Scanner QR Code WhatsApp
+            </h3>
+
+            {status.qrCodeUrl ? (
+              <div className="space-y-4 flex flex-col items-center">
+                <div className="p-3 bg-white rounded-2xl shadow-xl border-4 border-blue-500/20 inline-block">
+                  <img
+                    src={status.qrCodeUrl}
+                    alt="WhatsApp QR Code"
+                    className="w-56 h-56 object-contain"
+                  />
+                </div>
+                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl max-w-xs leading-relaxed">
+                  Buka WhatsApp di HP $\rightarrow$ Perangkat Tertaut $\rightarrow$ Tautkan Perangkat $\rightarrow$ Scan QR di atas.
+                </div>
+              </div>
+            ) : status.state === "CONNECTED" ? (
+              <div className="py-3 space-y-1 flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <h4 className="font-semibold text-white text-xs">Sesi Terhubung & Tersimpan Permanen</h4>
+              </div>
+            ) : (
+              <div className="py-6 space-y-2 flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                  <Bot className="w-6 h-6" />
+                </div>
+                <h4 className="font-semibold text-slate-300 text-sm">Bot Belum Dijalankan</h4>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side: Group Members Datatable & Exclusion List (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Render Group Members Table if Group Data is Loaded */}
+          {groupData ? (
+            <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div>
+                  <h3 className="font-extrabold text-white text-base flex items-center gap-2">
+                    {groupData.groupSubject} <Sparkles className="w-4 h-4 text-amber-400" />
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Daftar {groupData.totalMembers} Anggota terdeteksi di grup
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleSendAllMembers}
+                  disabled={sendingAllGroup}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {sendingAllGroup ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <SendHorizontal className="w-3.5 h-3.5" />
+                  )}
+                  <span>Kirim Pesan Ke Semua Anggota</span>
+                </button>
+              </div>
+
+              {/* Members Table */}
+              <div className="overflow-x-auto max-h-[360px] overflow-y-auto rounded-xl border border-slate-800">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-slate-900 z-10">
+                    <tr className="border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                      <th className="py-3 px-3">No. WhatsApp / JID</th>
+                      <th className="py-3 px-3">Nama</th>
+                      <th className="py-3 px-3">Status Pendaftaran</th>
+                      <th className="py-3 px-3 text-right">Aksi Kirim</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 text-xs text-slate-200">
+                    {groupData.members.map((m) => (
+                      <tr key={m.phoneNumber} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3 px-3 font-mono font-medium text-slate-300">
+                          {formatDisplayPhoneNumber(m.phoneNumber)}
+                        </td>
+                        <td className="py-3 px-3 font-semibold text-white">
+                          {m.name || <span className="text-slate-500 font-normal">-</span>}
+                        </td>
+                        <td className="py-3 px-3">
+                          {getStatusBadge(m.status, m.isExcluded)}
+                        </td>
+                        <td className="py-3 px-3 text-right space-x-2">
+                          <button
+                            onClick={() => handleSendSingleMember(m.phoneNumber, m.jid)}
+                            disabled={
+                              sendingSingleMember === m.phoneNumber ||
+                              m.status === "COMPLETED" ||
+                              m.isExcluded
+                            }
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all inline-flex items-center gap-1 cursor-pointer disabled:opacity-40 ${
+                              m.status === "OPTED_OUT"
+                                ? "bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30"
+                                : "bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30"
+                            }`}
+                          >
+                            {sendingSingleMember === m.phoneNumber ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Send className="w-3 h-3" />
+                            )}
+                            <span>
+                              {m.status === "WAITING_CONFIRMATION"
+                                ? "Kirim Ulang"
+                                : m.status === "COMPLETED"
+                                ? "Selesai"
+                                : m.status === "OPTED_OUT"
+                                ? "Resend Konfirmasi"
+                                : "Kirim Pesan"}
+                            </span>
+                          </button>
+
+                          {!m.isExcluded && (
+                            <button
+                              onClick={() => handleExcludeMemberDirect(m.phoneNumber, m.name)}
+                              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all inline-flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/20"
+                              title="Pilih nomor ini untuk langsung dimasukkan ke Exclusion List"
+                            >
+                              <ShieldAlert className="w-3 h-3" />
+                              <span>Kecualikan</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Unified Exclusion List Table Card */}
+          <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Daftar Pengecualian Aktif ({exclusions.length} Nomor)
+                </h3>
+              </div>
+
+              <button
+                onClick={fetchExclusions}
+                className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs"
+                title="Refresh Exclusion List"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="overflow-x-auto max-h-[220px] overflow-y-auto rounded-xl border border-slate-800">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-slate-900 z-10">
+                  <tr className="border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <th className="py-2.5 px-3">No. WhatsApp</th>
+                    <th className="py-2.5 px-3">Nama / Jabatan</th>
+                    <th className="py-2.5 px-3 text-right">Aksi Hapus</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-xs text-slate-200">
+                  {exclusions.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-4 text-center text-slate-500 italic">
+                        Belum ada nomor yang dikecualikan.
+                      </td>
+                    </tr>
+                  ) : (
+                    exclusions.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-semibold text-amber-300">
+                          {formatDisplayPhoneNumber(item.phoneNumber)}
+                        </td>
+                        <td className="py-2.5 px-3 font-medium text-white">
+                          {item.name || "Admin / Pembina"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            onClick={() => handleRemoveExclusion(item.id)}
+                            className="px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition-all inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <ShieldOff className="w-3 h-3" />
+                            <span>Hapus</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Live Terminal Log Stream Card */}
+          <div className="p-5 rounded-2xl glass-panel border border-slate-800 flex flex-col h-[320px]">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-xs font-mono font-semibold text-slate-300 uppercase tracking-wider">
+                  Live Engine Terminal Logs
+                </h3>
+              </div>
+
+              <button
+                onClick={clearConsoleLogs}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs transition-colors flex items-center gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Bersihkan</span>
+              </button>
+            </div>
+
+            <div className="flex-1 bg-black/80 rounded-xl p-4 font-mono text-xs overflow-y-auto space-y-2 text-slate-300 border border-slate-950">
+              {logs.length === 0 ? (
+                <div className="text-slate-600 italic py-4 text-center">
+                  Belum ada log aktivitas. Log real-time akan muncul saat bot beroperasi...
+                </div>
+              ) : (
+                logs.map((log, index) => (
+                  <div key={index} className="flex items-start gap-2 leading-relaxed">
+                    <span className="text-slate-600 select-none">[{log.time}]</span>
+                    <span className="text-emerald-400 font-semibold">$</span>
+                    <span className="text-slate-200">{log.message}</span>
+                  </div>
+                ))
+              )}
+              <div ref={logEndRef} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
