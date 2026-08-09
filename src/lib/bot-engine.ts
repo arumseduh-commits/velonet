@@ -659,10 +659,10 @@ class WhatsAppBotEngine extends EventEmitter {
   }
 }
 
-// Global Singleton Instance
+// Global Singleton Instance (Must be active in BOTH dev and production)
 const globalForBot = globalThis as unknown as {
   botEngine: WhatsAppBotEngine | undefined;
 };
 
 export const botEngine = globalForBot.botEngine ?? new WhatsAppBotEngine();
-if (process.env.NODE_ENV !== "production") globalForBot.botEngine = botEngine;
+globalForBot.botEngine = botEngine;
