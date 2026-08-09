@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Providers } from "@/components/providers/Providers";
 
 export const metadata: Metadata = {
   title: "Velocity English Community - Registration & Management System",
@@ -15,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="id" className="dark">
       <body className="bg-[#090d16] text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
