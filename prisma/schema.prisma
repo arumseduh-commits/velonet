@@ -8,19 +8,51 @@ generator client {
 }
 
 model Participant {
-  id              String       @id @default(uuid())
-  phoneNumber     String       @unique
+  id              String            @id @default(uuid())
+  phoneNumber     String            @unique
   name            String?
   studentClass    String?
   motivation      String?
   hobby           String?
-  status          String       @default("NOT_STARTED")
-  isExcluded      Boolean      @default(false)
-  isKickedFromGrp Boolean      @default(false)
+  status          String            @default("NOT_STARTED")
+  isExcluded      Boolean           @default(false)
+  isKickedFromGrp Boolean           @default(false)
   lastSentAt      DateTime?
   attendances     Attendance[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  otpVerifications OtpVerification[]
+  studentSessions  StudentSession[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model OtpVerification {
+  id            String      @id @default(uuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  phoneNumber   String
+  otpCode       String
+  magicToken    String      @unique
+  attempts      Int         @default(0)
+  isUsed        Boolean     @default(false)
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+
+  @@index([phoneNumber])
+  @@index([magicToken])
+}
+
+model StudentSession {
+  id            String      @id @default(uuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  sessionToken  String      @unique
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+
+  @@index([participantId])
+  @@index([sessionToken])
 }
 
 model BaileysAuth {
