@@ -41,7 +41,7 @@ model LocationPreset {
   name        String   @unique
   latitude    Float
   longitude   Float
-  radiusMeter Float    @default(150)
+  radiusMeter Float    @default(15)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -55,7 +55,7 @@ model MeetingSession {
   locationName String?      // Nama tempat kumpul
   latitude     Float?       // Latitude tempat kumpul
   longitude    Float?       // Longitude tempat kumpul
-  radiusMeter  Float        @default(150) // Radius toleransi (meter)
+  radiusMeter  Float        @default(15) // Radius toleransi (meter)
   isActive     Boolean      @default(true)
   isCancelled  Boolean      @default(false)
   customMessage String?     // Custom broadcast message note

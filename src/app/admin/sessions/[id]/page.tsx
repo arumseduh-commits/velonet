@@ -253,6 +253,8 @@ export default function SessionDetailPage({
     minute: "2-digit",
   });
 
+  const isExpired = new Date() > new Date(session.endTime);
+
   return (
     <div className="space-y-6">
       {/* Top Navigation & Actions */}
@@ -266,32 +268,37 @@ export default function SessionDetailPage({
         </Link>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleFollowupAlpaWA}
-            disabled={isFollowingUpAlpa}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all disabled:opacity-50"
-            title="Kirim notifikasi pengingat WA ke peserta yang Alpa (Tidak Hadir)"
-          >
-            {isFollowingUpAlpa ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-            <span>📢 Follow-up Alpa (WA)</span>
-          </button>
+          {/* WA Broadcast & Follow-up Alpa buttons ONLY enabled for ongoing/future active sessions */}
+          {!isExpired && (
+            <>
+              <button
+                onClick={handleFollowupAlpaWA}
+                disabled={isFollowingUpAlpa}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all disabled:opacity-50"
+                title="Kirim notifikasi pengingat WA ke peserta yang Alpa (Tidak Hadir)"
+              >
+                {isFollowingUpAlpa ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span>📢 Follow-up Alpa (WA)</span>
+              </button>
 
-          <button
-            onClick={handleBroadcastWA}
-            disabled={isBroadcasting}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-semibold transition-all disabled:opacity-50"
-          >
-            {isBroadcasting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-            <span>Broadcast Undangan WA</span>
-          </button>
+              <button
+                onClick={handleBroadcastWA}
+                disabled={isBroadcasting}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-semibold transition-all disabled:opacity-50"
+              >
+                {isBroadcasting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span>Broadcast Undangan WA</span>
+              </button>
+            </>
+          )}
 
           <button
             onClick={handleExportCSV}
@@ -313,19 +320,26 @@ export default function SessionDetailPage({
             <h1 className="text-2xl font-bold text-white mt-0.5">{session.title}</h1>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <span className="px-3 py-1 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              Real-time Live Sync
-            </span>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {isExpired ? (
+              <span className="px-3 py-1 rounded-full font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
+                🔒 Sesi Selesai (Data Absensi Terkunci)
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                Real-time Live Sync
+              </span>
+            )}
+
             <span
               className={`px-3 py-1 rounded-full font-semibold border ${
-                session.isActive
+                !isExpired && session.isActive
                   ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
                   : "bg-slate-800 text-slate-400 border-slate-700"
               }`}
             >
-              {session.isActive ? "● Sesi Aktif Absen" : "○ Sesi Ditutup"}
+              {!isExpired && session.isActive ? "● Sesi Aktif Absen" : "○ Sesi Ditutup"}
             </span>
           </div>
         </div>
@@ -519,7 +533,11 @@ export default function SessionDetailPage({
                       </td>
 
                       <td className="p-4 text-right">
-                        {isUpdatingThis ? (
+                        {isExpired ? (
+                          <span className="text-[11px] font-medium text-slate-500 italic">
+                            🔒 Rekap Terkunci
+                          </span>
+                        ) : isUpdatingThis ? (
                           <Loader2 className="w-4 h-4 text-emerald-400 animate-spin ml-auto" />
                         ) : (
                           <div className="flex items-center justify-end gap-1.5">

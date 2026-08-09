@@ -160,6 +160,60 @@ export async function processIncomingMessage(
   const text = messageText.trim();
   const lowerText = text.toLowerCase();
 
+  // Check if participant has a pending leave session choice selection (e.g. user replied '1' or '2')
+  try {
+    const pendingSetting = await prisma.systemSetting.findUnique({
+      where: { key: `leave_pending:${participant.id}` },
+    });
+
+    if (pendingSetting) {
+      const pendingData = JSON.parse(pendingSetting.value);
+      // If setting is less than 1 hour old and text contains choice numbers (e.g., '1', '2', '1,2')
+      if (pendingData && Date.now() - pendingData.timestamp < 3600000) {
+        const numbers = text.match(/\d+/g);
+        if (numbers && numbers.length > 0) {
+          const selectedChoices = numbers.map((n) => parseInt(n, 10));
+          const matchedSessions = pendingData.sessions.filter((s: any) =>
+            selectedChoices.includes(s.choice)
+          );
+
+          if (matchedSessions.length > 0) {
+            await prisma.systemSetting.delete({
+              where: { key: `leave_pending:${participant.id}` },
+            });
+
+            const processedTitles: string[] = [];
+            for (const sess of matchedSessions) {
+              await processLeaveRequest(
+                prisma,
+                participant.id,
+                pendingData.type || "IZIN",
+                pendingData.notes || "",
+                sess.id
+              );
+              processedTitles.push(sess.title);
+            }
+
+            return {
+              newStatus: participant.status as RegistrationStatusType,
+              replyMessage: `🟡 *PENGAJUAN ${pendingData.type || "IZIN"} DICATAT*\n\n📌 *Sesi Terpilih:* ${processedTitles.join(
+                ", "
+              )}\n👤 *Nama:* ${participant.name || "Peserta"}\n📝 *Keterangan:* ${
+                pendingData.notes || "-"
+              }\n\nTerima kasih atas konfirmasinya!`,
+            };
+          }
+        }
+      } else {
+        await prisma.systemSetting.delete({
+          where: { key: `leave_pending:${participant.id}` },
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error processing pending leave choice:", e);
+  }
+
   // 2. Handle Leave / Sick Requests (!izin / !sakit)
   if (
     lowerText.startsWith("!izin") ||

@@ -84,7 +84,7 @@ export async function POST(
         session.title
       }"* (${dateStr}).\n\n${
         customNote ? `📝 *Catatan Pembina:*\n${customNote}\n\n` : ""
-      }_Jika Kakak berhalangan hadir karena ada keperluan mendadak, mohon segera mengonfirmasi alasan ke Pembina. Terima kasih!_`;
+      }📝 *Petunjuk Izin Absensi:*\nJika kelak Kakak berhalangan hadir pada pertemuan berikutnya, silakan gunakan format *!ijin [alasan]* ke bot ini.\n*Contoh:* \`!ijin izin karena ada acara kondangan\`\n\n_Terima kasih atas perhatian dan kerjasamanya!_`;
 
       const sent = await botEngine.sendMessage(p.phoneNumber, msg);
       if (sent) {

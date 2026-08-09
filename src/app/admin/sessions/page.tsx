@@ -61,14 +61,14 @@ export default function SessionsAdminPage() {
   const [customLocation, setCustomLocation] = useState("");
   const [latitude, setLatitude] = useState("-7.9666");
   const [longitude, setLongitude] = useState("112.6326");
-  const [radiusMeter, setRadiusMeter] = useState("150");
+  const [radiusMeter, setRadiusMeter] = useState("15");
 
   // Location Presets database state
   const [dbPresets, setDbPresets] = useState<
     Array<{ id: string; name: string; latitude: number; longitude: number; radiusMeter: number }>
   >([
-    { id: "default-caprice", name: "Ruang Caprice", latitude: -7.9666, longitude: 112.6326, radiusMeter: 150 },
-    { id: "default-bi", name: "Ruang BI", latitude: -7.9785, longitude: 112.6315, radiusMeter: 150 },
+    { id: "default-caprice", name: "Ruang Caprice", latitude: -7.9666, longitude: 112.6326, radiusMeter: 15 },
+    { id: "default-bi", name: "Ruang BI", latitude: -7.9785, longitude: 112.6315, radiusMeter: 15 },
   ]);
   const [isSavingPreset, setIsSavingPreset] = useState(false);
 
@@ -643,13 +643,15 @@ export default function SessionsAdminPage() {
 
                 {/* Card Actions Footer */}
                 <div className="space-y-2 pt-2">
-                  <button
-                    onClick={() => handleOpenBroadcastModal(session)}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-semibold transition-all"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>📢 Edit & Broadcast WA</span>
-                  </button>
+                  {!isClosedTime && (
+                    <button
+                      onClick={() => handleOpenBroadcastModal(session)}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-semibold transition-all"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>📢 Edit & Broadcast WA</span>
+                    </button>
+                  )}
 
                   <div className="flex items-center gap-2">
                     <button

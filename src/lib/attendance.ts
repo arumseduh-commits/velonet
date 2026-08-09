@@ -212,6 +212,24 @@ export async function processLocationCheckIn({
   };
 }
 
+export async function getTodayMeetingSessions(prisma: PrismaClient) {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+  return await prisma.meetingSession.findMany({
+    where: {
+      isActive: true,
+      isCancelled: false,
+      date: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+    orderBy: { startTime: "asc" },
+  });
+}
+
 /**
  * Processes incoming leave / sick request via text message (e.g., "!izin Ada acara keluarga").
  */
@@ -219,7 +237,8 @@ export async function processLeaveRequest(
   prisma: PrismaClient,
   participantId: string,
   type: "IZIN" | "SAKIT",
-  notes: string
+  notes: string,
+  targetSessionId?: string
 ): Promise<{ success: boolean; replyMessage: string }> {
   const participant = await prisma.participant.findUnique({
     where: { id: participantId },
@@ -232,39 +251,125 @@ export async function processLeaveRequest(
     };
   }
 
-  const session = await getActiveMeetingSession(prisma);
-  if (!session) {
+  // 1. If targetSessionId is explicitly provided (user responded with choice number)
+  if (targetSessionId) {
+    const session = await prisma.meetingSession.findUnique({
+      where: { id: targetSessionId },
+    });
+    if (!session) {
+      return { success: false, replyMessage: "🔴 Sesi pertemuan tidak ditemukan." };
+    }
+
+    await prisma.attendance.upsert({
+      where: {
+        sessionId_participantId: {
+          sessionId: session.id,
+          participantId: participant.id,
+        },
+      },
+      create: {
+        sessionId: session.id,
+        participantId: participant.id,
+        status: type,
+        method: "TEXT_MESSAGE",
+        notes: notes || `Pengajuan ${type} via WhatsApp`,
+      },
+      update: {
+        status: type,
+        notes: notes || `Pengajuan ${type} via WhatsApp`,
+      },
+    });
+
     return {
-      success: false,
-      replyMessage:
-        "🔴 Tidak ada Sesi Pertemuan yang sedang aktif atau dijadwalkan hari ini.",
+      success: true,
+      replyMessage: `🟡 *PENGAJUAN ${type} DICATAT*\n\n📌 *Sesi:* ${session.title}\n👤 *Nama:* ${
+        participant.name || "Peserta"
+      }\n📝 *Keterangan:* ${notes || "-"}\n\nTerima kasih atas informasinya!`,
     };
   }
 
-  await prisma.attendance.upsert({
-    where: {
-      sessionId_participantId: {
+  // 2. Fetch all scheduled/active sessions for today
+  const todaySessions = await getTodayMeetingSessions(prisma);
+
+  if (todaySessions.length === 0) {
+    // Fallback: check currently active session
+    const activeSession = await getActiveMeetingSession(prisma);
+    if (!activeSession) {
+      return {
+        success: false,
+        replyMessage: "🔴 Tidak ada Sesi Pertemuan yang sedang aktif atau dijadwalkan hari ini.",
+      };
+    }
+    todaySessions.push(activeSession);
+  }
+
+  // Single session scheduled today
+  if (todaySessions.length === 1) {
+    const session = todaySessions[0];
+    await prisma.attendance.upsert({
+      where: {
+        sessionId_participantId: {
+          sessionId: session.id,
+          participantId: participant.id,
+        },
+      },
+      create: {
         sessionId: session.id,
         participantId: participant.id,
+        status: type,
+        method: "TEXT_MESSAGE",
+        notes: notes || `Pengajuan ${type} via WhatsApp`,
       },
-    },
+      update: {
+        status: type,
+        notes: notes || `Pengajuan ${type} via WhatsApp`,
+      },
+    });
+
+    return {
+      success: true,
+      replyMessage: `🟡 *PENGAJUAN ${type} DICATAT*\n\n📌 *Sesi:* ${session.title}\n👤 *Nama:* ${
+        participant.name || "Peserta"
+      }\n📝 *Keterangan:* ${notes || "-"}\n\nTerima kasih atas informasinya!`,
+    };
+  }
+
+  // Multiple sessions today (2 or 3 classes/sessions scheduled)
+  // Save pending state in SystemSetting table for user choice
+  const sessionListPayload = todaySessions.map((s, idx) => ({
+    choice: idx + 1,
+    id: s.id,
+    title: s.title,
+    time: new Date(s.startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+  }));
+
+  await prisma.systemSetting.upsert({
+    where: { key: `leave_pending:${participant.id}` },
     create: {
-      sessionId: session.id,
-      participantId: participant.id,
-      status: type,
-      method: "TEXT_MESSAGE",
-      notes: notes || `Pengajuan ${type} via WhatsApp`,
+      key: `leave_pending:${participant.id}`,
+      value: JSON.stringify({
+        type,
+        notes,
+        sessions: sessionListPayload,
+        timestamp: Date.now(),
+      }),
     },
     update: {
-      status: type,
-      notes: notes || `Pengajuan ${type} via WhatsApp`,
+      value: JSON.stringify({
+        type,
+        notes,
+        sessions: sessionListPayload,
+        timestamp: Date.now(),
+      }),
     },
   });
 
+  const sessionOptionsText = sessionListPayload
+    .map((s) => `${s.choice}️⃣ *${s.title}* (${s.time} WIB)`)
+    .join("\n");
+
   return {
     success: true,
-    replyMessage: `🟡 *PENGAJUAN ${type} DICATAT*\n\n📌 *Sesi:* ${session.title}\n👤 *Nama:* ${
-      participant.name || "Peserta"
-    }\n📝 *Keterangan:* ${notes || "-"}\n\nTerima kasih atas informasinya. Semoga lekas beraktivitas kembali!`,
+    replyMessage: `📌 *PILIH SESI PERTEMUAN UNTUK IZIN:*\n\nAda *${todaySessions.length} Sesi Pertemuan* yang dijadwalkan hari ini. Silakan balas dengan **ANGKA** nomor sesi yang ingin Kakak izinkan:\n\n${sessionOptionsText}\n\n_Balas dengan angka *1*${todaySessions.length > 1 ? `, *2*` : ''}${todaySessions.length > 2 ? `, *3*` : ''} untuk mengonfirmasi pilihan izin Kakak._`,
   };
 }

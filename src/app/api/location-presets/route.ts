@@ -7,7 +7,7 @@ const DEFAULT_PRESETS = [
     name: "Ruang Caprice",
     latitude: -7.9666,
     longitude: 112.6326,
-    radiusMeter: 150,
+    radiusMeter: 15,
     isDefault: true,
   },
   {
@@ -15,7 +15,7 @@ const DEFAULT_PRESETS = [
     name: "Ruang BI",
     latitude: -7.9785,
     longitude: 112.6315,
-    radiusMeter: 150,
+    radiusMeter: 15,
     isDefault: true,
   },
 ];
