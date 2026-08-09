@@ -11,6 +11,7 @@ import pino from "pino";
 import { prisma } from "./prisma";
 import { usePrismaAuthState } from "./baileys-db-auth";
 import { processIncomingMessage } from "./bot-state-machine";
+import { startAutoCronScheduler } from "./auto-cron-scheduler";
 
 export type BotConnectionState = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 
@@ -136,6 +137,7 @@ class WhatsAppBotEngine extends EventEmitter {
           this.qrCodeUrl = null;
           this.updateStatus("CONNECTED", null, { id: userJid, name: userName }, null);
           this.emit("log", `WhatsApp Bot connected successfully as ${userName} (${userJid})!`);
+          startAutoCronScheduler();
         }
       });
 
