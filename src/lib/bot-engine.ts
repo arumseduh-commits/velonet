@@ -137,6 +137,16 @@ class WhatsAppBotEngine extends EventEmitter {
           this.qrCodeUrl = null;
           this.updateStatus("CONNECTED", null, { id: userJid, name: userName }, null);
           this.emit("log", `WhatsApp Bot connected successfully as ${userName} (${userJid})!`);
+
+          const botPhone = userJid.split("@")[0].split(":")[0];
+          if (botPhone) {
+            prisma.systemSetting.upsert({
+              where: { key: "bot_phone_number" },
+              create: { key: "bot_phone_number", value: botPhone },
+              update: { value: botPhone },
+            }).catch(() => {});
+          }
+
           startAutoCronScheduler();
         }
       });

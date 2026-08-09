@@ -22,11 +22,18 @@ export async function GET() {
     // Get WhatsApp bot phone number if available
     let botPhoneNumber = "";
     try {
-      const botStatusSetting = await prisma.systemSetting.findUnique({
-        where: { key: "bot_user_id" },
+      const phoneSetting = await prisma.systemSetting.findUnique({
+        where: { key: "bot_phone_number" },
       });
-      if (botStatusSetting && botStatusSetting.value) {
-        botPhoneNumber = botStatusSetting.value.split("@")[0].split(":")[0];
+      if (phoneSetting && phoneSetting.value) {
+        botPhoneNumber = phoneSetting.value.trim();
+      } else {
+        const botStatusSetting = await prisma.systemSetting.findUnique({
+          where: { key: "bot_user_id" },
+        });
+        if (botStatusSetting && botStatusSetting.value) {
+          botPhoneNumber = botStatusSetting.value.split("@")[0].split(":")[0];
+        }
       }
     } catch (e) {}
 
