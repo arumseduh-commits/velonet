@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/Sidebar";
 import { AdminHeader } from "@/components/admin/Header";
 import { DialogProvider } from "@/components/ui/DialogProvider";
@@ -11,6 +12,12 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const pathname = usePathname();
+
+  // If on admin login page (/admin/login), DO NOT render AdminSidebar and AdminHeader!
+  if (pathname === "/admin/login") {
+    return <DialogProvider>{children}</DialogProvider>;
+  }
 
   return (
     <DialogProvider>
