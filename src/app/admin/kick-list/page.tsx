@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserX, CheckSquare, Square, Copy, Check, RefreshCw, AlertCircle, UserMinus, ShieldAlert } from "lucide-react";
+import { UserX, CheckSquare, Square, Copy, Check, RefreshCw, AlertCircle, UserMinus, ShieldAlert, Search } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 interface KickParticipant {
@@ -29,6 +29,7 @@ export default function KickListPage() {
   const [targetGroupId, setTargetGroupId] = useState<string>("");
   const [customJid, setCustomJid] = useState<string>("");
   const [kickingId, setKickingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const fetchKickList = async () => {
     setLoading(true);
@@ -269,6 +270,26 @@ export default function KickListPage() {
         </p>
       </div>
 
+      {/* Real-time Search Bar for Phone Number or Name */}
+      <div className="p-4 rounded-2xl glass-panel border border-slate-800 flex items-center gap-3">
+        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+        <input
+          type="text"
+          placeholder="Cari berdasarkan nomor WhatsApp (misal: 62812...) atau Nama..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded-lg bg-slate-800"
+          >
+            Bersihkan
+          </button>
+        )}
+      </div>
+
       {/* Table */}
       <div className="rounded-2xl glass-panel border border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
@@ -297,8 +318,28 @@ export default function KickListPage() {
                     Belum ada anggota yang memilih TIDAK.
                   </td>
                 </tr>
+              ) : list.filter((item) => {
+                  if (!searchQuery.trim()) return true;
+                  const q = searchQuery.toLowerCase().trim();
+                  const phone = (item.phoneNumber || "").toLowerCase();
+                  const name = (item.name || "").toLowerCase();
+                  return phone.includes(q) || name.includes(q);
+                }).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                    Tidak ditemukan nomor HP/nama yang cocok dengan "{searchQuery}".
+                  </td>
+                </tr>
               ) : (
-                list.map((item) => (
+                list
+                  .filter((item) => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase().trim();
+                    const phone = (item.phoneNumber || "").toLowerCase();
+                    const name = (item.name || "").toLowerCase();
+                    return phone.includes(q) || name.includes(q);
+                  })
+                  .map((item) => (
                   <tr
                     key={item.id}
                     className={`transition-colors ${

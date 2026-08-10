@@ -101,6 +101,38 @@ export default function BotControlPage() {
   const [importing, setImporting] = useState(false);
   const [broadcastingUncontacted, setBroadcastingUncontacted] = useState(false);
 
+  // Join Group via Invite Link State
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [joiningGroup, setJoiningGroup] = useState(false);
+
+  const handleJoinGroupViaInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteUrl.trim()) return;
+
+    setJoiningGroup(true);
+    try {
+      const res = await fetch("/api/bot/join-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteUrl: inviteUrl.trim() }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message || "Bot berhasil bergabung ke grup WhatsApp!");
+        setInviteUrl("");
+        setShowJoinModal(false);
+        fetchSavedGroupsList();
+      } else {
+        toast.error(json.error || "Gagal bergabung ke grup.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan koneksi.");
+    } finally {
+      setJoiningGroup(false);
+    }
+  };
+
   const handleBulkImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!importRawText.trim()) return;
@@ -517,7 +549,17 @@ export default function BotControlPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {status.state === "CONNECTED" && (
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>➕ Gabungkan Bot via Link Undangan</span>
+            </button>
+          )}
+
           {status.state !== "CONNECTED" && (
             <button
               onClick={handleStartBot}
@@ -942,6 +984,81 @@ export default function BotControlPage() {
           </div>
         </div>
       </div>
+
+      {/* Join Group via Invite Link Modal */}
+      {showJoinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <UserPlus className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white tracking-wide">
+                    Gabungkan Bot via Link Undangan
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Masukkan Link Undangan Grup WhatsApp untuk memasukkan bot tanpa memegang HP
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowJoinModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleJoinGroupViaInvite} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-300">
+                  Link Undangan Grup WhatsApp (Invite Link)
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://chat.whatsapp.com/ABC123xyz..."
+                  value={inviteUrl}
+                  onChange={(e) => setInviteUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  required
+                />
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  💡 <b>Petunjuk:</b> Buka info grup WhatsApp di HP Anda ➔ Klik <b>"Undang via Tautan" (Invite via Link)</b> ➔ Tempelkan linknya di atas. Bot akan langsung bergabung otomatis!
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowJoinModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={joiningGroup || !inviteUrl.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {joiningGroup ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Bergabung ke Grup...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Gabungkan Bot Sekarang</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

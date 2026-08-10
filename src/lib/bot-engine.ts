@@ -654,6 +654,24 @@ class WhatsAppBotEngine extends EventEmitter {
     }
   }
 
+  public async joinGroupViaInvite(inviteUrlOrCode: string): Promise<{ success: boolean; groupId?: string; error?: string }> {
+    if (!this.socket || this.connectionState !== "CONNECTED") {
+      throw new Error("WhatsApp Bot belum terhubung.");
+    }
+
+    try {
+      const codeMatch = inviteUrlOrCode.match(/(?:chat\.whatsapp\.com\/)?([a-zA-Z0-9_-]+)/);
+      const code = codeMatch ? codeMatch[1] : inviteUrlOrCode.trim();
+
+      const groupId = await this.socket.groupAcceptInvite(code);
+      this.emit("log", `✅ BOT JOINED GROUP via invite code [${code}] -> Group JID: ${groupId}`);
+      return { success: true, groupId };
+    } catch (err: any) {
+      console.error("[BotEngine] Failed to join group via invite code:", err);
+      throw new Error(err.message || "Gagal bergabung ke grup via link undangan.");
+    }
+  }
+
   public async logoutBot() {
     this.emit("log", "Logging out bot session...");
     if (this.socket) {
