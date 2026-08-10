@@ -109,6 +109,12 @@ export default function BotControlPage() {
   const [importing, setImporting] = useState(false);
   const [broadcastingUncontacted, setBroadcastingUncontacted] = useState(false);
 
+  // Pairing Code Login State
+  const [loginMode, setLoginMode] = useState<"QR" | "PAIRING">("QR");
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCodeResult, setPairingCodeResult] = useState<string | null>(null);
+  const [requestingPairingCode, setRequestingPairingCode] = useState(false);
+
   // Join Group via Invite Link State
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
@@ -138,6 +144,34 @@ export default function BotControlPage() {
       toast.error(err.message || "Terjadi kesalahan koneksi.");
     } finally {
       setJoiningGroup(false);
+    }
+  };
+
+  const handleRequestPairingCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pairingPhone.trim()) return;
+    setRequestingPairingCode(true);
+    setPairingCodeResult(null);
+    try {
+      const res = await fetch("/api/bot/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "request_pairing_code",
+          phoneNumber: pairingPhone.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.pairingCode) {
+        setPairingCodeResult(json.pairingCode);
+        toast.success(`Kode Pasangan WhatsApp: ${json.pairingCode}`);
+      } else {
+        toast.error(json.error || "Gagal menghasilkan Kode Pasangan.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan koneksi.");
+    } finally {
+      setRequestingPairingCode(false);
     }
   };
 
@@ -794,39 +828,109 @@ export default function BotControlPage() {
             </form>
           </div>
 
-          {/* QR Code Card */}
+          {/* QR Code & Pairing Code Login Card */}
           <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4 text-center">
-            <h3 className="text-sm font-semibold text-slate-200 flex items-center justify-center gap-2">
-              <QrCode className="w-4 h-4 text-blue-400" /> Scanner QR Code WhatsApp
-            </h3>
-
-            {status.qrCodeUrl ? (
-              <div className="space-y-4 flex flex-col items-center">
-                <div className="p-3 bg-white rounded-2xl shadow-xl border-4 border-blue-500/20 inline-block">
-                  <img
-                    src={status.qrCodeUrl}
-                    alt="WhatsApp QR Code"
-                    className="w-56 h-56 object-contain"
-                  />
-                </div>
-                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl max-w-xs leading-relaxed">
-                  Buka WhatsApp di HP $\rightarrow$ Perangkat Tertaut $\rightarrow$ Tautkan Perangkat $\rightarrow$ Scan QR di atas.
-                </div>
-              </div>
-            ) : status.state === "CONNECTED" ? (
+            {status.state === "CONNECTED" ? (
               <div className="py-3 space-y-1 flex flex-col items-center">
                 <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
                   <Smartphone className="w-5 h-5" />
                 </div>
                 <h4 className="font-semibold text-white text-xs">Sesi Terhubung & Tersimpan Permanen</h4>
+                <p className="text-[11px] text-slate-400">
+                  Bot terhubung sebagai: <b className="text-emerald-400">+{status.userInfo?.id.split(":")[0]}</b>
+                </p>
               </div>
             ) : (
-              <div className="py-6 space-y-2 flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
-                  <Bot className="w-6 h-6" />
+              <>
+                <div className="flex items-center justify-center gap-2 p-1 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <button
+                    onClick={() => setLoginMode("QR")}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      loginMode === "QR"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    📷 Scan QR Code
+                  </button>
+                  <button
+                    onClick={() => setLoginMode("PAIRING")}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      loginMode === "PAIRING"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    🔑 Kode 8-Angka (Tanpa Kamera)
+                  </button>
                 </div>
-                <h4 className="font-semibold text-slate-300 text-sm">Bot Belum Dijalankan</h4>
-              </div>
+
+                {loginMode === "QR" ? (
+                  status.qrCodeUrl ? (
+                    <div className="space-y-4 flex flex-col items-center">
+                      <div className="p-3 bg-white rounded-2xl shadow-xl border-4 border-blue-500/20 inline-block">
+                        <img
+                          src={status.qrCodeUrl}
+                          alt="WhatsApp QR Code"
+                          className="w-56 h-56 object-contain"
+                        />
+                      </div>
+                      <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl max-w-xs leading-relaxed">
+                        Buka WhatsApp di HP ➔ Perangkat Tertaut ➔ Tautkan Perangkat ➔ Scan QR di atas.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-6 space-y-2 flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                        <Bot className="w-6 h-6" />
+                      </div>
+                      <h4 className="font-semibold text-slate-300 text-sm">Mempersiapkan QR Code...</h4>
+                      <p className="text-xs text-slate-500">Klik "Mulai Service Bot" di atas jika belum berjalan</p>
+                    </div>
+                  )
+                ) : (
+                  <form onSubmit={handleRequestPairingCode} className="space-y-4 text-left">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Nomor WhatsApp Bot (Awali 08 / 62)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: 08123456789"
+                        value={pairingPhone}
+                        onChange={(e) => setPairingPhone(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                        required
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={requestingPairingCode || !pairingPhone.trim()}
+                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {requestingPairingCode ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Smartphone className="w-4 h-4" />
+                      )}
+                      <span>{requestingPairingCode ? "Meminta Kode..." : "Dapatkan Kode Tautan (Pairing Code)"}</span>
+                    </button>
+
+                    {pairingCodeResult && (
+                      <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 space-y-2 text-center animate-in fade-in duration-200">
+                        <p className="text-xs text-emerald-300 font-medium">Kode Pasangan WhatsApp Anda:</p>
+                        <div className="text-2xl font-extrabold text-white font-mono tracking-widest bg-black/60 py-2 rounded-xl border border-emerald-500/30 select-all">
+                          {pairingCodeResult}
+                        </div>
+                        <p className="text-[11px] text-emerald-300/80 leading-relaxed pt-1">
+                          💡 <b>Langkah Tautkan di HP:</b> Buka WA ➔ Perangkat Tertaut ➔ Tautkan Perangkat ➔ <b>"Tautkan dengan Nomor Telepon"</b> ➔ Masukkan kode di atas!
+                        </p>
+                      </div>
+                    )}
+                  </form>
+                )}
+              </>
             )}
           </div>
         </div>

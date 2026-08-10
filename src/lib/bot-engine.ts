@@ -59,6 +59,22 @@ class WhatsAppBotEngine extends EventEmitter {
     this.emit("log", `Status changed to: ${state}${error ? ` (${error})` : ""}`);
   }
 
+  public async requestPairingCode(phoneNumber: string): Promise<string> {
+    if (!this.socket) {
+      await this.startBot();
+      // Small pause for socket creation
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+    if (!this.socket) {
+      throw new Error("Bot socket failed to initialize.");
+    }
+    const cleanNumber = phoneNumber.replace(/\D/g, "");
+    const formattedNum = cleanNumber.startsWith("0") ? "62" + cleanNumber.slice(1) : cleanNumber;
+    const code = await this.socket.requestPairingCode(formattedNum);
+    this.emit("log", `🔑 Generated WhatsApp Pairing Code: ${code} for phone +${formattedNum}`);
+    return code;
+  }
+
   public async startBot() {
     if (this.socket || this.isInitializing) {
       console.log("[BotEngine] Bot is already running or initializing.");

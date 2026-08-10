@@ -4,7 +4,7 @@ import { botEngine } from "@/lib/bot-engine";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action } = body;
+    const { action, phoneNumber } = body;
 
     if (action === "start") {
       // Non-blocking start
@@ -15,6 +15,22 @@ export async function POST(req: NextRequest) {
         success: true,
         message: "Bot start process triggered.",
         status: botEngine.getStatus(),
+      });
+    }
+
+    if (action === "request_pairing_code") {
+      if (!phoneNumber) {
+        return NextResponse.json(
+          { success: false, error: "Nomor WhatsApp wajib diisi." },
+          { status: 400 }
+        );
+      }
+
+      const pairingCode = await botEngine.requestPairingCode(phoneNumber);
+      return NextResponse.json({
+        success: true,
+        pairingCode,
+        message: `Kode Pasangan berhasil dibuat: ${pairingCode}`,
       });
     }
 
