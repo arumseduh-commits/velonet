@@ -21,7 +21,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (status && status !== "ALL") {
-      whereClause.status = status;
+      if (status === "ACTIVE") {
+        whereClause.status = "COMPLETED";
+      } else if (status === "WAITING") {
+        whereClause.status = { in: ["WAITING_CONFIRMATION", "WAITING_NAME", "NOT_STARTED"] };
+      } else {
+        whereClause.status = status;
+      }
     }
 
     const participants = await prisma.participant.findMany({
@@ -90,11 +96,25 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, ...data } = body;
+    const { id, ids, ...data } = body;
+
+    // Bulk update support
+    if (Array.isArray(ids) && ids.length > 0) {
+      const result = await prisma.participant.updateMany({
+        where: { id: { in: ids } },
+        data,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `${result.count} peserta berhasil diperbarui.`,
+        count: result.count,
+      });
+    }
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: "Participant ID is required for update." },
+        { success: false, error: "Participant ID or IDs array is required for update." },
         { status: 400 }
       );
     }
@@ -119,26 +139,43 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
-    const id = searchParams.get("id");
+    const singleId = searchParams.get("id");
 
-    if (!id) {
+    let ids: string[] = [];
+
+    // Support JSON body bulk delete
+    try {
+      const body = await req.json();
+      if (Array.isArray(body.ids)) {
+        ids = body.ids;
+      }
+    } catch (e) {
+      // Body may be empty if query params used
+    }
+
+    if (singleId) {
+      ids.push(singleId);
+    }
+
+    if (ids.length === 0) {
       return NextResponse.json(
-        { success: false, error: "Participant ID is required." },
+        { success: false, error: "Participant ID or IDs array is required for deletion." },
         { status: 400 }
       );
     }
 
-    await prisma.participant.delete({
-      where: { id },
+    const result = await prisma.participant.deleteMany({
+      where: { id: { in: ids } },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Participant deleted successfully.",
+      message: `${result.count} peserta berhasil dihapus.`,
+      count: result.count,
     });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to delete participant." },
+      { success: false, error: error.message || "Failed to delete participant(s)." },
       { status: 500 }
     );
   }
