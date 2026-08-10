@@ -280,13 +280,19 @@ export default function BotControlPage() {
   function formatDisplayPhoneNumber(raw: string): string {
     if (!raw) return "-";
     let cleaned = raw.replace(/\D/g, "");
+    
+    // Detect raw LID format (starts with 1, 2, 69, 82, 91 and has length >= 14)
+    if (cleaned.length >= 14 && !cleaned.startsWith("62") && !cleaned.startsWith("0")) {
+      return `ID Privat WA (LID: ${cleaned.slice(0, 4)}...${cleaned.slice(-4)})`;
+    }
+
     if (cleaned.startsWith("0")) {
       cleaned = "62" + cleaned.slice(1);
     }
     if (cleaned.startsWith("62")) {
       return `+${cleaned}`;
     }
-    return `+62 (ID: ${cleaned})`;
+    return `+${cleaned}`;
   }
 
   const handleExcludeMemberDirect = async (phone: string, name?: string | null) => {

@@ -442,8 +442,8 @@ class WhatsAppBotEngine extends EventEmitter {
         const rawPn = fullJid.split("@")[0].split(":")[0];
         displayPhone = rawPn.startsWith("0") ? "62" + rawPn.slice(1) : rawPn;
       } else {
-        const rawLid = fullJid.split("@")[0].split(":")[0];
-        displayPhone = rawLid;
+        // Do not set raw LID digits as displayPhone (prevents raw LIDs from being saved into Participant table)
+        displayPhone = "";
       }
 
       // Extract clean digits for bot's own phone number & LID without device suffix (e.g. 6285187257740:12 -> 6285187257740)
@@ -461,15 +461,16 @@ class WhatsAppBotEngine extends EventEmitter {
         continue;
       }
 
-      let participant = await prisma.participant.findFirst({
-        where: {
-          OR: [
-            { phoneNumber: displayPhone },
-            { phoneNumber: fullJid.split("@")[0] },
-            ...(pnJid ? [{ phoneNumber: pnJid.split("@")[0] }] : []),
-          ],
-        },
-      });
+      let participant = displayPhone
+        ? await prisma.participant.findFirst({
+            where: {
+              OR: [
+                { phoneNumber: displayPhone },
+                ...(pnJid ? [{ phoneNumber: pnJid.split("@")[0] }] : []),
+              ],
+            },
+          })
+        : null;
 
       // If pnJid resolved a real 62 number, auto-update participant's phoneNumber in DB if it was previously an LID
       if (participant && pnJid) {
@@ -509,7 +510,7 @@ class WhatsAppBotEngine extends EventEmitter {
       const finalPhone =
         participant && participant.phoneNumber && participant.phoneNumber.startsWith("62")
           ? participant.phoneNumber
-          : displayPhone;
+          : displayPhone || fullJid.split("@")[0];
 
       membersList.push({
         id: participant?.id || null,
