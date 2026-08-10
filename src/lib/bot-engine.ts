@@ -193,7 +193,7 @@ class WhatsAppBotEngine extends EventEmitter {
               `📌 GROUP ACTIVITY DETECTED! Group JID: "${remoteJid}"`
             );
 
-            // Respond to .jid or .id command (works even if sent from bot's own phone)
+            // Respond to .jid or .id command
             if (
               cleanCmd === ".jid" ||
               cleanCmd === "!jid" ||
@@ -205,8 +205,41 @@ class WhatsAppBotEngine extends EventEmitter {
               await sock.sendMessage(remoteJid, {
                 text: `📌 *ID Group WhatsApp ini:*\n\`${remoteJid}\`\n\nGunakan JID ini di Admin Dashboard VeloNet!`,
               });
+              continue;
             }
-            // Ignore all normal group chatter for state machine
+
+            // Skip messages sent by bot itself in group
+            if (msg.key.fromMe) continue;
+
+            const groupSenderJid = (msg as any).participant || (msg.key as any).participant;
+            const pushName = msg.pushName || undefined;
+
+            // Automatically catch group replies like "ya", "iya", "hadir", "ikut", "lanjut", "ok"
+            if (
+              groupSenderJid &&
+              ["ya", "iya", "hadir", "lanjut", "ok", "ikut", "siap", "y"].includes(cleanCmd)
+            ) {
+              let realPhoneNum: string | undefined = undefined;
+              if (groupSenderJid.endsWith("@s.whatsapp.net")) {
+                realPhoneNum = groupSenderJid.split("@")[0].split(":")[0];
+              }
+
+              const result = await processIncomingMessage(
+                prisma,
+                groupSenderJid,
+                conversationText,
+                pushName,
+                realPhoneNum
+              );
+
+              if (result && result.replyMessage) {
+                this.emit("log", `✅ Group confirmation recorded for member [${groupSenderJid}]`);
+                await sock.sendMessage(remoteJid, {
+                  text: `@${groupSenderJid.split("@")[0]} ${result.replyMessage}`,
+                  mentions: [groupSenderJid],
+                });
+              }
+            }
             continue;
           }
 
