@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { botEngine } from "@/lib/bot-engine";
+import { buildAlpaFollowUpMessage } from "@/lib/message-variations";
+
 
 export async function POST(
   req: Request,
@@ -81,15 +83,15 @@ export async function POST(
     (async () => {
       botEngine.emit("log", `Memulai pengiriman follow-up ALPA sesi "${session.title}" ke ${alpaParticipants.length} peserta...`);
       for (const p of alpaParticipants) {
-        const msg = `🔴 *PEMBERITAHUAN KEHADIRAN VELOCITY*\n\nHalo Kak *${
-          p.name || "Peserta"
-        }*,\n\nAnda tercatat *TIDAK HADIR (ALPA)* pada sesi pertemuan *"${
-          session.title
-        }"* (${dateStr}).\n\n${
-          customNote ? `📝 *Catatan Pembina:*\n${customNote}\n\n` : ""
-        }📝 *Petunjuk Izin Absensi:*\nJika kelak Kakak berhalangan hadir pada pertemuan berikutnya, silakan gunakan format *!ijin [alasan]* ke bot ini.\n*Contoh:* \`!ijin izin karena ada acara kondangan\`\n\n_Terima kasih atas perhatian dan kerjasamanya!_`;
-
         try {
+          // Each participant gets a unique variation of the ALPA follow-up message
+          const msg = buildAlpaFollowUpMessage({
+            name: p.name || undefined,
+            sessionTitle: session.title,
+            dateStr,
+            customNote: customNote || undefined,
+          });
+
           const sent = await botEngine.sendMessage(p.phoneNumber, msg);
           if (sent) {
             successCount++;

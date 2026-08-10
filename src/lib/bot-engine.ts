@@ -12,6 +12,8 @@ import { prisma } from "./prisma";
 import { usePrismaAuthState } from "./baileys-db-auth";
 import { processIncomingMessage } from "./bot-state-machine";
 import { startAutoCronScheduler } from "./auto-cron-scheduler";
+import { buildConfirmationMessage } from "./message-variations";
+
 
 export type BotConnectionState = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 
@@ -695,8 +697,9 @@ class WhatsAppBotEngine extends EventEmitter {
       });
     }
 
-    const initMsg =
-      "Halo! Apakah kamu masih ingin melanjutkan pelatihan ekskul Bahasa Inggris di komunitas Velocity?\n\nBalas *YA* untuk lanjut, atau *TIDAK* untuk keluar.";
+    // Build a unique varied confirmation message to avoid WhatsApp spam detection
+    const initMsg = buildConfirmationMessage(participant.name || undefined);
+
 
     // Prioritize standard phone number (628xxx@s.whatsapp.net) over @lid to prevent WA session revocation!
     let targetToSend = jidOrPhone;
