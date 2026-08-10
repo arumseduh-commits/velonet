@@ -188,7 +188,7 @@ export default function SessionsAdminPage() {
   useEffect(() => {
     fetchSessions();
     // Set default date to today YYYY-MM-DD
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD local time
     setDate(today);
 
     // Real-time Auto-Sync Poller (Every 3.0s)
@@ -231,7 +231,7 @@ export default function SessionsAdminPage() {
       return;
     }
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD local time
     if (date < todayStr) {
       setActionMessage({
         type: "error",

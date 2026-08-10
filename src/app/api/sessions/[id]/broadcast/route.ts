@@ -85,45 +85,57 @@ export async function POST(
     let successCount = 0;
     let failCount = 0;
 
-    for (const p of participants) {
-      let msg = "";
-      if (session.isCancelled || isCancellationNotice) {
-        msg = `🔴 *PEMBERITAHUAN PEMBATALAN PERTEMUAN VELOCITY*\n\nHalo Kak *${
-          p.name || "Peserta"
-        }*,\n\nMohon maaf, sesi pertemuan *"${
-          session.title
-        }"* yang dijadwalkan pada *${dateStr}* di *${
-          session.locationName || "Titik Kumpul"
-        }* telah *DIBATALKAN* oleh Admin.\n\n${
-          activeCustomMessage ? `📝 *Alasan/Catatan Admin:*\n${activeCustomMessage}\n\n` : ""
-        }_Terima kasih dan mohon maaf atas ketidaknyamanannya._`;
-      } else {
-        msg = `📢 *PENGUMUMAN PERTEMUAN VELOCITY*\n\nHalo Kak *${
-          p.name || "Peserta"
-        }*,\n\n📌 *Sesi:* ${
-          session.title
-        }\n📅 *Hari/Tanggal:* ${dateStr}\n⏰ *Jam Buka Absen:* ${startTimeStr} WIB\n⌛ *Jam Ditutup Absen:* ${endTimeStr} WIB (Ditutup Otomatis)\n📍 *Lokasi:* ${
-          session.locationName || "Lokasi Kumpul Velocity"
-        }\n${
-          activeCustomMessage ? `\n📝 *Catatan Khusus Admin:*\n${activeCustomMessage}\n` : ""
-        }\n*Petunjuk Absensi:* Saat berada di lokasi perkumpulan sebelum jam ${endTimeStr} WIB, cukup kirimkan *Share Location* WhatsApp Anda ke chat bot ini.\n\n_Jika berhalangan hadir, balas dengan format: *!izin [alasan]*_`;
-      }
+    // Start background task
+    (async () => {
+      botEngine.emit("log", `Memulai broadcast pengumuman sesi "${session.title}" ke ${participants.length} peserta...`);
+      for (const p of participants) {
+        let msg = "";
+        if (session.isCancelled || isCancellationNotice) {
+          msg = `🔴 *PEMBERITAHUAN PEMBATALAN PERTEMUAN VELOCITY*\n\nHalo Kak *${
+            p.name || "Peserta"
+          }*,\n\nMohon maaf, sesi pertemuan *"${
+            session.title
+          }"* yang dijadwalkan pada *${dateStr}* di *${
+            session.locationName || "Titik Kumpul"
+          }* telah *DIBATALKAN* oleh Admin.\n\n${
+            activeCustomMessage ? `📝 *Alasan/Catatan Admin:*\n${activeCustomMessage}\n\n` : ""
+          }_Terima kasih dan mohon maaf atas ketidaknyamanannya._`;
+        } else {
+          msg = `📢 *PENGUMUMAN PERTEMUAN VELOCITY*\n\nHalo Kak *${
+            p.name || "Peserta"
+          }*,\n\n📌 *Sesi:* ${
+            session.title
+          }\n📅 *Hari/Tanggal:* ${dateStr}\n⏰ *Jam Buka Absen:* ${startTimeStr} WIB\n⌛ *Jam Ditutup Absen:* ${endTimeStr} WIB (Ditutup Otomatis)\n📍 *Lokasi:* ${
+            session.locationName || "Lokasi Kumpul Velocity"
+          }\n${
+            activeCustomMessage ? `\n📝 *Catatan Khusus Admin:*\n${activeCustomMessage}\n` : ""
+          }\n*Petunjuk Absensi:* Saat berada di lokasi perkumpulan sebelum jam ${endTimeStr} WIB, cukup kirimkan *Share Location* WhatsApp Anda ke chat bot ini.\n\n_Jika berhalangan hadir, balas dengan format: *!izin [alasan]*_`;
+        }
 
-      const sent = await botEngine.sendMessage(p.phoneNumber, msg);
-      if (sent) {
-        successCount++;
-      } else {
-        failCount++;
+        try {
+          const sent = await botEngine.sendMessage(p.phoneNumber, msg);
+          if (sent) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (e) {
+          failCount++;
+        }
+        
+        // Wait 10-16 seconds between messages to prevent spam detection
+        const delay = Math.floor(Math.random() * 6000) + 10000; 
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-      // Small delay between sends to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 800));
-    }
+      botEngine.emit("log", `✅ Selesai broadcast sesi "${session.title}". Sukses: ${successCount}, Gagal: ${failCount}`);
+    })().catch(err => {
+      console.error("Broadcast background task error:", err);
+    });
 
     return NextResponse.json({
       success: true,
+      message: "Broadcast sedang diproses di latar belakang.",
       total: participants.length,
-      successCount,
-      failCount,
     });
   } catch (error: any) {
     console.error("POST /api/sessions/[id]/broadcast error:", error);

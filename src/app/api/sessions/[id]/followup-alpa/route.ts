@@ -77,30 +77,42 @@ export async function POST(
     let successCount = 0;
     let failCount = 0;
 
-    for (const p of alpaParticipants) {
-      const msg = `🔴 *PEMBERITAHUAN KEHADIRAN VELOCITY*\n\nHalo Kak *${
-        p.name || "Peserta"
-      }*,\n\nAnda tercatat *TIDAK HADIR (ALPA)* pada sesi pertemuan *"${
-        session.title
-      }"* (${dateStr}).\n\n${
-        customNote ? `📝 *Catatan Pembina:*\n${customNote}\n\n` : ""
-      }📝 *Petunjuk Izin Absensi:*\nJika kelak Kakak berhalangan hadir pada pertemuan berikutnya, silakan gunakan format *!ijin [alasan]* ke bot ini.\n*Contoh:* \`!ijin izin karena ada acara kondangan\`\n\n_Terima kasih atas perhatian dan kerjasamanya!_`;
+    // Start background task
+    (async () => {
+      botEngine.emit("log", `Memulai pengiriman follow-up ALPA sesi "${session.title}" ke ${alpaParticipants.length} peserta...`);
+      for (const p of alpaParticipants) {
+        const msg = `🔴 *PEMBERITAHUAN KEHADIRAN VELOCITY*\n\nHalo Kak *${
+          p.name || "Peserta"
+        }*,\n\nAnda tercatat *TIDAK HADIR (ALPA)* pada sesi pertemuan *"${
+          session.title
+        }"* (${dateStr}).\n\n${
+          customNote ? `📝 *Catatan Pembina:*\n${customNote}\n\n` : ""
+        }📝 *Petunjuk Izin Absensi:*\nJika kelak Kakak berhalangan hadir pada pertemuan berikutnya, silakan gunakan format *!ijin [alasan]* ke bot ini.\n*Contoh:* \`!ijin izin karena ada acara kondangan\`\n\n_Terima kasih atas perhatian dan kerjasamanya!_`;
 
-      const sent = await botEngine.sendMessage(p.phoneNumber, msg);
-      if (sent) {
-        successCount++;
-      } else {
-        failCount++;
+        try {
+          const sent = await botEngine.sendMessage(p.phoneNumber, msg);
+          if (sent) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (e) {
+          failCount++;
+        }
+        
+        // Delay 10-16s between messages to prevent spam detection
+        const delay = Math.floor(Math.random() * 6000) + 10000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-      // Small delay between sends to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 800));
-    }
+      botEngine.emit("log", `✅ Selesai kirim follow-up ALPA sesi "${session.title}". Sukses: ${successCount}, Gagal: ${failCount}`);
+    })().catch(err => {
+      console.error("Follow-up ALPA background task error:", err);
+    });
 
     return NextResponse.json({
       success: true,
+      message: "Notifikasi ALPA sedang dikirim di latar belakang.",
       total: alpaParticipants.length,
-      successCount,
-      failCount,
     });
   } catch (error: any) {
     console.error("POST /api/sessions/[id]/followup-alpa error:", error);

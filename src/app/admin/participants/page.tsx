@@ -48,7 +48,7 @@ export default function ParticipantsPage() {
   // Default Tab Status Filter: ACTIVE (Peserta Aktif / COMPLETED)
   const [activeTab, setActiveTab] = useState<"ACTIVE" | "WAITING" | "ALL">("ACTIVE");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
+    // removed selectedParticipant
 
   // Bulk Action State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -268,7 +268,7 @@ export default function ParticipantsPage() {
       if (json.success) {
         toast.success("Peserta berhasil dihapus.");
         fetchParticipants();
-        if (selectedParticipant?.id === id) setSelectedParticipant(null);
+        fetchParticipants();
       } else {
         toast.error(json.error || "Gagal menghapus peserta.");
       }
@@ -588,19 +588,7 @@ export default function ParticipantsPage() {
         </div>
       </div>
 
-      {/* Detail Modal */}
-      {selectedParticipant && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
-            <button
-              onClick={() => setSelectedParticipant(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Detail Modal Removed */}
 
       {/* Add Participant Modal */}
       {showAddModal && (

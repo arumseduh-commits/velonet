@@ -291,7 +291,7 @@ export default function CumulativeReportsPage() {
                       </td>
                       <td className="p-4 text-right">
                         <Link
-                          href={`/admin/participants/${item.participantId}`}
+                          href={`/admin/participants/${item.phoneNumber}`}
                           className="p-1.5 inline-flex items-center gap-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
                         >
                           <span>Profil</span>

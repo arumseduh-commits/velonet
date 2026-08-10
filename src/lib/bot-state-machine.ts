@@ -77,13 +77,7 @@ export async function processIncomingMessage(
         orderBy: { updatedAt: "desc" },
       });
     }
-
-    if (!participant) {
-      participant = await prisma.participant.findFirst({
-        where: { isExcluded: false },
-        orderBy: { updatedAt: "desc" },
-      });
-    }
+    // DO NOT add any additional fallback - if we can't identify, return null silently
   }
 
   // STRICT RULE: If participant is NOT in the database, DO NOT REPLY!
@@ -141,8 +135,14 @@ export async function processIncomingMessage(
     return null;
   }
 
-  // 1. Handle GPS Location Check-In
+  // 1. Handle GPS Location Check-In (only for COMPLETED participants)
   if (locationData) {
+    if (participant.status !== RegistrationStatus.COMPLETED) {
+      return {
+        newStatus: participant.status as RegistrationStatusType,
+        replyMessage: 'Maaf, fitur absensi GPS hanya tersedia untuk peserta yang sudah menyelesaikan pendaftaran. Silakan selesaikan pendaftaran terlebih dahulu.',
+      };
+    }
     const checkInResult = await processLocationCheckIn({
       prisma,
       participantId: participant.id,
@@ -338,6 +338,20 @@ export async function processIncomingMessage(
   }
 
   const upperText = text.toUpperCase();
+
+  // Allow user to cancel registration at any step
+  if (upperText === 'BATAL' || upperText === 'CANCEL' || upperText === 'STOP') {
+    if (participant.status !== RegistrationStatus.COMPLETED && participant.status !== RegistrationStatus.OPTED_OUT) {
+      await prisma.participant.update({
+        where: { id: participant.id },
+        data: { status: RegistrationStatus.OPTED_OUT },
+      });
+      return {
+        newStatus: RegistrationStatus.OPTED_OUT,
+        replyMessage: 'Pendaftaran dibatalkan. Jika berubah pikiran, ketik *DAFTAR* untuk mendaftar ulang.',
+      };
+    }
+  }
 
   switch (participant.status) {
     case RegistrationStatus.NOT_STARTED:

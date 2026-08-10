@@ -222,6 +222,22 @@ class WhatsAppBotEngine extends EventEmitter {
               let realPhoneNum: string | undefined = undefined;
               if (groupSenderJid.endsWith("@s.whatsapp.net")) {
                 realPhoneNum = groupSenderJid.split("@")[0].split(":")[0];
+              } else if (groupSenderJid.endsWith("@lid")) {
+                // Try resolving @lid to real phone number
+                try {
+                  const res = await sock.onWhatsApp(groupSenderJid);
+                  if (res && Array.isArray(res)) {
+                    for (const item of res) {
+                      if (item && item.jid) {
+                        const raw = item.jid.split("@")[0].split(":")[0];
+                        if (raw.startsWith("62")) {
+                          realPhoneNum = raw;
+                          break;
+                        }
+                      }
+                    }
+                  }
+                } catch (e) {}
               }
 
               const result = await processIncomingMessage(
@@ -242,8 +258,15 @@ class WhatsAppBotEngine extends EventEmitter {
                 });
 
                 // 2. Send data collection prompts (Nama, Kelas, Motivasi, Hobi) PRIVATELY via 1-on-1 DM
-                const privateTarget = realPhoneNum ? `${realPhoneNum}@s.whatsapp.net` : groupSenderJid;
-                await this.sendToJid(privateTarget, result.replyMessage);
+                const privateTarget = realPhoneNum 
+                  ? `${realPhoneNum}@s.whatsapp.net` 
+                  : (groupSenderJid.endsWith('@s.whatsapp.net') ? groupSenderJid : null);
+
+                if (privateTarget) {
+                  await this.sendToJid(privateTarget, result.replyMessage);
+                } else {
+                  this.emit('log', `⚠️ Cannot send private DM to group member [${groupSenderJid}] - no phone number resolved.`);
+                }
               }
             }
             continue;
@@ -459,17 +482,17 @@ class WhatsAppBotEngine extends EventEmitter {
     );
     const resolvedLidMap = new Map<string, string>();
 
-    console.log("Group Metadata Participants sample:", metadata.participants[0]);
+    // console.log removed
 
     if (lidMembers.length > 0) {
       try {
         const lidJids = lidMembers.map((m) => m.id);
-        console.log(`Resolving ${lidJids.length} LID members via onWhatsApp...`);
+        this.emit("log", `Resolving ${lidJids.length} LID members via onWhatsApp...`);
         const onWaPromise = this.socket.onWhatsApp(...lidJids);
         const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
         const res = await Promise.race([onWaPromise, timeoutPromise]);
 
-        console.log("onWhatsApp raw result:", res);
+        // console.log removed
 
         if (res && Array.isArray(res)) {
           for (let i = 0; i < res.length; i++) {
@@ -485,7 +508,7 @@ class WhatsAppBotEngine extends EventEmitter {
             }
           }
         }
-        console.log("Resolved LID Map size:", resolvedLidMap.size);
+        this.emit("log", `Resolved LID Map size: ${resolvedLidMap.size}`);
       } catch (e) {
         console.error("LID resolution error:", e);
       }
@@ -651,6 +674,11 @@ class WhatsAppBotEngine extends EventEmitter {
     });
 
     if (!participant) {
+      // Safety guard: Only create participant for valid Indonesian phone numbers
+      if (!cleanNum.startsWith("62") || cleanNum.length < 10 || cleanNum.length > 15) {
+        this.emit("log", `⚠️ Skipping participant creation for invalid phone: ${cleanNum}`);
+        return false;
+      }
       participant = await prisma.participant.create({
         data: {
           phoneNumber: cleanNum,
@@ -715,7 +743,7 @@ class WhatsAppBotEngine extends EventEmitter {
       `📢 *PENGUMUMAN KONFIRMASI EKSKUL VELOCITY*\n\n` +
       `Halo teman-teman! Mohon konfirmasi kelanjutan pendaftaran ekskul Bahasa Inggris.\n\n` +
       `Bagi anggota berikut yang belum konfirmasi:\n${memberListText}\n` +
-      `Silakan chat personal ke bot ini dengan mengetik *YA* untuk lanjut atau *TIDAK* untuk keluar.\n\nTerima kasih banyak! 🙏`;
+      `Silakan balas *YA* di chat grup ini untuk konfirmasi keikutsertaan Anda, atau *TIDAK* untuk keluar. Bot akan langsung memproses balasan Anda. 🤖\n\nTerima kasih banyak! 🙏`;
 
     await this.socket.sendMessage(groupId, { text, mentions });
     this.emit(
