@@ -325,7 +325,14 @@ class WhatsAppBotEngine extends EventEmitter {
       }
 
       await this.socket.sendMessage(jid, { text });
-      this.emit("log", `Successfully sent message to JID [${jid}]: "${text.slice(0, 40)}..."`);
+      if (jid.endsWith("@lid")) {
+        this.emit(
+          "log",
+          `⚠️ [Catatan LID] Pesan dikirim ke ID Privat [${jid}]. Jika pesan tidak masuk di HP penerima, hal tersebut karena privasi WA penerima menyembunyikan nomor HP. Disarankan Impor/Buka Nomor HP Asli.`
+        );
+      } else {
+        this.emit("log", `Successfully sent message to JID [${jid}]: "${text.slice(0, 40)}..."`);
+      }
       return true;
     } catch (err: any) {
       console.error(`[BotEngine] Failed to send message to JID [${jid}]:`, err);
@@ -512,9 +519,21 @@ class WhatsAppBotEngine extends EventEmitter {
           ? participant.phoneNumber
           : displayPhone || fullJid.split("@")[0];
 
+      // Prioritize real phone number JID (@s.whatsapp.net) over @lid JID so WhatsApp servers deliver DMs to handset
+      let targetJid = pnJid;
+      if (!targetJid && participant?.phoneNumber && participant.phoneNumber.startsWith("62")) {
+        targetJid = `${participant.phoneNumber}@s.whatsapp.net`;
+      }
+      if (!targetJid && fullJid.endsWith("@s.whatsapp.net")) {
+        targetJid = fullJid;
+      }
+      if (!targetJid) {
+        targetJid = fullJid; // Fallback to LID JID if no phone number available
+      }
+
       membersList.push({
         id: participant?.id || null,
-        jid: fullJid,
+        jid: targetJid,
         pnJid: pnJid || (fullJid.endsWith("@s.whatsapp.net") ? fullJid : null),
         phoneNumber: finalPhone,
         isLid: fullJid.endsWith("@lid") && !pnJid,
