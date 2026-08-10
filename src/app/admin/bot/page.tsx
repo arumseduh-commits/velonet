@@ -91,12 +91,18 @@ export default function BotControlPage() {
   const [inspectorMsg, setInspectorMsg] = useState<string | null>(null);
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
   const [exclusionSearchQuery, setExclusionSearchQuery] = useState("");
+  const [groupDropdownSearch, setGroupDropdownSearch] = useState("");
 
-  // Exclusion List State (Unified inside Bot Control)
+  // Exclusion List State & Modal State
   const [exclusions, setExclusions] = useState<ExclusionItem[]>([]);
   const [newExclusionPhone, setNewExclusionPhone] = useState("");
   const [newExclusionName, setNewExclusionName] = useState("");
   const [addingExclusion, setAddingExclusion] = useState(false);
+  const [excludeModalMember, setExcludeModalMember] = useState<{
+    phone: string;
+    name: string;
+  } | null>(null);
+  const [excludingMember, setExcludingMember] = useState(false);
 
   // Bulk Import State
   const [importRawText, setImportRawText] = useState("");
@@ -276,6 +282,15 @@ export default function BotControlPage() {
       setAddingExclusion(false);
     }
   };
+
+  const filteredSavedGroups = savedGroups.filter((g) => {
+    if (!groupDropdownSearch.trim()) return true;
+    const q = groupDropdownSearch.toLowerCase().trim();
+    return (
+      (g.subject || "").toLowerCase().includes(q) ||
+      (g.id || "").toLowerCase().includes(q)
+    );
+  });
 
   function formatDisplayPhoneNumber(raw: string): string {
     if (!raw) return "-";
@@ -654,12 +669,35 @@ export default function BotControlPage() {
                 </div>
               )}
 
-              {/* Saved Groups Dropdown */}
+              {/* Saved Groups Dropdown with Real-Time Search */}
               {savedGroups.length > 0 && (
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Pilih Grup yang Pernah Diisi / Terdeteksi:
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Pilih Grup Terdeteksi ({savedGroups.length} Grup):
+                    </label>
+                  </div>
+
+                  {/* Search Bar for Groups */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Cari nama grup WA..."
+                      value={groupDropdownSearch}
+                      onChange={(e) => setGroupDropdownSearch(e.target.value)}
+                      className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                    {groupDropdownSearch && (
+                      <button
+                        onClick={() => setGroupDropdownSearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
                   <select
                     value={inputGroupJid}
                     onChange={(e) => {
@@ -668,7 +706,8 @@ export default function BotControlPage() {
                     }}
                     className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    {savedGroups.map((g) => (
+                    <option value="">-- Pilih Grup ({filteredSavedGroups.length} terurai) --</option>
+                    {filteredSavedGroups.map((g) => (
                       <option key={g.id} value={g.id}>
                         {g.subject} ({g.size} Anggota) - {g.id}
                       </option>
@@ -917,9 +956,14 @@ export default function BotControlPage() {
 
                           {!m.isExcluded && (
                             <button
-                              onClick={() => handleExcludeMemberDirect(m.phoneNumber, m.name)}
+                              onClick={() =>
+                                setExcludeModalMember({
+                                  phone: m.phoneNumber,
+                                  name: m.name || "",
+                                })
+                              }
                               className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all inline-flex items-center gap-1 cursor-pointer bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/20"
-                              title="Pilih nomor ini untuk langsung dimasukkan ke Exclusion List"
+                              title="Kecualikan nomor ini dan tambahkan nama/jabatan"
                             >
                               <ShieldAlert className="w-3 h-3" />
                               <span>Kecualikan</span>
@@ -1141,6 +1185,102 @@ export default function BotControlPage() {
                     <>
                       <UserPlus className="w-4 h-4" />
                       <span>Gabungkan Bot Sekarang</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Exclude Member Name Input Modal */}
+      {excludeModalMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Tambahkan ke Exclusion List</h3>
+                  <p className="text-xs text-slate-400">Kecualikan nomor dari pesan WA bot</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setExcludeModalMember(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setExcludingMember(true);
+                await handleExcludeMemberDirect(
+                  excludeModalMember.phone,
+                  excludeModalMember.name.trim() || "Anggota Grup Dikecualikan"
+                );
+                setExcludingMember(false);
+                setExcludeModalMember(null);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nomor WhatsApp / ID
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={formatDisplayPhoneNumber(excludeModalMember.phone)}
+                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-amber-300 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nama Lengkap / Jabatan Pengecualian
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Pak Pembina Velocity, Admin, Rizky"
+                  value={excludeModalMember.name}
+                  onChange={(e) =>
+                    setExcludeModalMember({ ...excludeModalMember, name: e.target.value })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  autoFocus
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  💡 <b>Petunjuk:</b> Isikan nama atau keterangan jabatan agar mudah dikenali di daftar pengecualian.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setExcludeModalMember(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={excludingMember}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-lg shadow-amber-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {excludingMember ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <span>Simpan Ke Exclusion List</span>
                     </>
                   )}
                 </button>
