@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { botEngine } from "@/lib/bot-engine";
 import { prisma } from "@/lib/prisma";
 
+// Humanized Anti-Spam Delay Helper (Prevents WA Account Banning)
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const getRandomDelay = (minMs = 3500, maxMs = 6500) =>
+  Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+
 export async function GET(req: NextRequest) {
   try {
     const groupId = req.nextUrl.searchParams.get("groupId");
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Batch Group Member Confirmation Sender
+    // Batch Group Member Confirmation Sender with Humanized Anti-Spam Delays
     if (action === "send_all_group_members") {
       if (!groupId) {
         return NextResponse.json(
@@ -91,6 +96,9 @@ export async function POST(req: NextRequest) {
           const sent = await botEngine.sendConfirmationToMember(target);
           if (sent) successCount++;
           else failCount++;
+
+          // Humanized anti-spam pause between each DM (3.5s - 6.5s)
+          await delay(getRandomDelay(3500, 6500));
         } catch (e) {
           failCount++;
         }
@@ -103,7 +111,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Broadcast to All Uncontacted Registered Participants
+    // Broadcast to All Uncontacted Registered Participants with Humanized Delays
     if (action === "send_all_uncontacted") {
       const uncontacted = await prisma.participant.findMany({
         where: {
@@ -120,6 +128,9 @@ export async function POST(req: NextRequest) {
           const sent = await botEngine.sendConfirmationToMember(p.phoneNumber);
           if (sent) successCount++;
           else failCount++;
+
+          // Humanized anti-spam pause between each DM (3.5s - 6.5s)
+          await delay(getRandomDelay(3500, 6500));
         } catch (e) {
           failCount++;
         }
