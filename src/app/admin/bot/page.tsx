@@ -89,6 +89,8 @@ export default function BotControlPage() {
   const [sendingSingleMember, setSendingSingleMember] = useState<string | null>(null);
   const [sendingAllGroup, setSendingAllGroup] = useState(false);
   const [inspectorMsg, setInspectorMsg] = useState<string | null>(null);
+  const [groupSearchQuery, setGroupSearchQuery] = useState("");
+  const [exclusionSearchQuery, setExclusionSearchQuery] = useState("");
 
   // Exclusion List State (Unified inside Bot Control)
   const [exclusions, setExclusions] = useState<ExclusionItem[]>([]);
@@ -813,6 +815,26 @@ export default function BotControlPage() {
                 </button>
               </div>
 
+              {/* Search Bar for Group Members */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5">
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Cari anggota grup berdasarkan nomor WhatsApp atau nama..."
+                  value={groupSearchQuery}
+                  onChange={(e) => setGroupSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+                />
+                {groupSearchQuery && (
+                  <button
+                    onClick={() => setGroupSearchQuery("")}
+                    className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded-md bg-slate-800"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
               {/* Members Table */}
               <div className="overflow-x-auto max-h-[360px] overflow-y-auto rounded-xl border border-slate-800">
                 <table className="w-full text-left border-collapse">
@@ -825,7 +847,28 @@ export default function BotControlPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-xs text-slate-200">
-                    {groupData.members.map((m) => (
+                    {groupData.members.filter((m) => {
+                      if (!groupSearchQuery.trim()) return true;
+                      const q = groupSearchQuery.toLowerCase().trim();
+                      const phone = (m.phoneNumber || "").toLowerCase();
+                      const name = (m.name || "").toLowerCase();
+                      return phone.includes(q) || name.includes(q);
+                    }).length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-6 text-center text-slate-400 text-xs">
+                          Tidak ditemukan anggota grup yang cocok dengan "{groupSearchQuery}".
+                        </td>
+                      </tr>
+                    ) : (
+                      groupData.members
+                        .filter((m) => {
+                          if (!groupSearchQuery.trim()) return true;
+                          const q = groupSearchQuery.toLowerCase().trim();
+                          const phone = (m.phoneNumber || "").toLowerCase();
+                          const name = (m.name || "").toLowerCase();
+                          return phone.includes(q) || name.includes(q);
+                        })
+                        .map((m) => (
                       <tr key={m.phoneNumber} className="hover:bg-slate-800/40 transition-colors">
                         <td className="py-3 px-3 font-mono font-medium text-slate-300">
                           {formatDisplayPhoneNumber(m.phoneNumber)}
@@ -878,7 +921,8 @@ export default function BotControlPage() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                   </tbody>
                 </table>
               </div>
@@ -904,6 +948,26 @@ export default function BotControlPage() {
               </button>
             </div>
 
+            {/* Search Bar for Exclusion List */}
+            <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Cari nomor HP atau nama di daftar pengecualian..."
+                value={exclusionSearchQuery}
+                onChange={(e) => setExclusionSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+              />
+              {exclusionSearchQuery && (
+                <button
+                  onClick={() => setExclusionSearchQuery("")}
+                  className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded-md bg-slate-800"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
             <div className="overflow-x-auto max-h-[220px] overflow-y-auto rounded-xl border border-slate-800">
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-slate-900 z-10">
@@ -920,8 +984,28 @@ export default function BotControlPage() {
                         Belum ada nomor yang dikecualikan.
                       </td>
                     </tr>
+                  ) : exclusions.filter((item) => {
+                      if (!exclusionSearchQuery.trim()) return true;
+                      const q = exclusionSearchQuery.toLowerCase().trim();
+                      const phone = (item.phoneNumber || "").toLowerCase();
+                      const name = (item.name || "").toLowerCase();
+                      return phone.includes(q) || name.includes(q);
+                    }).length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-4 text-center text-slate-400 text-xs">
+                        Tidak ditemukan nomor pengecualian yang cocok dengan "{exclusionSearchQuery}".
+                      </td>
+                    </tr>
                   ) : (
-                    exclusions.map((item) => (
+                    exclusions
+                      .filter((item) => {
+                        if (!exclusionSearchQuery.trim()) return true;
+                        const q = exclusionSearchQuery.toLowerCase().trim();
+                        const phone = (item.phoneNumber || "").toLowerCase();
+                        const name = (item.name || "").toLowerCase();
+                        return phone.includes(q) || name.includes(q);
+                      })
+                      .map((item) => (
                       <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
                         <td className="py-2.5 px-3 font-mono font-semibold text-amber-300">
                           {formatDisplayPhoneNumber(item.phoneNumber)}
