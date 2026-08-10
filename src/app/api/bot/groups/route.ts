@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { botEngine } from "@/lib/bot-engine";
 import { prisma } from "@/lib/prisma";
 
-// Humanized Anti-Spam Delay Helper (Prevents WA Account Banning)
+// Heavy Anti-Spam Delay Helper (Prevents WA Account Banning / Disconnects)
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-const getRandomDelay = (minMs = 3000, maxMs = 5000) =>
+const getRandomDelay = (minMs = 10000, maxMs = 16000) =>
   Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 
 export async function GET(req: NextRequest) {
@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
       (action === "send_jid_message" ||
         action === "send_member_confirmation" ||
         action === "send_all_group_members" ||
-        action === "send_all_uncontacted") &&
+        action === "send_all_uncontacted" ||
+        action === "send_group_announcement") &&
       botStatus.state !== "CONNECTED"
     ) {
       return NextResponse.json(
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Async Batch Group Member Confirmation Sender
+    // Async Super Slow & Safe Batch DM Sender (10s-16s Delay per Message)
     if (action === "send_all_group_members") {
       if (!groupId) {
         return NextResponse.json(
@@ -130,15 +131,16 @@ export async function POST(req: NextRequest) {
         let failCount = 0;
         let sentCounter = 0;
 
-        botEngine.emit(
-          "log",
-          `🚀 [Broadcast Group] Memulai pengiriman pesan ke ${groupData.members.length} anggota...`
+        const membersToSend = groupData.members.filter(
+          (m) => m.status !== "COMPLETED" && m.status !== "OPTED_OUT" && !m.isExcluded
         );
 
-        for (const m of groupData.members) {
-          if (m.status === "COMPLETED" || m.status === "OPTED_OUT" || m.isExcluded) {
-            continue;
-          }
+        botEngine.emit(
+          "log",
+          `🚀 [Broadcast DM Lambat & Aman] Memulai pengiriman DM ke ${membersToSend.length} anggota (Jeda 10-16 detik per nomor)...`
+        );
+
+        for (const m of membersToSend) {
           try {
             const target = m.jid || m.phoneNumber;
             const sent = await botEngine.sendConfirmationToMember(target);
@@ -149,15 +151,20 @@ export async function POST(req: NextRequest) {
               failCount++;
             }
 
-            // Anti-Spam Safeguard: Every 6 messages, take a 15s cool-off break
-            if (sentCounter > 0 && sentCounter % 6 === 0) {
+            // Heavy Anti-Spam Protection: Every 3 messages, take a 30s cool-off break
+            if (sentCounter > 0 && sentCounter % 3 === 0) {
               botEngine.emit(
                 "log",
-                `☕ [Anti-Spam] Istirahat 15 detik setelah mengirim ${sentCounter} pesan...`
+                `☕ [Anti-Spam Pause] Istirahat 30 detik setelah mengirim ${sentCounter} DM...`
               );
-              await delay(15000);
+              await delay(30000);
             } else {
-              await delay(getRandomDelay(3000, 5000));
+              const waitSec = Math.floor(getRandomDelay(10000, 16000) / 1000);
+              botEngine.emit(
+                "log",
+                `⏳ [Jeda Manusiawi] Menunggu ${waitSec} detik sebelum mengirim DM ke nomor berikutnya...`
+              );
+              await delay(waitSec * 1000);
             }
           } catch (e) {
             failCount++;
@@ -166,17 +173,17 @@ export async function POST(req: NextRequest) {
 
         botEngine.emit(
           "log",
-          `✅ [Broadcast Selesai] Pesan berhasil terkirim ke ${successCount} anggota, gagal ${failCount}.`
+          `✅ [Broadcast DM Selesai] Pesan DM berhasil terkirim ke ${successCount} anggota, gagal ${failCount}.`
         );
       })();
 
       return NextResponse.json({
         success: true,
-        message: `🚀 Broadcast DM telah dimulai! Bot sedang mengirimkan pesan satu per satu secara otomatis (periksa log di samping).`,
+        message: `🚀 Broadcast DM Lambat & Aman (Jeda 10-16s) telah dimulai di background! Pantau log di samping.`,
       });
     }
 
-    // Async Broadcast to All Uncontacted Registered Participants
+    // Async Super Slow & Safe Broadcast to All Uncontacted Registered Participants
     if (action === "send_all_uncontacted") {
       const uncontacted = await prisma.participant.findMany({
         where: {
@@ -193,7 +200,7 @@ export async function POST(req: NextRequest) {
 
         botEngine.emit(
           "log",
-          `🚀 [Broadcast Uncontacted] Memulai pengiriman pesan ke ${uncontacted.length} nomor HP...`
+          `🚀 [Broadcast DM Lambat & Aman] Memulai pengiriman DM ke ${uncontacted.length} nomor HP (Jeda 10-16 detik per nomor)...`
         );
 
         for (const p of uncontacted) {
@@ -206,15 +213,20 @@ export async function POST(req: NextRequest) {
               failCount++;
             }
 
-            // Anti-Spam Safeguard: Every 6 messages, take a 15s cool-off break
-            if (sentCounter > 0 && sentCounter % 6 === 0) {
+            // Heavy Anti-Spam Protection: Every 3 messages, take a 30s cool-off break
+            if (sentCounter > 0 && sentCounter % 3 === 0) {
               botEngine.emit(
                 "log",
-                `☕ [Anti-Spam] Istirahat 15 detik setelah mengirim ${sentCounter} pesan...`
+                `☕ [Anti-Spam Pause] Istirahat 30 detik setelah mengirim ${sentCounter} DM...`
               );
-              await delay(15000);
+              await delay(30000);
             } else {
-              await delay(getRandomDelay(3000, 5000));
+              const waitSec = Math.floor(getRandomDelay(10000, 16000) / 1000);
+              botEngine.emit(
+                "log",
+                `⏳ [Jeda Manusiawi] Menunggu ${waitSec} detik sebelum mengirim DM ke nomor berikutnya...`
+              );
+              await delay(waitSec * 1000);
             }
           } catch (e) {
             failCount++;
@@ -223,13 +235,13 @@ export async function POST(req: NextRequest) {
 
         botEngine.emit(
           "log",
-          `✅ [Broadcast Selesai] Pesan berhasil terkirim ke ${successCount} nomor HP, gagal ${failCount}.`
+          `✅ [Broadcast DM Selesai] Pesan DM berhasil terkirim ke ${successCount} nomor HP, gagal ${failCount}.`
         );
       })();
 
       return NextResponse.json({
         success: true,
-        message: `🚀 Broadcast DM telah dimulai! Bot sedang mengirimkan pesan satu per satu secara otomatis (periksa log di samping).`,
+        message: `🚀 Broadcast DM Lambat & Aman (Jeda 10-16s) telah dimulai di background! Pantau log di samping.`,
       });
     }
 
