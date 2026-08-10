@@ -119,3 +119,21 @@ model Attendance {
   @@unique([sessionId, participantId])
 }
 
+model ScrapedArticle {
+  id              String   @id @default(uuid())
+  title           String
+  slug            String   @unique
+  category        String   @default("General")
+  level           String   @default("Intermediate")
+  summary         String?
+  contentHtml     String
+  sourceUrl       String
+  quizData        String?  // JSON stringified array of quiz questions
+  scrapedAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([slug])
+}
+
+

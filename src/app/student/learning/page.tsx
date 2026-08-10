@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen,
@@ -20,17 +20,39 @@ import {
   FileText,
   Clock,
   ChevronRight,
+  RefreshCw,
 } from "lucide-react";
 import { MISTERGURU_MATERIALS, LearningMaterial } from "@/data/misterguru-data";
 
 export default function StudentLearningPage() {
+  const [materials, setMaterials] = useState<any[]>(MISTERGURU_MATERIALS);
+  const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeMaterial, setActiveMaterial] = useState<LearningMaterial | null>(null);
+  const [activeMaterial, setActiveMaterial] = useState<any | null>(null);
 
   // Quiz state
   const [quizAnswers, setQuizAnswers] = useState<{ [qIndex: number]: number }>({});
   const [submittedQuiz, setSubmittedQuiz] = useState(false);
+
+  const fetchScrapedArticles = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/learning/articles");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setMaterials(json.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch scraped articles:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScrapedArticles();
+  }, []);
 
   const categories = [
     { id: "ALL", name: "📚 Semua Materi" },
@@ -41,23 +63,24 @@ export default function StudentLearningPage() {
     { id: "Vocabulary Builder", name: "💡 Vocabulary Builder" },
   ];
 
-  const filteredMaterials = MISTERGURU_MATERIALS.filter((item) => {
+  const filteredMaterials = materials.filter((item) => {
     const matchesCategory = selectedCategory === "ALL" || item.category === selectedCategory;
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !q ||
       item.title.toLowerCase().includes(q) ||
-      item.summary.toLowerCase().includes(q) ||
+      (item.summary && item.summary.toLowerCase().includes(q)) ||
       item.category.toLowerCase().includes(q);
 
     return matchesCategory && matchesSearch;
   });
 
-  const handleOpenMaterial = (material: LearningMaterial) => {
+  const handleOpenMaterial = (material: any) => {
     setActiveMaterial(material);
     setQuizAnswers({});
     setSubmittedQuiz(false);
   };
+
 
   const handleSelectQuizOption = (qIndex: number, optionIndex: number) => {
     if (submittedQuiz) return;
@@ -67,11 +90,12 @@ export default function StudentLearningPage() {
   const calculateQuizScore = () => {
     if (!activeMaterial?.quiz) return 0;
     let correctCount = 0;
-    activeMaterial.quiz.forEach((q, idx) => {
+    activeMaterial.quiz.forEach((q: any, idx: number) => {
       if (quizAnswers[idx] === q.answerIndex) {
         correctCount++;
       }
     });
+
     return Math.round((correctCount / activeMaterial.quiz.length) * 100);
   };
 
@@ -220,12 +244,20 @@ export default function StudentLearningPage() {
               </button>
             </div>
 
-            {/* Markdown Content Display */}
+            {/* Content Display */}
             <div className="prose prose-invert max-w-none text-xs leading-relaxed space-y-4 bg-slate-950/60 p-5 rounded-2xl border border-slate-800">
-              <div className="whitespace-pre-wrap font-sans text-slate-200">
-                {activeMaterial.contentMarkdown}
-              </div>
+              {activeMaterial.contentHtml ? (
+                <div
+                  className="font-sans text-slate-200 space-y-3"
+                  dangerouslySetInnerHTML={{ __html: activeMaterial.contentHtml }}
+                />
+              ) : (
+                <div className="whitespace-pre-wrap font-sans text-slate-200">
+                  {activeMaterial.contentMarkdown}
+                </div>
+              )}
             </div>
+
 
             {/* Interactive Quiz Section */}
             {activeMaterial.quiz && activeMaterial.quiz.length > 0 && (
@@ -245,14 +277,15 @@ export default function StudentLearningPage() {
                 </div>
 
                 <div className="space-y-6 text-xs">
-                  {activeMaterial.quiz.map((q, qIdx) => (
+                  {activeMaterial.quiz.map((q: any, qIdx: number) => (
                     <div key={qIdx} className="space-y-3 p-4 rounded-xl bg-slate-900 border border-slate-800">
                       <p className="font-semibold text-white">
                         {qIdx + 1}. {q.question}
                       </p>
 
                       <div className="space-y-2">
-                        {q.options.map((opt, optIdx) => {
+                        {q.options.map((opt: string, optIdx: number) => {
+
                           const isSelected = quizAnswers[qIdx] === optIdx;
                           const isCorrectOption = optIdx === q.answerIndex;
 

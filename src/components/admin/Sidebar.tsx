@@ -155,6 +155,20 @@ export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
             <span>Laporan Kumulatif</span>
           </Link>
 
+          {/* 5. MisterGuru Scraper Hub */}
+          <Link
+            href="/admin/learning"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              pathname.startsWith("/admin/learning")
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-md shadow-blue-500/10"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+          >
+            <Sparkles className={`w-5 h-5 ${pathname.startsWith("/admin/learning") ? "text-amber-400" : "text-slate-400"}`} />
+            <span>MisterGuru Scraper</span>
+          </Link>
+
+
           {/* 3. Dropdown Parent Menu: Fitur Bot */}
           <div>
             <button
