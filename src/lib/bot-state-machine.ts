@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { processLocationCheckIn, processLeaveRequest } from "./attendance";
+import { buildRegistrationMessage } from "./message-variations";
+
 
 export interface LocationPayload {
   latitude: number;
@@ -368,8 +370,7 @@ export async function processIncomingMessage(
         });
         return {
           newStatus: RegistrationStatus.WAITING_NAME,
-          replyMessage:
-            "Terima kasih atas konfirmasinya! 👍\n\nSilakan jawab pertanyaan 1 dari 4:\n*Siapa nama lengkap kamu?*",
+          replyMessage: buildRegistrationMessage("ask_name"),
         };
       } else if (
         upperText === "TIDAK" ||
@@ -385,14 +386,12 @@ export async function processIncomingMessage(
         });
         return {
           newStatus: RegistrationStatus.OPTED_OUT,
-          replyMessage:
-            "Baik, terima kasih atas konfirmasinya. Data kamu telah dicatat.",
+          replyMessage: buildRegistrationMessage("opted_out"),
         };
       } else {
         return {
           newStatus: participant.status as RegistrationStatusType,
-          replyMessage:
-            "Halo! Silakan konfirmasi terlebih dahulu:\n\nApakah kamu masih ingin melanjutkan pelatihan ekskul Bahasa Inggris di komunitas Velocity?\n\nBalas *YA* untuk lanjut, atau *TIDAK* untuk keluar.",
+          replyMessage: buildRegistrationMessage("remind_confirm"),
         };
       }
     }
@@ -407,7 +406,7 @@ export async function processIncomingMessage(
       });
       return {
         newStatus: RegistrationStatus.WAITING_CLASS,
-        replyMessage: `Terima kasih, ${text}!\n\nPertanyaan 2 dari 4:\n*Kamu dari kelas berapa?* (Contoh: X IPA 1 / XI IPS 2)`,
+        replyMessage: buildRegistrationMessage("ask_class", text),
       };
     }
 
@@ -421,8 +420,7 @@ export async function processIncomingMessage(
       });
       return {
         newStatus: RegistrationStatus.WAITING_MOTIVATION,
-        replyMessage:
-          "Pertanyaan 3 dari 4:\n*Apa motivasi/kemauan kamu untuk mempelajari bahasa Inggris?*",
+        replyMessage: buildRegistrationMessage("ask_motivation"),
       };
     }
 
@@ -436,7 +434,7 @@ export async function processIncomingMessage(
       });
       return {
         newStatus: RegistrationStatus.WAITING_HOBBY,
-        replyMessage: "Pertanyaan 4 dari 4 (Terakhir):\n*Apa hobi kamu?*",
+        replyMessage: buildRegistrationMessage("ask_hobby"),
       };
     }
 
@@ -450,7 +448,7 @@ export async function processIncomingMessage(
       });
       return {
         newStatus: RegistrationStatus.COMPLETED,
-        replyMessage: `🎉 Terima kasih! Data pendaftaran ekskul Bahasa Inggris Velocity kamu telah berhasil disimpan.\n\n*Detail Data Kamu:*\n• Nama: ${updated.name || "-"}\n• Kelas: ${updated.studentClass || "-"}\n• Motivasi: ${updated.motivation || "-"}\n• Hobi: ${updated.hobby || "-"}\n\nSampai jumpa di kelas Velocity! 🚀`,
+        replyMessage: buildRegistrationMessage("completed", updated.name || undefined, updated.studentClass || undefined, updated.motivation || undefined, updated.hobby || undefined),
       };
     }
 
