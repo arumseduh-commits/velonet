@@ -300,21 +300,7 @@ class WhatsAppBotEngine extends EventEmitter {
 
     let jid = targetInput.trim();
 
-    // Prevent direct DM sends to un-resolved @lid JIDs which trigger WA session revocation
-    if (jid.endsWith("@lid")) {
-      try {
-        const res = await this.socket.onWhatsApp(jid);
-        if (res && Array.isArray(res) && res[0]?.jid && res[0].jid.endsWith("@s.whatsapp.net")) {
-          jid = res[0].jid;
-        } else {
-          this.emit("log", `⚠️ Skipping direct DM to LID [${jid}] (LID DMs without phone number are prohibited by WhatsApp)`);
-          return false;
-        }
-      } catch (e) {
-        this.emit("log", `⚠️ Skipping direct DM to LID [${jid}] (LID DMs without phone number are prohibited by WhatsApp)`);
-        return false;
-      }
-    } else if (!jid.includes("@")) {
+    if (!jid.includes("@")) {
       const cleaned = jid.replace(/\D/g, "");
       if (cleaned.length > 15) {
         // Group ID format
@@ -327,8 +313,9 @@ class WhatsAppBotEngine extends EventEmitter {
     }
 
     try {
-      // Simulate human typing presence ('composing') for DMs to bypass WA automated spam filter
-      if (jid.endsWith("@s.whatsapp.net") || jid.endsWith("@lid")) {
+      // Simulate human typing presence ('composing') ONLY for standard @s.whatsapp.net DMs
+      // (Do NOT call sendPresenceUpdate on @lid JIDs as WhatsApp server rejects @lid presence frames and revokes session)
+      if (jid.endsWith("@s.whatsapp.net")) {
         try {
           await this.socket.sendPresenceUpdate("composing", jid);
           const typingTime = Math.floor(Math.random() * 1200) + 1200; // 1.2s - 2.4s typing
