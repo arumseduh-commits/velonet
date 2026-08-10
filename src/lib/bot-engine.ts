@@ -233,11 +233,17 @@ class WhatsAppBotEngine extends EventEmitter {
               );
 
               if (result && result.replyMessage) {
-                this.emit("log", `✅ Group confirmation recorded for member [${groupSenderJid}]`);
+                this.emit("log", `✅ Group confirmation recorded for member [${groupSenderJid}], sending private DM for profile data input.`);
+
+                // 1. Send brief acknowledgment in public group chat (NO personal data requested publicly)
                 await sock.sendMessage(remoteJid, {
-                  text: `@${groupSenderJid.split("@")[0]} ${result.replyMessage}`,
+                  text: `@${groupSenderJid.split("@")[0]} Siap! Silakan periksa pesan pribadi (DM) dari bot untuk melengkapi data pendaftaran Anda secara rahasia. 🙏`,
                   mentions: [groupSenderJid],
                 });
+
+                // 2. Send data collection prompts (Nama, Kelas, Motivasi, Hobi) PRIVATELY via 1-on-1 DM
+                const privateTarget = realPhoneNum ? `${realPhoneNum}@s.whatsapp.net` : groupSenderJid;
+                await this.sendToJid(privateTarget, result.replyMessage);
               }
             }
             continue;
