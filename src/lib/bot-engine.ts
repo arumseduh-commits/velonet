@@ -300,10 +300,21 @@ class WhatsAppBotEngine extends EventEmitter {
 
     let jid = targetInput.trim();
 
-    // If input already has domain (@lid, @s.whatsapp.net, @g.us), use directly!
-    if (jid.includes("@")) {
-      // Valid JID string
-    } else {
+    // Prevent direct DM sends to un-resolved @lid JIDs which trigger WA session revocation
+    if (jid.endsWith("@lid")) {
+      try {
+        const res = await this.socket.onWhatsApp(jid);
+        if (res && Array.isArray(res) && res[0]?.jid && res[0].jid.endsWith("@s.whatsapp.net")) {
+          jid = res[0].jid;
+        } else {
+          this.emit("log", `⚠️ Skipping direct DM to LID [${jid}] (LID DMs without phone number are prohibited by WhatsApp)`);
+          return false;
+        }
+      } catch (e) {
+        this.emit("log", `⚠️ Skipping direct DM to LID [${jid}] (LID DMs without phone number are prohibited by WhatsApp)`);
+        return false;
+      }
+    } else if (!jid.includes("@")) {
       const cleaned = jid.replace(/\D/g, "");
       if (cleaned.length > 15) {
         // Group ID format
@@ -597,8 +608,13 @@ class WhatsAppBotEngine extends EventEmitter {
     const initMsg =
       "Halo! Apakah kamu masih ingin melanjutkan pelatihan ekskul Bahasa Inggris di komunitas Velocity?\n\nBalas *YA* untuk lanjut, atau *TIDAK* untuk keluar.";
 
-    // Send directly to exact JID (e.g. 46832440885311@lid or 628xxx@s.whatsapp.net)
-    const sent = await this.sendToJid(jidOrPhone, initMsg);
+    // Prioritize standard phone number (628xxx@s.whatsapp.net) over @lid to prevent WA session revocation!
+    let targetToSend = jidOrPhone;
+    if (participant && participant.phoneNumber && participant.phoneNumber.startsWith("62")) {
+      targetToSend = `${participant.phoneNumber}@s.whatsapp.net`;
+    }
+
+    const sent = await this.sendToJid(targetToSend, initMsg);
     if (sent) {
       await prisma.participant.update({
         where: { id: participant.id },
