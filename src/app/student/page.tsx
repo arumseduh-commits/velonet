@@ -3,7 +3,9 @@
 export const dynamic = "force-dynamic";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import {
   UserCheck,
   CalendarCheck,
@@ -422,7 +424,15 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+          <Link
+            href="/student/learning"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/40 text-xs font-bold transition-all cursor-pointer shadow-lg shadow-blue-600/20"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>MisterGuru Hub</span>
+          </Link>
+
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
@@ -432,6 +442,32 @@ export default function StudentDashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* MisterGuru Learning Hub Highlight Banner */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/40 border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+        <div className="space-y-1 text-center sm:text-left">
+          <div className="flex items-center gap-2 justify-center sm:justify-start">
+            <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold">
+              NEW FEATURE 🚀
+            </span>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <span>MisterGuru English Learning & Test Hub</span>
+            </h2>
+          </div>
+          <p className="text-xs text-slate-300">
+            Pelajari materi Grammar, TOEIC, Speaking, Vocabulary & latihan soal kuis interaktif yang dikurasi langsung dari <b>MisterGuru.web.id</b>!
+          </p>
+        </div>
+
+        <Link
+          href="/student/learning"
+          className="w-full sm:w-auto px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+        >
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>Buka Bank Materi & Kuis</span>
+        </Link>
+      </div>
+
 
       {/* Quick Action Banner: Web GPS Check-In Button */}
       <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
