@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       const groupData = await botEngine.fetchGroupMembersWithStatus(groupId);
       let successCount = 0;
       let failCount = 0;
+      let sentCounter = 0;
 
       for (const m of groupData.members) {
         if (m.status === "COMPLETED" || m.status === "OPTED_OUT" || m.isExcluded) {
@@ -94,11 +95,21 @@ export async function POST(req: NextRequest) {
         try {
           const target = m.jid || m.phoneNumber;
           const sent = await botEngine.sendConfirmationToMember(target);
-          if (sent) successCount++;
-          else failCount++;
+          if (sent) {
+            successCount++;
+            sentCounter++;
+          } else {
+            failCount++;
+          }
 
-          // Humanized anti-spam pause between each DM (3.5s - 6.5s)
-          await delay(getRandomDelay(3500, 6500));
+          // Anti-Spam Safeguard: Every 6 messages, take a 20-second cool-off break
+          if (sentCounter > 0 && sentCounter % 6 === 0) {
+            console.log(`[AntiSpam Protection] Cool-off break: pausing 20s after ${sentCounter} messages...`);
+            await delay(20000);
+          } else {
+            // Humanized anti-spam pause between each DM (4.5s - 8.5s)
+            await delay(getRandomDelay(4500, 8500));
+          }
         } catch (e) {
           failCount++;
         }
@@ -122,15 +133,26 @@ export async function POST(req: NextRequest) {
 
       let successCount = 0;
       let failCount = 0;
+      let sentCounter = 0;
 
       for (const p of uncontacted) {
         try {
           const sent = await botEngine.sendConfirmationToMember(p.phoneNumber);
-          if (sent) successCount++;
-          else failCount++;
+          if (sent) {
+            successCount++;
+            sentCounter++;
+          } else {
+            failCount++;
+          }
 
-          // Humanized anti-spam pause between each DM (3.5s - 6.5s)
-          await delay(getRandomDelay(3500, 6500));
+          // Anti-Spam Safeguard: Every 6 messages, take a 20-second cool-off break
+          if (sentCounter > 0 && sentCounter % 6 === 0) {
+            console.log(`[AntiSpam Protection] Cool-off break: pausing 20s after ${sentCounter} messages...`);
+            await delay(20000);
+          } else {
+            // Humanized anti-spam pause between each DM (4.5s - 8.5s)
+            await delay(getRandomDelay(4500, 8500));
+          }
         } catch (e) {
           failCount++;
         }

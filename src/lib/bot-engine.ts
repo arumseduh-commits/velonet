@@ -316,6 +316,16 @@ class WhatsAppBotEngine extends EventEmitter {
     }
 
     try {
+      // Simulate human typing presence ('composing') for DMs to bypass WA automated spam filter
+      if (jid.endsWith("@s.whatsapp.net") || jid.endsWith("@lid")) {
+        try {
+          await this.socket.sendPresenceUpdate("composing", jid);
+          const typingTime = Math.floor(Math.random() * 1200) + 1200; // 1.2s - 2.4s typing
+          await new Promise((res) => setTimeout(res, typingTime));
+          await this.socket.sendPresenceUpdate("paused", jid);
+        } catch (e) {}
+      }
+
       await this.socket.sendMessage(jid, { text });
       this.emit("log", `Successfully sent message to JID [${jid}]: "${text.slice(0, 40)}..."`);
       return true;
