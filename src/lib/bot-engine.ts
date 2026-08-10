@@ -647,6 +647,45 @@ class WhatsAppBotEngine extends EventEmitter {
     return sent;
   }
 
+  public async sendGroupAnnouncement(groupId: string, customMessage?: string): Promise<boolean> {
+    if (!this.socket || this.connectionState !== "CONNECTED") {
+      throw new Error("WhatsApp Bot is not connected.");
+    }
+
+    const groupData = await this.fetchGroupMembersWithStatus(groupId);
+    const waitingMembers = groupData.members.filter(
+      (m) => m.status !== "COMPLETED" && m.status !== "OPTED_OUT" && !m.isExcluded
+    );
+
+    if (waitingMembers.length === 0) {
+      this.emit("log", "Semua anggota di grup ini sudah mengonfirmasi pendaftaran.");
+      return true;
+    }
+
+    const mentions: string[] = [];
+    let memberListText = "";
+    for (const m of waitingMembers) {
+      const jid = m.pnJid || m.jid;
+      if (jid) mentions.push(jid);
+      const numDisplay = m.phoneNumber.startsWith("62") ? `+${m.phoneNumber}` : m.name || m.phoneNumber;
+      memberListText += `• ${numDisplay}\n`;
+    }
+
+    const text =
+      customMessage ||
+      `📢 *PENGUMUMAN KONFIRMASI EKSKUL VELOCITY*\n\n` +
+      `Halo teman-teman! Mohon konfirmasi kelanjutan pendaftaran ekskul Bahasa Inggris.\n\n` +
+      `Bagi anggota berikut yang belum konfirmasi:\n${memberListText}\n` +
+      `Silakan chat personal ke bot ini dengan mengetik *YA* untuk lanjut atau *TIDAK* untuk keluar.\n\nTerima kasih banyak! 🙏`;
+
+    await this.socket.sendMessage(groupId, { text, mentions });
+    this.emit(
+      "log",
+      `📢 [Pengumuman Grup Berhasil] Pesan konfirmasi dikirim langsung di dalam grup [${groupId}] dengan tag ${waitingMembers.length} anggota.`
+    );
+    return true;
+  }
+
   public async kickGroupMember(groupIdInput: string, participantJidOrPhone: string): Promise<boolean> {
     if (!this.socket || this.connectionState !== "CONNECTED") {
       throw new Error("WhatsApp Bot is not connected.");

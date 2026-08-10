@@ -96,6 +96,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // 100% Safe Group Announcement Sender (No Anti-Spam / Kick Risk)
+    if (action === "send_group_announcement") {
+      if (!groupId) {
+        return NextResponse.json(
+          { success: false, error: "Group ID is required." },
+          { status: 400 }
+        );
+      }
+      const sent = await botEngine.sendGroupAnnouncement(groupId, message);
+      return NextResponse.json({
+        success: sent,
+        message: sent
+          ? `📢 Pengumuman konfirmasi berhasil dikirimkan di dalam grup WA!`
+          : `Gagal mengirim pengumuman di dalam grup.`,
+      });
+    }
+
     // Async Batch Group Member Confirmation Sender
     if (action === "send_all_group_members") {
       if (!groupId) {
