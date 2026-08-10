@@ -11,6 +11,7 @@ import { PrismaClient } from "@prisma/client";
 /**
  * Ultra-fast In-Memory Caching authentication adapter for @whiskeysockets/baileys.
  * Pre-loads auth keys into RAM to prevent SQLite database locking & crashes on Render free tier.
+ * Includes Auto-Backup & Auto-Restore to prevent session loss on Render redeployments.
  */
 export const usePrismaAuthState = async (
   prisma: PrismaClient
@@ -21,6 +22,34 @@ export const usePrismaAuthState = async (
 }> => {
   // In-memory cache map for 0ms RAM lookup
   const cache = new Map<string, any>();
+
+  // Check if BaileysAuth is empty (e.g. after fresh Render deployment wiping SQLite)
+  try {
+    const count = await prisma.baileysAuth.count().catch(() => 0);
+    if (count === 0) {
+      const backupSetting = await prisma.systemSetting.findUnique({
+        where: { key: "baileys_auth_backup" },
+      }).catch(() => null);
+
+      if (backupSetting && backupSetting.value) {
+        console.log("[BaileysAuth] Restoring session backup from SystemSetting after deployment...");
+        const backupMap = JSON.parse(backupSetting.value);
+        const entries = Object.entries(backupMap);
+        for (const [k, v] of entries) {
+          if (v && typeof v === "string") {
+            await prisma.baileysAuth.upsert({
+              where: { key: k },
+              create: { key: k, value: v },
+              update: { value: v },
+            }).catch(() => {});
+          }
+        }
+        console.log(`[BaileysAuth] ${entries.length} session keys auto-restored!`);
+      }
+    }
+  } catch (err) {
+    console.error("[BaileysAuth] Auto-restore warning:", err);
+  }
 
   // Preload all auth keys into RAM on startup
   try {
@@ -77,6 +106,23 @@ export const usePrismaAuthState = async (
     }
   };
 
+  const backupToSystemSetting = async () => {
+    try {
+      const allRecords = await prisma.baileysAuth.findMany();
+      if (allRecords.length > 0) {
+        const backupMap: Record<string, string> = {};
+        for (const r of allRecords) {
+          backupMap[r.key] = r.value;
+        }
+        await prisma.systemSetting.upsert({
+          where: { key: "baileys_auth_backup" },
+          create: { key: "baileys_auth_backup", value: JSON.stringify(backupMap) },
+          update: { value: JSON.stringify(backupMap) },
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  };
+
   const creds: AuthenticationCreds = readData("creds") || initAuthCreds();
 
   return {
@@ -110,15 +156,20 @@ export const usePrismaAuthState = async (
             }
           }
           await Promise.all(tasks);
+          await backupToSystemSetting();
         },
       },
     },
     saveCreds: async () => {
       await writeData("creds", creds);
+      await backupToSystemSetting();
     },
     clearState: async () => {
       cache.clear();
       await prisma.baileysAuth.deleteMany({}).catch(() => {});
+      await prisma.systemSetting.deleteMany({
+        where: { key: "baileys_auth_backup" },
+      }).catch(() => {});
     },
   };
 };
