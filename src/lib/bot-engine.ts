@@ -743,10 +743,11 @@ class WhatsAppBotEngine extends EventEmitter {
 
     const text =
       customMessage ||
-      `📢 *PENGUMUMAN KONFIRMASI EKSKUL VELOCITY*\n\n` +
-      `Halo teman-teman! Mohon konfirmasi kelanjutan pendaftaran ekskul Bahasa Inggris.\n\n` +
-      `Bagi anggota berikut yang belum konfirmasi:\n${memberListText}\n` +
-      `Silakan balas *YA* di chat grup ini untuk konfirmasi keikutsertaan Anda, atau *TIDAK* untuk keluar. Bot akan langsung memproses balasan Anda. 🤖\n\nTerima kasih banyak! 🙏`;
+      `📢 *PENGUMUMAN PENDAFTARAN EKSKUL VELOCITY*\n\n` +
+      `Halo teman-teman! Mohon lengkapi data pendaftaran ekskul Bahasa Inggris melalui Portal Web resmi VeloNet 🚀\n\n` +
+      `Bagi anggota grup berikut yang belum melengkapi pendaftaran:\n${memberListText}\n` +
+      `Silakan buka link Portal Siswa & masukkan nomor WhatsApp kamu untuk login OTP:\n🌐 *https://velonet.onrender.com/student/login*\n\nTerima kasih banyak atas kerjasamanya! 🙏`;
+
 
     await this.socket.sendMessage(groupId, { text, mentions });
     this.emit(

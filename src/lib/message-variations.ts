@@ -250,11 +250,11 @@ export function buildConfirmationMessage(name?: string): string {
   const namePart = name ? ` Kak *${name}*` : "";
 
   const templates = [
-    `Halo${namePart}! 👋\n\nKami ingin menanyakan apakah${namePart ? " Kakak" : " kamu"} masih berminat melanjutkan pelatihan ekskul Bahasa Inggris di Komunitas Velocity? 🚀\n\nBalas *YA* untuk lanjut, atau *TIDAK* untuk mundur.\n\n_Terima kasih atas responsnya!_ 🙏`,
-    `Halo${namePart}! 😊\n\nKomunitas Velocity menghubungi${namePart ? " Kakak" : "mu"} untuk konfirmasi keikutsertaan ekskul Bahasa Inggris.\n\nMasih mau lanjut? Balas *YA* atau *TIDAK* ya!\n\n_Ditunggu konfirmasinya_ 🙂`,
-    `Permisi${namePart}! 🙏\n\nApakah${namePart ? " Kakak" : " kamu"} masih ingin ikut program ekskul Bahasa Inggris Velocity?\n\nKetik *YA* jika masih berminat, atau *TIDAK* jika ingin keluar.\n\n_Terima kasih banyak!_ ✨`,
-    `Hai${namePart}! 👋\n\nIni pesan dari bot Komunitas Velocity.\nKami ingin mengkonfirmasi apakah${namePart ? " Kakak" : " kamu"} masih aktif di program ekskul Bahasa Inggris kita.\n\nSilakan balas:\n✅ *YA* — Masih ikut!\n❌ *TIDAK* — Mundur\n\n_Salam hangat dari Velocity!_ 🚀`,
+    `Halo${namePart}! 👋\n\nIni pesan resmi dari Komunitas Velocity.\nMohon lengkapi pendaftaran anggota ekskul Bahasa Inggris melalui Portal Web resmi kami 🚀\n\nSilakan buka link login & masukkan nomor WhatsApp kamu untuk mendapatkan OTP:\n🌐 *https://velonet.onrender.com/student/login*\n\n_Terima kasih atas kerjasamanya!_ 🙏`,
+    `Halo${namePart}! 😊\n\nKomunitas Velocity mengundang kamu untuk melengkapi pendaftaran ekskul Bahasa Inggris secara online.\n\nSilakan masuk ke Portal Siswa untuk mengisi data pendaftaran:\n🌐 *https://velonet.onrender.com/student/login*\n\n_Ditunggu pendaftarannya ya!_ ✨`,
+    `Permisi${namePart}! 🙏\n\nApakah${namePart ? " Kakak" : " kamu"} sudah melengkapi data pendaftaran ekskul Bahasa Inggris Velocity?\n\nYuk lengkapi pendaftaranmu melalui Portal Web:\n🌐 *https://velonet.onrender.com/student/login*\n\n_Terima kasih banyak!_ 🎯`,
   ];
 
   return pick(templates) + addInvisibleUniqueness();
 }
+
