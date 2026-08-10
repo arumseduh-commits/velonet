@@ -35,12 +35,15 @@ export async function GET() {
       data: {
         student: {
           id: student.id,
-          name: student.name || "Peserta Velocity",
+          name: student.name || "",
           phoneNumber: student.phoneNumber,
-          studentClass: student.studentClass || "-",
-          motivation: student.motivation || "-",
-          hobby: student.hobby || "-",
+          studentClass: student.studentClass || "",
+          motivation: student.motivation || "",
+          hobby: student.hobby || "",
+          gender: student.gender || "",
+          status: student.status,
         },
+
         stats: {
           totalSessions,
           hadirCount,

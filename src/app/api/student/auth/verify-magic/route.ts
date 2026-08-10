@@ -37,7 +37,11 @@ export async function GET(req: Request) {
     const sessionToken = await createStudentSession(otpRecord.participant.id, userAgent);
 
     // Construct redirect response and explicitly attach HTTP-Only Cookie
-    const response = NextResponse.redirect(new URL("/student", req.url));
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+    const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
+    const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
+
+    const response = NextResponse.redirect(`${origin}/student`);
     response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -49,6 +53,10 @@ export async function GET(req: Request) {
     return response;
   } catch (err) {
     console.error("[VerifyMagic] Error:", err);
-    return NextResponse.redirect(new URL("/student/login?error=server_error", req.url));
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+    const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
+    const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
+    return NextResponse.redirect(`${origin}/student/login?error=server_error`);
   }
+
 }

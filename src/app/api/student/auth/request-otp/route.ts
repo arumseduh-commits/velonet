@@ -24,31 +24,28 @@ export async function POST(req: Request) {
 
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
 
-    // Search for registered participant
-    const participant = await prisma.participant.findUnique({
+    let participant = await prisma.participant.findUnique({
       where: { phoneNumber: normalizedPhone },
     });
 
-    if (!participant || participant.isExcluded) {
+    if (participant && participant.isExcluded) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Nomor WhatsApp belum terdaftar di Komunitas Velocity. Silakan daftarkan diri Anda via WhatsApp terlebih dahulu.",
+          error: "Akun WhatsApp Anda berada dalam daftar pengecualian (di-exclude) oleh Pembina.",
         },
-        { status: 404 }
+        { status: 403 }
       );
     }
 
-    if (participant.status !== "COMPLETED") {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Pendaftaran Anda di WhatsApp belum selesai. Silakan selesaikan pengisian nama & kelas di WhatsApp sebelum login ke web.",
+    // Auto-create participant record if it doesn't exist yet (for Web registration)
+    if (!participant) {
+      participant = await prisma.participant.create({
+        data: {
+          phoneNumber: normalizedPhone,
+          status: "WAITING_NAME",
         },
-        { status: 400 }
-      );
+      });
     }
 
     // Inactivate any previous unused OTPs for this participant
@@ -74,9 +71,11 @@ export async function POST(req: Request) {
       },
     });
 
-    // Determine host origin for Magic Link URL
+    // Determine host origin reliably for Magic Link URL
     const url = new URL(req.url);
-    const origin = url.origin;
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+    const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
+    const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
 
     const botStatus = botEngine.getStatus();
     if (botStatus.state !== "CONNECTED") {
@@ -111,6 +110,7 @@ export async function POST(req: Request) {
       success: true,
       message: `Kode OTP 6-Digit telah dikirimkan ke WhatsApp +${normalizedPhone}.`,
     });
+
   } catch (err: any) {
     console.error("[RequestOTP] Error:", err);
     return NextResponse.json(

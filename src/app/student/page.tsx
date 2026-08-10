@@ -4,7 +4,26 @@ export const dynamic = "force-dynamic";
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserCheck, CalendarCheck, Clock, MapPin, Award, LogOut, CheckCircle2, AlertTriangle, FileText, Navigation, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  UserCheck,
+  CalendarCheck,
+  Clock,
+  MapPin,
+  Award,
+  LogOut,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  Navigation,
+  RefreshCw,
+  Sparkles,
+  User,
+  GraduationCap,
+  Heart,
+  Target,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 interface StudentProfile {
@@ -14,6 +33,8 @@ interface StudentProfile {
   studentClass: string;
   motivation: string;
   hobby: string;
+  gender: string;
+  status: string;
 }
 
 interface Stats {
@@ -45,6 +66,14 @@ export default function StudentDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState(false);
 
+  // Form Registration State
+  const [regName, setRegName] = useState("");
+  const [regClass, setRegClass] = useState("");
+  const [regGender, setRegGender] = useState<"Laki-laki" | "Perempuan" | "">("");
+  const [regMotivation, setRegMotivation] = useState("");
+  const [regHobby, setRegHobby] = useState("");
+  const [submittingReg, setSubmittingReg] = useState(false);
+
   const fetchStudentData = async () => {
     setLoading(true);
     try {
@@ -54,6 +83,15 @@ export default function StudentDashboardPage() {
         setStudent(json.data.student);
         setStats(json.data.stats);
         setRecords(json.data.recentAttendances);
+
+        // Pre-fill form if data already partially exists
+        if (json.data.student) {
+          if (json.data.student.name) setRegName(json.data.student.name.toUpperCase());
+          if (json.data.student.studentClass) setRegClass(json.data.student.studentClass);
+          if (json.data.student.gender) setRegGender(json.data.student.gender);
+          if (json.data.student.motivation) setRegMotivation(json.data.student.motivation);
+          if (json.data.student.hobby) setRegHobby(json.data.student.hobby);
+        }
       } else {
         router.push("/student/login");
       }
@@ -76,6 +114,60 @@ export default function StudentDashboardPage() {
       router.push("/student/login");
     } catch (e) {
       router.push("/student/login");
+    }
+  };
+
+  // Submit Web Registration Form
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!regName.trim()) {
+      toast.error("Nama Lengkap wajib diisi.");
+      return;
+    }
+    if (!regClass.trim()) {
+      toast.error("Kelas wajib diisi.");
+      return;
+    }
+    if (!regGender) {
+      toast.error("Jenis Kelamin wajib dipilih.");
+      return;
+    }
+    if (!regMotivation.trim()) {
+      toast.error("Alasan / Motivasi wajib diisi.");
+      return;
+    }
+    if (!regHobby.trim()) {
+      toast.error("Hobi wajib diisi.");
+      return;
+    }
+
+    setSubmittingReg(true);
+
+    try {
+      const res = await fetch("/api/student/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: regName.trim().toUpperCase(), // Default Uppercase
+          studentClass: regClass.trim(),
+          gender: regGender,
+          motivation: regMotivation.trim(),
+          hobby: regHobby.trim(),
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Pendaftaran Berhasil! Selamat datang di Komunitas Velocity. 🎉");
+        fetchStudentData(); // Refresh and load full dashboard
+      } else {
+        toast.error(json.error || "Gagal menyimpan pendaftaran.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menghubungi server.");
+    } finally {
+      setSubmittingReg(false);
     }
   };
 
@@ -130,6 +222,169 @@ export default function StudentDashboardPage() {
     );
   }
 
+  const isRegistrationIncomplete = student?.status !== "COMPLETED" || !student?.name;
+
+  // Render Web Registration Form if Student profile is not COMPLETED
+  if (isRegistrationIncomplete) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 flex items-center justify-center">
+        <div className="w-full max-w-xl bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+          {/* Form Header */}
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-emerald-500/20 shrink-0">
+                V
+              </div>
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
+                  Pendaftaran Anggota Baru
+                </span>
+                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-wide mt-1">
+                  Form Pendaftaran Siswa
+                </h1>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 transition-colors"
+              title="Keluar"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-400">
+            Nomor WhatsApp Anda (<strong>+{student?.phoneNumber}</strong>) telah terverifikasi. Silakan lengkapi form pendaftaran berikut untuk mengakses Portal Siswa Velocity.
+          </p>
+
+          <form onSubmit={handleRegisterSubmit} className="space-y-4 text-xs">
+            {/* 1. Nama Lengkap (DEFAULT KAPITAL) */}
+            <div className="space-y-1.5">
+              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <User className="w-4 h-4 text-emerald-400" />
+                <span>Nama Lengkap <span className="text-rose-400">*</span></span>
+              </label>
+              <input
+                type="text"
+                required
+                value={regName}
+                onChange={(e) => setRegName(e.target.value.toUpperCase())}
+                placeholder="CONTOH: AHMAD FAUZI SYAHPUTRA"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-semibold tracking-wide uppercase transition-colors"
+              />
+              <p className="text-[11px] text-slate-500">Format otomatis menggunakan huruf KAPITAL.</p>
+            </div>
+
+            {/* 2. Kelas & Jenis Kelamin Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Kelas */}
+              <div className="space-y-1.5">
+                <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <GraduationCap className="w-4 h-4 text-emerald-400" />
+                  <span>Kelas <span className="text-rose-400">*</span></span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={regClass}
+                  onChange={(e) => setRegClass(e.target.value)}
+                  placeholder="Contoh: X IPA 1 / XI IPS 2"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium transition-colors"
+                />
+              </div>
+
+              {/* Jenis Kelamin (Gender) */}
+              <div className="space-y-1.5">
+                <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Jenis Kelamin <span className="text-rose-400">*</span></span>
+                </label>
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setRegGender("Laki-laki")}
+                    className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      regGender === "Laki-laki"
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
+                        : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <span>👨 Laki-laki</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRegGender("Perempuan")}
+                    className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      regGender === "Perempuan"
+                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
+                        : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                    }`}
+                  >
+                    <span>👩 Perempuan</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Alasan / Motivasi */}
+            <div className="space-y-1.5">
+              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-emerald-400" />
+                <span>Alasan / Motivasi Masuk Ekskul <span className="text-rose-400">*</span></span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                value={regMotivation}
+                onChange={(e) => setRegMotivation(e.target.value)}
+                placeholder="Contoh: Ingin lancar berbicara Bahasa Inggris dan menambah percaya diri..."
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium resize-none transition-colors"
+              />
+            </div>
+
+            {/* 4. Hobi */}
+            <div className="space-y-1.5">
+              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <Heart className="w-4 h-4 text-emerald-400" />
+                <span>Hobi <span className="text-rose-400">*</span></span>
+              </label>
+              <input
+                type="text"
+                required
+                value={regHobby}
+                onChange={(e) => setRegHobby(e.target.value)}
+                placeholder="Contoh: Membaca buku, bermain musik, coding"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium transition-colors"
+              />
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={submittingReg}
+              className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
+            >
+              {submittingReg ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan Data Pendaftaran...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>Simpan & Selesaikan Pendaftaran</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Full Student Dashboard when profile is COMPLETED
   const badgeTitle =
     (stats?.ratePercentage || 0) >= 90
       ? "🌟 Velocity Star (Sangat Rajin)"
@@ -146,15 +401,20 @@ export default function StudentDashboardPage() {
             {student?.name?.charAt(0).toUpperCase() || "S"}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-bold text-white tracking-wide">
                 {student?.name}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
                 Kelas {student?.studentClass}
               </span>
+              {student?.gender && (
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium">
+                  {student.gender}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+            <p className="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
               <span>No. WA: +{student?.phoneNumber}</span>
               <span>•</span>
               <span className="text-amber-400 font-semibold">{badgeTitle}</span>

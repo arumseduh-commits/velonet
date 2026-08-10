@@ -14,7 +14,9 @@ model Participant {
   studentClass    String?
   motivation      String?
   hobby           String?
+  gender          String?
   status          String            @default("NOT_STARTED")
+
   isExcluded      Boolean           @default(false)
   isKickedFromGrp Boolean           @default(false)
   lastSentAt      DateTime?
