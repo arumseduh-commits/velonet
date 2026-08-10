@@ -334,7 +334,7 @@ class WhatsAppBotEngine extends EventEmitter {
       if (jid.endsWith("@s.whatsapp.net")) {
         try {
           await this.socket.sendPresenceUpdate("composing", jid);
-          const typingTime = Math.floor(Math.random() * 1200) + 1200; // 1.2s - 2.4s typing
+          const typingTime = Math.floor(Math.random() * 300) + 300; // Fast 0.3s - 0.6s typing simulation
           await new Promise((res) => setTimeout(res, typingTime));
           await this.socket.sendPresenceUpdate("paused", jid);
         } catch (e) {}

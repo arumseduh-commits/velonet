@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 // Humanized Anti-Spam Delay Helper (Prevents WA Account Banning)
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-const getRandomDelay = (minMs = 3500, maxMs = 6500) =>
+const getRandomDelay = (minMs = 3000, maxMs = 5000) =>
   Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 
 export async function GET(req: NextRequest) {
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Batch Group Member Confirmation Sender with Humanized Anti-Spam Delays
+    // Async Batch Group Member Confirmation Sender
     if (action === "send_all_group_members") {
       if (!groupId) {
         return NextResponse.json(
@@ -104,46 +104,62 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const groupData = await botEngine.fetchGroupMembersWithStatus(groupId);
-      let successCount = 0;
-      let failCount = 0;
-      let sentCounter = 0;
 
-      for (const m of groupData.members) {
-        if (m.status === "COMPLETED" || m.status === "OPTED_OUT" || m.isExcluded) {
-          continue; // Skip members who completed or declined or excluded
-        }
-        try {
-          const target = m.jid || m.phoneNumber;
-          const sent = await botEngine.sendConfirmationToMember(target);
-          if (sent) {
-            successCount++;
-            sentCounter++;
-          } else {
+      const groupData = await botEngine.fetchGroupMembersWithStatus(groupId);
+
+      // Trigger background broadcast loop without blocking HTTP POST response
+      (async () => {
+        let successCount = 0;
+        let failCount = 0;
+        let sentCounter = 0;
+
+        botEngine.emit(
+          "log",
+          `🚀 [Broadcast Group] Memulai pengiriman pesan ke ${groupData.members.length} anggota...`
+        );
+
+        for (const m of groupData.members) {
+          if (m.status === "COMPLETED" || m.status === "OPTED_OUT" || m.isExcluded) {
+            continue;
+          }
+          try {
+            const target = m.jid || m.phoneNumber;
+            const sent = await botEngine.sendConfirmationToMember(target);
+            if (sent) {
+              successCount++;
+              sentCounter++;
+            } else {
+              failCount++;
+            }
+
+            // Anti-Spam Safeguard: Every 6 messages, take a 15s cool-off break
+            if (sentCounter > 0 && sentCounter % 6 === 0) {
+              botEngine.emit(
+                "log",
+                `☕ [Anti-Spam] Istirahat 15 detik setelah mengirim ${sentCounter} pesan...`
+              );
+              await delay(15000);
+            } else {
+              await delay(getRandomDelay(3000, 5000));
+            }
+          } catch (e) {
             failCount++;
           }
-
-          // Anti-Spam Safeguard: Every 6 messages, take a 20-second cool-off break
-          if (sentCounter > 0 && sentCounter % 6 === 0) {
-            console.log(`[AntiSpam Protection] Cool-off break: pausing 20s after ${sentCounter} messages...`);
-            await delay(20000);
-          } else {
-            // Humanized anti-spam pause between each DM (4.5s - 8.5s)
-            await delay(getRandomDelay(4500, 8500));
-          }
-        } catch (e) {
-          failCount++;
         }
-      }
+
+        botEngine.emit(
+          "log",
+          `✅ [Broadcast Selesai] Pesan berhasil terkirim ke ${successCount} anggota, gagal ${failCount}.`
+        );
+      })();
 
       return NextResponse.json({
         success: true,
-        message: `Broadcast selesai. Dikirim ke ${successCount} anggota, gagal ${failCount}.`,
-        data: { successCount, failCount, total: groupData.members.length },
+        message: `🚀 Broadcast DM telah dimulai! Bot sedang mengirimkan pesan satu per satu secara otomatis (periksa log di samping).`,
       });
     }
 
-    // Broadcast to All Uncontacted Registered Participants with Humanized Delays
+    // Async Broadcast to All Uncontacted Registered Participants
     if (action === "send_all_uncontacted") {
       const uncontacted = await prisma.participant.findMany({
         where: {
@@ -152,37 +168,51 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      let successCount = 0;
-      let failCount = 0;
-      let sentCounter = 0;
+      // Trigger background broadcast loop without blocking HTTP POST response
+      (async () => {
+        let successCount = 0;
+        let failCount = 0;
+        let sentCounter = 0;
 
-      for (const p of uncontacted) {
-        try {
-          const sent = await botEngine.sendConfirmationToMember(p.phoneNumber);
-          if (sent) {
-            successCount++;
-            sentCounter++;
-          } else {
+        botEngine.emit(
+          "log",
+          `🚀 [Broadcast Uncontacted] Memulai pengiriman pesan ke ${uncontacted.length} nomor HP...`
+        );
+
+        for (const p of uncontacted) {
+          try {
+            const sent = await botEngine.sendConfirmationToMember(p.phoneNumber);
+            if (sent) {
+              successCount++;
+              sentCounter++;
+            } else {
+              failCount++;
+            }
+
+            // Anti-Spam Safeguard: Every 6 messages, take a 15s cool-off break
+            if (sentCounter > 0 && sentCounter % 6 === 0) {
+              botEngine.emit(
+                "log",
+                `☕ [Anti-Spam] Istirahat 15 detik setelah mengirim ${sentCounter} pesan...`
+              );
+              await delay(15000);
+            } else {
+              await delay(getRandomDelay(3000, 5000));
+            }
+          } catch (e) {
             failCount++;
           }
-
-          // Anti-Spam Safeguard: Every 6 messages, take a 20-second cool-off break
-          if (sentCounter > 0 && sentCounter % 6 === 0) {
-            console.log(`[AntiSpam Protection] Cool-off break: pausing 20s after ${sentCounter} messages...`);
-            await delay(20000);
-          } else {
-            // Humanized anti-spam pause between each DM (4.5s - 8.5s)
-            await delay(getRandomDelay(4500, 8500));
-          }
-        } catch (e) {
-          failCount++;
         }
-      }
+
+        botEngine.emit(
+          "log",
+          `✅ [Broadcast Selesai] Pesan berhasil terkirim ke ${successCount} nomor HP, gagal ${failCount}.`
+        );
+      })();
 
       return NextResponse.json({
         success: true,
-        message: `Broadcast langsung selesai. Dikirim ke ${successCount} nomor HP, gagal ${failCount}.`,
-        data: { successCount, failCount, total: uncontacted.length },
+        message: `🚀 Broadcast DM telah dimulai! Bot sedang mengirimkan pesan satu per satu secara otomatis (periksa log di samping).`,
       });
     }
 
