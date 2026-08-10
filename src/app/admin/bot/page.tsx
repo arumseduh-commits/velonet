@@ -434,6 +434,10 @@ export default function BotControlPage() {
 
   // Send confirmation DM to a single member
   const handleSendSingleMember = async (phoneNumber: string, targetJid?: string) => {
+    if (status.state !== "CONNECTED") {
+      toast.error("Bot belum terhubung! Silakan klik 'Mulai Service Bot' atau tautkan WhatsApp terlebih dahulu.");
+      return;
+    }
     setSendingSingleMember(phoneNumber);
     try {
       const res = await fetch("/api/bot/groups", {
@@ -463,6 +467,10 @@ export default function BotControlPage() {
   // Broadcast confirmation DM to all members of the group
   const handleSendAllMembers = async () => {
     if (!groupData) return;
+    if (status.state !== "CONNECTED") {
+      toast.error("Bot belum terhubung! Silakan klik 'Mulai Service Bot' atau tautkan WhatsApp terlebih dahulu.");
+      return;
+    }
     const confirmed = await confirm({
       title: "Broadcast Semua Anggota Grup",
       message: `Kirim pesan konfirmasi pendaftaran secara personal (DM) ke seluruh ${groupData.totalMembers} anggota grup "${groupData.groupSubject}"?`,

@@ -39,6 +39,27 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, groupId, phoneNumber, targetJid, message } = body;
 
+    // Check bot connection state before sending messages
+    const botStatus = botEngine.getStatus();
+    if (
+      (action === "send_jid_message" ||
+        action === "send_member_confirmation" ||
+        action === "send_all_group_members" ||
+        action === "send_all_uncontacted") &&
+      botStatus.state !== "CONNECTED"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Service Bot WhatsApp belum terhubung (Status: " +
+            botStatus.state +
+            "). Silakan klik 'Mulai Service Bot' atau scan QR/tautkan kode terlebih dahulu.",
+        },
+        { status: 400 }
+      );
+    }
+
     // Direct JID Message Sender
     if (action === "send_jid_message" || (targetJid && message)) {
       const target = targetJid || groupId;
