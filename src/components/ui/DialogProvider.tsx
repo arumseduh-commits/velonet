@@ -107,12 +107,18 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toastHelpers = {
+  const toastHelpers = React.useMemo(() => ({
     success: (msg: string) => addToast("success", msg),
     error: (msg: string) => addToast("error", msg),
     info: (msg: string) => addToast("info", msg),
     warning: (msg: string) => addToast("warning", msg),
-  };
+  }), [addToast]);
+
+  const contextValue = React.useMemo(() => ({
+    confirm,
+    customConfirm,
+    toast: toastHelpers,
+  }), [confirm, customConfirm, toastHelpers]);
 
   const getModalIcon = (iconName?: string, variant: ModalVariant = "warning") => {
     if (iconName === "trash") return <Trash2 className="w-6 h-6 text-rose-400" />;
@@ -159,7 +165,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <DialogContext.Provider value={{ confirm, customConfirm, toast: toastHelpers }}>
+    <DialogContext.Provider value={contextValue}>
       {children}
 
       {/* --- CONFIRMATION MODAL --- */}

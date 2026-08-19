@@ -109,13 +109,13 @@ export default function CompleteProfilePage() {
                 }
               }
 
-              setFormData({
-                name: (json.data.name || "").toUpperCase(),
-                gender: json.data.gender || "",
-                studentClass: json.data.studentClass || "",
-                motivation: json.data.motivation || "",
-                hobby: json.data.hobby || "",
-              });
+              setFormData((prev) => ({
+                name: prev.name || (json.data.name || "").toUpperCase(),
+                gender: prev.gender || json.data.gender || "",
+                studentClass: prev.studentClass || json.data.studentClass || "",
+                motivation: prev.motivation || json.data.motivation || "",
+                hobby: prev.hobby || json.data.hobby || "",
+              }));
             }
           } else {
             router.replace("/student/login");
@@ -125,7 +125,6 @@ export default function CompleteProfilePage() {
         }
       } catch (e) {
         console.error("Failed to check profile status:", e);
-        toast.error("Gagal memeriksa status profil.");
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -138,7 +137,7 @@ export default function CompleteProfilePage() {
     return () => {
       isMounted = false;
     };
-  }, [router, toast]);
+  }, []);
 
   const handleLogout = async () => {
     try {
