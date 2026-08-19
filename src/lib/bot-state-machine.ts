@@ -616,10 +616,11 @@ export async function processIncomingMessage(
     baseUrl = baseUrl.replace(/\/$/, "");
 
     const directRegUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
+    const greeting = participant.name && participant.name !== "Siswa Baru" ? `Halo Kak *${participant.name}*!` : "Halo Kak!";
 
     return {
-      newStatus: participant.status as RegistrationStatusType,
-      replyMessage: `📝 *LINK PENDAFTARAN VELOCITY*\n\nSilakan klik link di bawah ini untuk melengkapi data pendaftaran Anda:\n🔗 ${directRegUrl}\n\n_⏱️ Link pendaftaran aktif selama 2 jam._`,
+      newStatus: RegistrationStatus.WAITING_CONFIRMATION,
+      replyMessage: `🎉 *TERIMA KASIH ATAS KONFIRMASINYA!*\n\n${greeting}\nSilakan klik link di bawah ini untuk melengkapi formulir pendaftaran anggota ekskul Velocity:\n\n🔗 ${directRegUrl}\n\n_⏱️ Link pendaftaran aktif selama 2 jam. Selamat bergabung! 🚀_`,
     };
   }
 
@@ -630,47 +631,10 @@ export async function processIncomingMessage(
     case RegistrationStatus.WAITING_CLASS:
     case RegistrationStatus.WAITING_MOTIVATION:
     case RegistrationStatus.WAITING_HOBBY: {
-      const magicToken = crypto.randomBytes(32).toString("hex");
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
-
-      await prisma.otpVerification.updateMany({
-        where: { userId: participant.id, isUsed: false },
-        data: { isUsed: true },
-      });
-
-      await prisma.otpVerification.create({
-        data: {
-          userId: participant.id,
-          phoneNumber: participant.phoneNumber,
-          otpCode,
-          magicToken,
-          expiresAt,
-        },
-      });
-
-      let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
-      if (!baseUrl) {
-        try {
-          const setting = await prisma.systemSetting.findUnique({
-            where: { key: "app_base_url" },
-          });
-          if (setting && setting.value && !setting.value.includes("localhost")) {
-            baseUrl = setting.value;
-          }
-        } catch (e) {}
-      }
-      if (!baseUrl || baseUrl.includes("localhost")) {
-        const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
-        baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
-      }
-      baseUrl = baseUrl.replace(/\/$/, "");
-
-      const directRegUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
-
+      const greeting = participant.name && participant.name !== "Siswa Baru" ? `Halo Kak *${participant.name}*!` : "Halo Kak!";
       return {
-        newStatus: participant.status as RegistrationStatusType,
-        replyMessage: `Halo! Silakan lengkapi formulir pendaftaran ekskul Velocity melalui link berikut:\n\n🔗 ${directRegUrl}\n\n_⏱️ Link pendaftaran aktif selama 2 jam._\n\n_Ketik *TIDAK* jika Anda tidak bersedia bergabung._`,
+        newStatus: RegistrationStatus.WAITING_CONFIRMATION,
+        replyMessage: `${greeting} 👋\n\nKami dari *Komunitas English Club Velocity SMKN 1*.\nApakah Anda bersedia bergabung dan melengkapi data anggota ekskul Velocity?\n\nSilakan konfirmasi dengan membalas pesan ini:\n👉 Ketik *YA* (untuk menerima link pendaftaran resmi)\n👉 Ketik *TIDAK* (jika tidak ingin bergabung)\n\n_Terima kasih atas perhatiannya! 🙏_`,
       };
     }
 

@@ -861,63 +861,18 @@ class WhatsAppBotEngine extends EventEmitter {
       });
     }
 
-    // Generate 2-Hour Magic Token for Registration Link
-    const magicToken = require('crypto').randomBytes(32).toString("hex");
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
-
-    // Invalidate existing unused tokens for this user
-    await prisma.otpVerification.updateMany({
-      where: { userId: participant.id, isUsed: false },
-      data: { isUsed: true },
-    });
-
-    await prisma.otpVerification.create({
-      data: {
-        userId: participant.id,
-        phoneNumber: participant.phoneNumber,
-        otpCode,
-        magicToken,
-        expiresAt,
-      },
-    });
-
-    let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
-    if (!baseUrl) {
-      try {
-        const setting = await prisma.systemSetting.findUnique({
-          where: { key: "app_base_url" },
-        });
-        if (setting && setting.value && !setting.value.includes("localhost")) {
-          baseUrl = setting.value;
-        }
-      } catch (e) {}
-    }
-    if (!baseUrl || baseUrl.includes("localhost")) {
-      const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
-      baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
-    }
-    baseUrl = baseUrl.replace(/\/$/, "");
-
-    const directRegUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
-
     const confirmationMsg = `Halo${participant.name ? ` Kak *${participant.name}*` : ""}! 👋
 
-Kami dari *Komunitas English Club Velocity SMKN 1* ingin mengonfirmasi keikutsertaan Anda di ekstrakurikuler.
+Kami dari *Komunitas English Club Velocity SMKN 1*.
+Kami ingin mengonfirmasi keikutsertaan Anda di kegiatan ekstrakurikuler Velocity.
 
 ❓ *Apakah Anda bersedia bergabung dan aktif sebagai anggota ekskul Velocity?*
 
-👉 *Jika BERSEDIA / INGIN MENDAFTAR:*
-Silakan klik link pendaftaran di bawah ini untuk melengkapi data diri Anda:
-🔗 ${directRegUrl}
+Silakan balas pesan ini:
+👉 Ketik *YA* (untuk menerima link pendaftaran resmi)
+👉 Ketik *TIDAK* (jika tidak ingin bergabung)
 
-_⏱️ Link pendaftaran di atas aktif selama 2 jam._
-
-❌ *Jika TIDAK INGIN BERGABUNG:*
-Silakan balas pesan ini dengan mengetik: *TIDAK*
-_(Nomor Anda akan otomatis dimasukkan ke daftar pengeluaran dari grup WhatsApp)_
-
-Terima kasih atas kerjasamanya! 🙏✨`;
+_Terima kasih atas perhatian dan kerjasamanya! 🙏✨_`;
 
     // Prioritize standard phone number (628xxx@s.whatsapp.net) over @lid to prevent WA session revocation!
     let targetToSend = jidOrPhone;
