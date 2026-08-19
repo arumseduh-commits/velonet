@@ -67,13 +67,13 @@ export async function POST(req: NextRequest) {
       const cleanNum = normalizePhoneNumber(item.phoneNumber);
       if (!cleanNum || cleanNum.length < 8) continue;
 
-      const existing = await prisma.participant.findUnique({
+      const existing = await prisma.user.findUnique({
         where: { phoneNumber: cleanNum },
       });
 
       if (existing) {
         // Don't overwrite if already completed
-        const updated = await prisma.participant.update({
+        const updated = await prisma.user.update({
           where: { id: existing.id },
           data: {
             name: existing.name || item.name || null,
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         });
         importedResults.push(updated);
       } else {
-        const created = await prisma.participant.create({
+        const created = await prisma.user.create({
           data: {
             phoneNumber: cleanNum,
             name: item.name || null,

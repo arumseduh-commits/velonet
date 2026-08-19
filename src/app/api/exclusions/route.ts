@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const exclusions = await prisma.participant.findMany({
+    const exclusions = await prisma.user.findMany({
       where: { isExcluded: true },
       orderBy: { updatedAt: "desc" },
     });
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
     const cleanNum = normalizePhoneNumber(phoneNumber);
 
-    const participant = await prisma.participant.upsert({
+    const participant = await prisma.user.upsert({
       where: { phoneNumber: cleanNum },
       create: {
         phoneNumber: cleanNum,
@@ -74,7 +74,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const updated = await prisma.participant.update({
+    const updated = await prisma.user.update({
       where: { id },
       data: { isExcluded: false },
     });

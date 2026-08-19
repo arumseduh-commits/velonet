@@ -15,7 +15,7 @@ export async function GET() {
 
     // Get attendance stats for student
     const attendances = await prisma.attendance.findMany({
-      where: { participantId: student.id },
+      where: { userId: student.id },
       include: { session: true },
       orderBy: { createdAt: "desc" },
     });

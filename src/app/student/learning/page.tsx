@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { useEffect, useState } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import Link from "next/link";
 import {
   BookOpen,
@@ -249,7 +250,7 @@ export default function StudentLearningPage() {
               {activeMaterial.contentHtml ? (
                 <div
                   className="font-sans text-slate-200 space-y-3"
-                  dangerouslySetInnerHTML={{ __html: activeMaterial.contentHtml }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(activeMaterial.contentHtml) }}
                 />
               ) : (
                 <div className="whitespace-pre-wrap font-sans text-slate-200">

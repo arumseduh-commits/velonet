@@ -32,7 +32,7 @@ export async function createStudentSession(
 
   await prisma.studentSession.create({
     data: {
-      participantId,
+      userId: participantId,
       sessionToken,
       userAgent: userAgent || null,
       ipAddress: ipAddress || null,
@@ -66,11 +66,11 @@ export async function getLoggedInStudent() {
     const session = await prisma.studentSession.findUnique({
       where: { sessionToken: token },
       include: {
-        participant: true,
+        user: true,
       },
     });
 
-    if (!session || !session.participant) return null;
+    if (!session || !session.user) return null;
 
     // Check expiration
     if (new Date() > new Date(session.expiresAt)) {
@@ -79,9 +79,9 @@ export async function getLoggedInStudent() {
     }
 
     // Check if participant is excluded or not completed
-    if (session.participant.isExcluded) return null;
+    if (session.user.isExcluded) return null;
 
-    return session.participant;
+    return session.user;
   } catch (err) {
     console.error("[StudentAuth] Error verifying session:", err);
     return null;

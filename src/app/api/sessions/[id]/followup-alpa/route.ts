@@ -44,7 +44,7 @@ export async function POST(
     }
 
     // Fetch all active completed participants
-    const allParticipants = await prisma.participant.findMany({
+    const allParticipants = await prisma.user.findMany({
       where: {
         isExcluded: false,
         status: "COMPLETED",
@@ -52,7 +52,7 @@ export async function POST(
     });
 
     const attendanceMap = new Map(
-      session.attendances.map((a) => [a.participantId, a])
+      session.attendances.map((a) => [a.userId, a])
     );
 
     // Filter participants who are ALPA (no attendance record or status == ALPA)

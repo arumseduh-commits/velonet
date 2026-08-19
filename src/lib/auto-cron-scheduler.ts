@@ -94,7 +94,7 @@ export async function checkAndRunNightlyReminders() {
 
   console.log(`[AutoCronScheduler] Found ${tomorrowSessions.length} session(s) scheduled for tomorrow. Initiating WA reminders...`);
 
-  const participants = await prisma.participant.findMany({
+  const participants = await prisma.user.findMany({
     where: {
       isExcluded: false,
       status: "COMPLETED",
@@ -193,7 +193,7 @@ export async function checkAndRunSameDayMorningReminders() {
 
   console.log(`[AutoCronScheduler] Same-Day 07:00 AM Check: Found ${todaySessions.length} session(s) today.`);
 
-  const participants = await prisma.participant.findMany({
+  const participants = await prisma.user.findMany({
     where: {
       isExcluded: false,
       status: "COMPLETED",

@@ -49,7 +49,7 @@ export async function getActiveMeetingSession(prisma: PrismaClient) {
 
 export interface LocationCheckInParams {
   prisma: PrismaClient;
-  participantId: string;
+  userId: string;
   latitude: number;
   longitude: number;
   messageTimestamp?: number; // Unix timestamp in seconds
@@ -61,18 +61,18 @@ export interface LocationCheckInParams {
  */
 export async function processLocationCheckIn({
   prisma,
-  participantId,
+  userId,
   latitude,
   longitude,
   messageTimestamp,
   isForwarded,
 }: LocationCheckInParams): Promise<{ success: boolean; replyMessage: string }> {
-  // 1. Fetch participant info
-  const participant = await prisma.participant.findUnique({
-    where: { id: participantId },
+  // 1. Fetch User info
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
   });
 
-  if (!participant) {
+  if (!user) {
     return {
       success: false,
       replyMessage: "🔴 Data Anda tidak ditemukan di database. Hubungi Admin.",
@@ -177,14 +177,14 @@ export async function processLocationCheckIn({
 
   await prisma.attendance.upsert({
     where: {
-      sessionId_participantId: {
+      sessionId_userId: {
         sessionId: session.id,
-        participantId: participant.id,
+        userId: user.id,
       },
     },
     create: {
       sessionId: session.id,
-      participantId: participant.id,
+      userId: user.id,
       status: "HADIR",
       method: "LOCATION_GPS",
       latitude,
@@ -207,8 +207,8 @@ export async function processLocationCheckIn({
   return {
     success: true,
     replyMessage: `🟢 *ABSENSI BERHASIL*\n\n📌 *Sesi:* ${session.title}\n👤 *Nama:* ${
-      participant.name || "Peserta"
-    }\n🏫 *Kelas:* ${participant.studentClass || "-"}\n⏰ *Waktu:* ${timeStr} WIB\n📍 *Jarak:* ${distText} (Di Lokasi)\n\nTerima kasih, selamat mengikuti pertemuan Velocity! 🚀`,
+      user.name || "Peserta"
+    }\n🏫 *Kelas:* ${user.studentClass || "-"}\n⏰ *Waktu:* ${timeStr} WIB\n📍 *Jarak:* ${distText} (Di Lokasi)\n\nTerima kasih, selamat mengikuti pertemuan Velocity! 🚀`,
   };
 }
 
@@ -235,16 +235,16 @@ export async function getTodayMeetingSessions(prisma: PrismaClient) {
  */
 export async function processLeaveRequest(
   prisma: PrismaClient,
-  participantId: string,
+  userId: string,
   type: "IZIN" | "SAKIT",
   notes: string,
   targetSessionId?: string
 ): Promise<{ success: boolean; replyMessage: string }> {
-  const participant = await prisma.participant.findUnique({
-    where: { id: participantId },
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
   });
 
-  if (!participant) {
+  if (!user) {
     return {
       success: false,
       replyMessage: "🔴 Data Anda tidak ditemukan.",
@@ -262,14 +262,14 @@ export async function processLeaveRequest(
 
     await prisma.attendance.upsert({
       where: {
-        sessionId_participantId: {
+        sessionId_userId: {
           sessionId: session.id,
-          participantId: participant.id,
+          userId: user.id,
         },
       },
       create: {
         sessionId: session.id,
-        participantId: participant.id,
+        userId: user.id,
         status: type,
         method: "TEXT_MESSAGE",
         notes: notes || `Pengajuan ${type} via WhatsApp`,
@@ -283,7 +283,7 @@ export async function processLeaveRequest(
     return {
       success: true,
       replyMessage: `🟡 *PENGAJUAN ${type} DICATAT*\n\n📌 *Sesi:* ${session.title}\n👤 *Nama:* ${
-        participant.name || "Peserta"
+        user.name || "Peserta"
       }\n📝 *Keterangan:* ${notes || "-"}\n\nTerima kasih atas informasinya!`,
     };
   }
@@ -308,14 +308,14 @@ export async function processLeaveRequest(
     const session = todaySessions[0];
     await prisma.attendance.upsert({
       where: {
-        sessionId_participantId: {
+        sessionId_userId: {
           sessionId: session.id,
-          participantId: participant.id,
+          userId: user.id,
         },
       },
       create: {
         sessionId: session.id,
-        participantId: participant.id,
+        userId: user.id,
         status: type,
         method: "TEXT_MESSAGE",
         notes: notes || `Pengajuan ${type} via WhatsApp`,
@@ -329,7 +329,7 @@ export async function processLeaveRequest(
     return {
       success: true,
       replyMessage: `🟡 *PENGAJUAN ${type} DICATAT*\n\n📌 *Sesi:* ${session.title}\n👤 *Nama:* ${
-        participant.name || "Peserta"
+        user.name || "Peserta"
       }\n📝 *Keterangan:* ${notes || "-"}\n\nTerima kasih atas informasinya!`,
     };
   }
@@ -344,9 +344,9 @@ export async function processLeaveRequest(
   }));
 
   await prisma.systemSetting.upsert({
-    where: { key: `leave_pending:${participant.id}` },
+    where: { key: `leave_pending:${user.id}` },
     create: {
-      key: `leave_pending:${participant.id}`,
+      key: `leave_pending:${user.id}`,
       value: JSON.stringify({
         type,
         notes,

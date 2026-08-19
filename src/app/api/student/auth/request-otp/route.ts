@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
 
-    let participant = await prisma.participant.findUnique({
+    let participant = await prisma.user.findUnique({
       where: { phoneNumber: normalizedPhone },
     });
 
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
     // Auto-create participant record if it doesn't exist yet (for Web registration)
     if (!participant) {
-      participant = await prisma.participant.create({
+      participant = await prisma.user.create({
         data: {
           phoneNumber: normalizedPhone,
           status: "WAITING_NAME",
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     // Inactivate any previous unused OTPs for this participant
     await prisma.otpVerification.updateMany({
       where: {
-        participantId: participant.id,
+        userId: participant.id,
         isUsed: false,
       },
       data: { isUsed: true },
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
     await prisma.otpVerification.create({
       data: {
-        participantId: participant.id,
+        userId: participant.id,
         phoneNumber: normalizedPhone,
         otpCode,
         magicToken,

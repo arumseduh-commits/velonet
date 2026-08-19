@@ -53,13 +53,14 @@ export async function processIncomingMessage(
   messageText: string,
   pushName?: string,
   realPhoneNum?: string,
-  locationData?: LocationPayload
+  locationData?: LocationPayload,
+  checkGroup?: (phoneNumber: string) => Promise<boolean>
 ): Promise<StateMachineResult | null> {
   const cleanJid = rawSenderJid.split("@")[0].split(":")[0];
   const incomingNum = normalizePhoneNumber(cleanJid);
 
   // Find participant by LID number OR real phone number
-  let participant = await prisma.participant.findFirst({
+  let participant = await prisma.user.findFirst({
     where: {
       OR: [
         { phoneNumber: incomingNum },
@@ -71,7 +72,7 @@ export async function processIncomingMessage(
   // Fallback: If not found and incoming JID is LID, search by pushName or latest participant
   if (!participant && rawSenderJid.endsWith("@lid")) {
     if (pushName && pushName.trim().length > 2) {
-      participant = await prisma.participant.findFirst({
+      participant = await prisma.user.findFirst({
         where: {
           name: { contains: pushName.trim(), mode: "insensitive" },
           isExcluded: false,
@@ -83,21 +84,34 @@ export async function processIncomingMessage(
   }
 
   // STRICT RULE: If participant is NOT in the database, DO NOT REPLY!
+  // KECUALI jika pesan berisi perintah registrasi (REG_xxx)
   if (!participant) {
-    return null;
+    const matchRegPayload = messageText.match(/REG_[a-f0-9]+/i);
+    if (matchRegPayload && matchRegPayload[0]) {
+      // Buat partisipan baru
+      participant = await prisma.user.create({
+        data: {
+          phoneNumber: realPhoneNum ? normalizePhoneNumber(realPhoneNum) : incomingNum,
+          name: pushName || "Siswa Baru",
+          status: RegistrationStatus.NOT_STARTED,
+        },
+      });
+    } else {
+      return null;
+    }
   }
 
   // Auto-upgrade participant's phoneNumber to REAL Phone Number if we now have realPhoneNum
   if (realPhoneNum && realPhoneNum !== participant.phoneNumber) {
     const formattedRealNum = normalizePhoneNumber(realPhoneNum);
     if (formattedRealNum.startsWith("62")) {
-      const existingReal = await prisma.participant.findUnique({
+      const existingReal = await prisma.user.findUnique({
         where: { phoneNumber: formattedRealNum },
       });
 
       if (existingReal && existingReal.id !== participant.id) {
         // Merge current LID participant into existing real phone number participant
-        const merged = await prisma.participant.update({
+        const merged = await prisma.user.update({
           where: { id: existingReal.id },
           data: {
             name: participant.name || pushName || existingReal.name || null,
@@ -108,12 +122,12 @@ export async function processIncomingMessage(
           },
         });
         try {
-          await prisma.participant.delete({ where: { id: participant.id } });
+          await prisma.user.delete({ where: { id: participant.id } });
         } catch (e) {}
         participant = merged;
       } else {
         try {
-          participant = await prisma.participant.update({
+          participant = await prisma.user.update({
             where: { id: participant.id },
             data: {
               phoneNumber: formattedRealNum,
@@ -125,7 +139,7 @@ export async function processIncomingMessage(
     }
   } else if (pushName && !participant.name) {
     try {
-      participant = await prisma.participant.update({
+      participant = await prisma.user.update({
         where: { id: participant.id },
         data: { name: pushName },
       });
@@ -147,7 +161,7 @@ export async function processIncomingMessage(
     }
     const checkInResult = await processLocationCheckIn({
       prisma,
-      participantId: participant.id,
+      userId: participant.id,
       latitude: locationData.latitude,
       longitude: locationData.longitude,
       messageTimestamp: locationData.messageTimestamp,
@@ -217,6 +231,76 @@ export async function processIncomingMessage(
     console.error("Error processing pending leave choice:", e);
   }
 
+  // Handle Registration Command (REG_...)
+  const matchRegPayload = text.match(/REG_[a-f0-9]+/i);
+  if (matchRegPayload && matchRegPayload[0]) {
+    const payloadId = matchRegPayload[0];
+    
+    if (participant.isExcluded) {
+      return {
+        newStatus: participant.status as RegistrationStatusType,
+        replyMessage: "Maaf, akun Anda telah dinonaktifkan oleh admin.",
+      };
+    }
+
+    // Cek keberadaan di Grup Utama
+    let isInGroup = true;
+    if (checkGroup) {
+      isInGroup = await checkGroup(participant.phoneNumber);
+    }
+
+    if (!isInGroup) {
+      let inviteLink = "Hubungi admin untuk mendapatkan link grup.";
+      try {
+        const linkSetting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_invite_link" } });
+        if (linkSetting && linkSetting.value) inviteLink = linkSetting.value;
+      } catch (e) {}
+
+      return {
+        newStatus: participant.status as RegistrationStatusType,
+        replyMessage: `Maaf, kamu belum bergabung di grup komunitas kami. Silakan join grup melalui link berikut terlebih dahulu:\n\n${inviteLink}`,
+      };
+    }
+
+    // Jika ada di grup, set verified dan kirim link
+    try {
+      const payloadSetting = await prisma.systemSetting.findUnique({
+        where: { key: `login_payload:${payloadId}` },
+      });
+
+      if (payloadSetting) {
+        const payloadData = JSON.parse(payloadSetting.value);
+        if (payloadData && payloadData.status === "PENDING") {
+          await prisma.systemSetting.update({
+            where: { key: `login_payload:${payloadId}` },
+            data: {
+              value: JSON.stringify({
+                ...payloadData,
+                status: "VERIFIED",
+                participantId: participant.id,
+                verifiedAt: new Date().toISOString(),
+              }),
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error updating temp register payload:", err);
+    }
+
+    let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
+    if (!baseUrl || baseUrl.includes("localhost")) {
+      const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+      baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
+    }
+    baseUrl = baseUrl.replace(/\/$/, "");
+
+    return {
+      newStatus: participant.status as RegistrationStatusType,
+      replyMessage: `Hello, this is your registration link:\n${baseUrl}/api/student/auth/verify-registration?token=${payloadId}`,
+    };
+  }
+
   // 1.5 Handle Instant Web Login Command (!login / login / !auth)
   if (
     lowerText === "!login" ||
@@ -226,11 +310,32 @@ export async function processIncomingMessage(
     lowerText.startsWith("!auth") ||
     lowerText.startsWith("auth")
   ) {
-    if (participant.status !== RegistrationStatus.COMPLETED || participant.isExcluded) {
+    if (participant.isExcluded) {
       return {
         newStatus: participant.status as RegistrationStatusType,
-        replyMessage: `🔴 *AKUN BELUM TERDAFTAR DI GRUP VELOCITY*\n\nNomor WhatsApp Anda (+${participant.phoneNumber}) belum terdaftar atau belum bergabung di Grup WhatsApp Komunitas Velocity.\n\nSilakan bergabung ke grup WhatsApp Velocity atau ikuti pendaftaran via WA terlebih dahulu dengan membalas *YA* pada chat ini.`,
+        replyMessage: "Maaf, akun Anda telah dinonaktifkan oleh admin.",
       };
+    }
+
+    // Jika belum registrasi, cek grup dulu
+    if (participant.status !== RegistrationStatus.COMPLETED) {
+      let isInGroup = true;
+      if (checkGroup) {
+        isInGroup = await checkGroup(participant.phoneNumber);
+      }
+
+      if (!isInGroup) {
+        let inviteLink = "Hubungi admin untuk mendapatkan link grup.";
+        try {
+          const linkSetting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_invite_link" } });
+          if (linkSetting && linkSetting.value) inviteLink = linkSetting.value;
+        } catch (e) {}
+
+        return {
+          newStatus: participant.status as RegistrationStatusType,
+          replyMessage: `Maaf, kamu belum bergabung di grup komunitas kami. Silakan join grup melalui link berikut terlebih dahulu:\n\n${inviteLink}`,
+        };
+      }
     }
 
     // Extract payloadId if provided (e.g., "!login AUTH_e8f92a10b4c7_984102")
@@ -268,13 +373,13 @@ export async function processIncomingMessage(
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await prisma.otpVerification.updateMany({
-      where: { participantId: participant.id, isUsed: false },
+      where: { userId: participant.id, isUsed: false },
       data: { isUsed: true },
     });
 
     await prisma.otpVerification.create({
       data: {
-        participantId: participant.id,
+        userId: participant.id,
         phoneNumber: participant.phoneNumber,
         otpCode,
         magicToken,
@@ -282,10 +387,7 @@ export async function processIncomingMessage(
       },
     });
 
-    // Prioritize production environment variables first
     let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
-
-    // If env vars not set, check DB setting if it's a valid non-localhost domain
     if (!baseUrl) {
       try {
         const setting = await prisma.systemSetting.findUnique({
@@ -296,16 +398,20 @@ export async function processIncomingMessage(
         }
       } catch (e) {}
     }
-
-    // Default fallback to Render production domain if still empty or localhost
     if (!baseUrl || baseUrl.includes("localhost")) {
       const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
       baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
     }
-
     baseUrl = baseUrl.replace(/\/$/, "");
 
     const directLoginUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
+
+    if (participant.status !== RegistrationStatus.COMPLETED) {
+      return {
+        newStatus: participant.status as RegistrationStatusType,
+        replyMessage: `Hello, this is your registration link:\n${directLoginUrl}\n\n_(Silakan klik link di atas untuk melengkapi data pendaftaran Anda)_`,
+      };
+    }
 
     return {
       newStatus: participant.status as RegistrationStatusType,
@@ -344,7 +450,7 @@ export async function processIncomingMessage(
   // Allow user to cancel registration at any step
   if (upperText === 'BATAL' || upperText === 'CANCEL' || upperText === 'STOP') {
     if (participant.status !== RegistrationStatus.COMPLETED && participant.status !== RegistrationStatus.OPTED_OUT) {
-      await prisma.participant.update({
+      await prisma.user.update({
         where: { id: participant.id },
         data: { status: RegistrationStatus.OPTED_OUT },
       });
@@ -357,100 +463,15 @@ export async function processIncomingMessage(
 
   switch (participant.status) {
     case RegistrationStatus.NOT_STARTED:
-    case RegistrationStatus.WAITING_CONFIRMATION: {
-      if (
-        upperText === "YA" ||
-        upperText === "Y" ||
-        upperText === "YES" ||
-        upperText === "IYA"
-      ) {
-        await prisma.participant.update({
-          where: { id: participant.id },
-          data: { status: RegistrationStatus.WAITING_NAME },
-        });
-        return {
-          newStatus: RegistrationStatus.WAITING_NAME,
-          replyMessage: buildRegistrationMessage("ask_name"),
-        };
-      } else if (
-        upperText === "TIDAK" ||
-        upperText === "N" ||
-        upperText === "NO" ||
-        upperText === "GA" ||
-        upperText === "GAK" ||
-        upperText === "ENGGAK"
-      ) {
-        await prisma.participant.update({
-          where: { id: participant.id },
-          data: { status: RegistrationStatus.OPTED_OUT },
-        });
-        return {
-          newStatus: RegistrationStatus.OPTED_OUT,
-          replyMessage: buildRegistrationMessage("opted_out"),
-        };
-      } else {
-        return {
-          newStatus: participant.status as RegistrationStatusType,
-          replyMessage: buildRegistrationMessage("remind_confirm"),
-        };
-      }
-    }
-
-    case RegistrationStatus.WAITING_NAME: {
-      await prisma.participant.update({
-        where: { id: participant.id },
-        data: {
-          name: text,
-          status: RegistrationStatus.WAITING_CLASS,
-        },
-      });
+    case RegistrationStatus.WAITING_CONFIRMATION:
+    case RegistrationStatus.WAITING_NAME:
+    case RegistrationStatus.WAITING_CLASS:
+    case RegistrationStatus.WAITING_MOTIVATION:
+    case RegistrationStatus.WAITING_HOBBY:
       return {
-        newStatus: RegistrationStatus.WAITING_CLASS,
-        replyMessage: buildRegistrationMessage("ask_class", text),
+        newStatus: participant.status as RegistrationStatusType,
+        replyMessage: "Halo! Sistem pendaftaran sekarang menggunakan Web Form.\n\nSilakan daftar atau lengkapi profil Anda melalui Portal Siswa kami:\nhttps://velonet.onrender.com/student/login",
       };
-    }
-
-    case RegistrationStatus.WAITING_CLASS: {
-      await prisma.participant.update({
-        where: { id: participant.id },
-        data: {
-          studentClass: text,
-          status: RegistrationStatus.WAITING_MOTIVATION,
-        },
-      });
-      return {
-        newStatus: RegistrationStatus.WAITING_MOTIVATION,
-        replyMessage: buildRegistrationMessage("ask_motivation"),
-      };
-    }
-
-    case RegistrationStatus.WAITING_MOTIVATION: {
-      await prisma.participant.update({
-        where: { id: participant.id },
-        data: {
-          motivation: text,
-          status: RegistrationStatus.WAITING_HOBBY,
-        },
-      });
-      return {
-        newStatus: RegistrationStatus.WAITING_HOBBY,
-        replyMessage: buildRegistrationMessage("ask_hobby"),
-      };
-    }
-
-    case RegistrationStatus.WAITING_HOBBY: {
-      const updated = await prisma.participant.update({
-        where: { id: participant.id },
-        data: {
-          hobby: text,
-          status: RegistrationStatus.COMPLETED,
-        },
-      });
-      return {
-        newStatus: RegistrationStatus.COMPLETED,
-        replyMessage: buildRegistrationMessage("completed", updated.name || undefined, updated.studentClass || undefined, updated.motivation || undefined, updated.hobby || undefined),
-      };
-    }
 
     case RegistrationStatus.COMPLETED: {
       const cleanLower = text.toLowerCase().trim().replace(/^[.\s/!\\]+/, "");
@@ -476,7 +497,7 @@ export async function processIncomingMessage(
     case RegistrationStatus.OPTED_OUT: {
       const cleanUpper = upperText.replace(/^\./, "");
       if (cleanUpper === "DAFTAR" || cleanUpper === "RESET" || cleanUpper === "TIKET") {
-        await prisma.participant.update({
+        await prisma.user.update({
           where: { id: participant.id },
           data: { status: RegistrationStatus.WAITING_CONFIRMATION },
         });

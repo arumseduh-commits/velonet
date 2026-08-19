@@ -13,15 +13,15 @@ export async function GET(req: Request) {
   try {
     const otpRecord = await prisma.otpVerification.findUnique({
       where: { magicToken: token },
-      include: { participant: true },
+      include: { user: true },
     });
 
     if (
       !otpRecord ||
       otpRecord.isUsed ||
       new Date() > new Date(otpRecord.expiresAt) ||
-      !otpRecord.participant ||
-      otpRecord.participant.isExcluded
+      !otpRecord.user ||
+      otpRecord.user.isExcluded
     ) {
       return NextResponse.redirect(new URL("/student/login?error=invalid_or_expired_link", req.url));
     }
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
     // Create session in DB
     const userAgent = req.headers.get("user-agent") || undefined;
-    const sessionToken = await createStudentSession(otpRecord.participant.id, userAgent);
+    const sessionToken = await createStudentSession(otpRecord.user.id, userAgent);
 
     // Construct redirect response and explicitly attach HTTP-Only Cookie
     const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;

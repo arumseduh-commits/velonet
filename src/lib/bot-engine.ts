@@ -247,7 +247,21 @@ class WhatsAppBotEngine extends EventEmitter {
                 groupSenderJid,
                 conversationText,
                 pushName,
-                realPhoneNum
+                realPhoneNum,
+                undefined,
+                async (phone: string) => {
+                  try {
+                    const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
+                    if (!setting || !setting.value) return true;
+                    
+                    const groupData = await this.fetchGroupMembersWithStatus(setting.value);
+                    const cleanPhone = phone.startsWith("0") ? "62" + phone.slice(1) : phone;
+                    return groupData.members.some(m => m.phoneNumber === cleanPhone || m.jid?.startsWith(cleanPhone));
+                  } catch (e) {
+                    console.error("[CheckGroup] Failed to fetch group metadata:", e);
+                    return false;
+                  }
+                }
               );
 
               if (result && result.replyMessage) {
@@ -336,7 +350,20 @@ class WhatsAppBotEngine extends EventEmitter {
               conversationText,
               pushName,
               realPhoneNum,
-              locationData
+              locationData,
+              async (phone: string) => {
+                try {
+                  const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
+                  if (!setting || !setting.value) return true; // If no group set, assume true
+                  
+                  const groupData = await this.fetchGroupMembersWithStatus(setting.value);
+                  const cleanPhone = phone.startsWith("0") ? "62" + phone.slice(1) : phone;
+                  return groupData.members.some(m => m.phoneNumber === cleanPhone || m.jid?.startsWith(cleanPhone));
+                } catch (e) {
+                  console.error("[CheckGroup] Failed to fetch group metadata:", e);
+                  return false;
+                }
+              }
             );
 
             // STRICT RULE: If result is null (unknown user or excluded), DO NOT REPLY!
@@ -549,7 +576,7 @@ class WhatsAppBotEngine extends EventEmitter {
       }
 
       let participant = displayPhone
-        ? await prisma.participant.findFirst({
+        ? await prisma.user.findFirst({
             where: {
               OR: [
                 { phoneNumber: displayPhone },
@@ -564,12 +591,12 @@ class WhatsAppBotEngine extends EventEmitter {
         const cleanPn = pnJid.split("@")[0].split(":")[0];
         const formattedPn = cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
         if (formattedPn.startsWith("62") && participant.phoneNumber !== formattedPn) {
-          const existingReal = await prisma.participant.findUnique({
+          const existingReal = await prisma.user.findUnique({
             where: { phoneNumber: formattedPn },
           });
 
           if (existingReal && existingReal.id !== participant.id) {
-            const merged = await prisma.participant.update({
+            const merged = await prisma.user.update({
               where: { id: existingReal.id },
               data: {
                 name: participant.name || existingReal.name || null,
@@ -580,12 +607,12 @@ class WhatsAppBotEngine extends EventEmitter {
               },
             });
             try {
-              await prisma.participant.delete({ where: { id: participant.id } });
+              await prisma.user.delete({ where: { id: participant.id } });
             } catch (e) {}
             participant = merged;
           } else {
             try {
-              participant = await prisma.participant.update({
+              participant = await prisma.user.update({
                 where: { id: participant.id },
                 data: { phoneNumber: formattedPn },
               });
@@ -666,7 +693,7 @@ class WhatsAppBotEngine extends EventEmitter {
     const rawNum = jidOrPhone.split("@")[0].split(":")[0];
     const cleanNum = rawNum.startsWith("0") ? "62" + rawNum.slice(1) : rawNum;
 
-    let participant = await prisma.participant.findFirst({
+    let participant = await prisma.user.findFirst({
       where: {
         OR: [
           { phoneNumber: cleanNum },
@@ -681,14 +708,14 @@ class WhatsAppBotEngine extends EventEmitter {
         this.emit("log", `⚠️ Skipping participant creation for invalid phone: ${cleanNum}`);
         return false;
       }
-      participant = await prisma.participant.create({
+      participant = await prisma.user.create({
         data: {
           phoneNumber: cleanNum,
           status: "WAITING_CONFIRMATION",
         },
       });
     } else {
-      await prisma.participant.update({
+      await prisma.user.update({
         where: { id: participant.id },
         data: {
           status: "WAITING_CONFIRMATION",
@@ -709,7 +736,7 @@ class WhatsAppBotEngine extends EventEmitter {
 
     const sent = await this.sendToJid(targetToSend, initMsg);
     if (sent) {
-      await prisma.participant.update({
+      await prisma.user.update({
         where: { id: participant.id },
         data: { lastSentAt: new Date() },
       });
@@ -829,6 +856,16 @@ class WhatsAppBotEngine extends EventEmitter {
       console.error("[BotEngine] Failed to join group via invite code:", err);
       throw new Error(err.message || "Gagal bergabung ke grup via link undangan.");
     }
+  }
+
+  public async sendGradeNotification(phoneNumber: string, courseName: string, score: number): Promise<boolean> {
+    const text = `Halo! 🎉 Selamat, tugas kamu di pelajaran *${courseName}* sudah dinilai oleh Mentor. Kamu mendapatkan nilai *${score}*! Terus semangat belajarnya ya!`;
+    return this.sendMessage(phoneNumber, text);
+  }
+
+  public async sendAssignmentNudge(phoneNumber: string, lessonName: string, daysLate: number): Promise<boolean> {
+    const text = `Halo! 🔔 Sekadar mengingatkan, kamu memiliki tugas di materi *${lessonName}* yang belum dikumpulkan. Saat ini sudah terlambat *${daysLate}* hari. Yuk, segera diselesaikan agar proses belajarmu tidak terhambat! 💪`;
+    return this.sendMessage(phoneNumber, text);
   }
 
   public async logoutBot() {

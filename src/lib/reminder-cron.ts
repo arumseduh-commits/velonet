@@ -19,7 +19,7 @@ export async function runReminderBatch(
 ): Promise<ReminderRunResult> {
   const cutoffDate = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
 
-  const pendingParticipants = await prisma.participant.findMany({
+  const pendingParticipants = await prisma.user.findMany({
     where: {
       status: {
         in: [RegistrationStatus.NOT_STARTED, RegistrationStatus.WAITING_CONFIRMATION],
@@ -53,7 +53,7 @@ export async function runReminderBatch(
     try {
       const sent = await botEngine.sendMessage(participant.phoneNumber, reminderMsg);
       if (sent) {
-        await prisma.participant.update({
+        await prisma.user.update({
           where: { id: participant.id },
           data: {
             lastSentAt: new Date(),

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
 
-    const participant = await prisma.participant.findUnique({
+    const participant = await prisma.user.findUnique({
       where: { phoneNumber: normalizedPhone },
     });
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // Find the active OTP verification record
     const otpRecord = await prisma.otpVerification.findFirst({
       where: {
-        participantId: participant.id,
+        userId: participant.id,
         isUsed: false,
         expiresAt: { gte: new Date() },
       },

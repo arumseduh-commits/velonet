@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     const checkInResult = await processLocationCheckIn({
       prisma,
-      participantId: student.id,
+      userId: student.id,
       latitude,
       longitude,
     });

@@ -8,17 +8,17 @@ export async function GET() {
   try {
     const [total, completed, optedOut, waitingConfirmation, inProgress, excluded] =
       await Promise.all([
-        prisma.participant.count(),
-        prisma.participant.count({ where: { status: RegistrationStatus.COMPLETED } }),
-        prisma.participant.count({ where: { status: RegistrationStatus.OPTED_OUT } }),
-        prisma.participant.count({
+        prisma.user.count(),
+        prisma.user.count({ where: { status: RegistrationStatus.COMPLETED } }),
+        prisma.user.count({ where: { status: RegistrationStatus.OPTED_OUT } }),
+        prisma.user.count({
           where: {
             status: {
               in: [RegistrationStatus.NOT_STARTED, RegistrationStatus.WAITING_CONFIRMATION],
             },
           },
         }),
-        prisma.participant.count({
+        prisma.user.count({
           where: {
             status: {
               in: [
@@ -30,7 +30,7 @@ export async function GET() {
             },
           },
         }),
-        prisma.participant.count({ where: { isExcluded: true } }),
+        prisma.user.count({ where: { isExcluded: true } }),
       ]);
 
     return NextResponse.json({

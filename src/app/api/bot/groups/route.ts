@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
 
     // Async Super Slow & Safe Broadcast to All Uncontacted Registered Participants
     if (action === "send_all_uncontacted") {
-      const uncontacted = await prisma.participant.findMany({
+      const uncontacted = await prisma.user.findMany({
         where: {
           isExcluded: false,
           status: { in: ["NOT_STARTED", "WAITING_CONFIRMATION"] },

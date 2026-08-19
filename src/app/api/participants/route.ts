@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const participants = await prisma.participant.findMany({
+    const participants = await prisma.user.findMany({
       where: whereClause,
       orderBy: { updatedAt: "desc" },
     });
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     const cleanNumber = normalizePhoneNumber(phoneNumber);
 
-    const existing = await prisma.participant.findUnique({
+    const existing = await prisma.user.findUnique({
       where: { phoneNumber: cleanNumber },
     });
 
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newParticipant = await prisma.participant.create({
+    const newParticipant = await prisma.user.create({
       data: {
         phoneNumber: cleanNumber,
         name: name || null,
@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest) {
 
     // Bulk update support
     if (Array.isArray(ids) && ids.length > 0) {
-      const result = await prisma.participant.updateMany({
+      const result = await prisma.user.updateMany({
         where: { id: { in: ids } },
         data,
       });
@@ -119,7 +119,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const updated = await prisma.participant.update({
+    const updated = await prisma.user.update({
       where: { id },
       data,
     });
@@ -164,7 +164,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const result = await prisma.participant.deleteMany({
+    const result = await prisma.user.deleteMany({
       where: { id: { in: ids } },
     });
 

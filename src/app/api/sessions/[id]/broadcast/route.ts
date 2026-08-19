@@ -31,7 +31,7 @@ export async function POST(
     }
 
     // Fetch all active completed participants
-    const participants = await prisma.participant.findMany({
+    const participants = await prisma.user.findMany({
       where: {
         isExcluded: false,
         status: "COMPLETED",

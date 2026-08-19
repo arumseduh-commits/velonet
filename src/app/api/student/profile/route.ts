@@ -54,7 +54,7 @@ export async function PATCH(req: Request) {
     // Force Name to UPPERCASE per user rule ("nama default kapital")
     const formattedName = name.trim().toUpperCase();
 
-    const updated = await prisma.participant.update({
+    const updated = await prisma.user.update({
       where: { id: student.id },
       data: {
         name: formattedName,

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const kickList = await prisma.participant.findMany({
+    const kickList = await prisma.user.findMany({
       where: { status: RegistrationStatus.OPTED_OUT },
       orderBy: { updatedAt: "desc" },
     });
@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const updated = await prisma.participant.update({
+    const updated = await prisma.user.update({
       where: { id },
       data: { isKickedFromGrp },
     });
@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { participantId, groupId, targetJid, phoneNumber } = body;
+    const { userId, groupId, targetJid, phoneNumber } = body;
 
     if (!groupId) {
       return NextResponse.json(
@@ -74,9 +74,9 @@ export async function POST(req: NextRequest) {
     }
 
     const kicked = await botEngine.kickGroupMember(groupId, target);
-    if (kicked && participantId) {
-      await prisma.participant.update({
-        where: { id: participantId },
+    if (kicked && userId) {
+      await prisma.user.update({
+        where: { id: userId },
         data: { isKickedFromGrp: true },
       });
     }
