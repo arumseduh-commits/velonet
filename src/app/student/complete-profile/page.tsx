@@ -30,6 +30,22 @@ const SCHOOL_CLASSES = {
   ],
 };
 
+const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
+const MONTHS = [
+  { value: "01", label: "01 - Jan" },
+  { value: "02", label: "02 - Feb" },
+  { value: "03", label: "03 - Mar" },
+  { value: "04", label: "04 - Apr" },
+  { value: "05", label: "05 - Mei" },
+  { value: "06", label: "06 - Jun" },
+  { value: "07", label: "07 - Jul" },
+  { value: "08", label: "08 - Agu" },
+  { value: "09", label: "09 - Sep" },
+  { value: "10", label: "10 - Okt" },
+  { value: "11", label: "11 - Nov" },
+  { value: "12", label: "12 - Des" },
+];
+
 export default function CompleteProfilePage() {
   const router = useRouter();
   const { toast } = useDialog();
@@ -37,23 +53,30 @@ export default function CompleteProfilePage() {
   const [submitting, setSubmitting] = useState(false);
   const [initialPhone, setInitialPhone] = useState("");
   const [customPhone, setCustomPhone] = useState("");
+  
+  // State Tanggal Lahir (Pemisahan Tanggal, Bulan, Tahun agar 100% rapi di semua HP)
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+
   const [formData, setFormData] = useState({
     name: "",
-    birthDate: "",
     gender: "",
     studentClass: "",
     motivation: "",
     hobby: "",
   });
 
-  // Hitung batas maksimal tanggal lahir (Minimal 15 Tahun)
-  const maxBirthDate = useMemo(() => {
-    const now = new Date();
-    const min15Date = new Date(now.getFullYear() - 15, now.getMonth(), now.getDate());
-    return min15Date.toISOString().split("T")[0];
+  // Batas tahun maksimal (Minimal 15 Tahun dari tahun sekarang)
+  const maxAllowedYear = useMemo(() => {
+    return new Date().getFullYear() - 15;
   }, []);
 
-  // Cek apakah nomor yang tersimpan adalah LID Baileys (bukan nomor HP nyata)
+  const YEARS = useMemo(() => {
+    return Array.from({ length: maxAllowedYear - 1990 + 1 }, (_, i) => String(maxAllowedYear - i));
+  }, [maxAllowedYear]);
+
+  // Cek apakah nomor yang tersimpan adalah LID Baileys
   const isLidNumber = useMemo(() => {
     if (!initialPhone) return false;
     const clean = initialPhone.replace(/\D/g, "");
@@ -79,9 +102,19 @@ export default function CompleteProfilePage() {
               if (rawPhone && !rawPhone.length && !rawPhone.startsWith("62")) {
                 setCustomPhone(rawPhone);
               }
+
+              // Prefill tanggal lahir jika ada
+              if (json.data.birthDate) {
+                const parts = json.data.birthDate.split("-");
+                if (parts.length === 3) {
+                  setBirthYear(parts[0]);
+                  setBirthMonth(parts[1]);
+                  setBirthDay(parts[2]);
+                }
+              }
+
               setFormData({
                 name: (json.data.name || "").toUpperCase(),
-                birthDate: json.data.birthDate || "",
                 gender: json.data.gender || "",
                 studentClass: json.data.studentClass || "",
                 motivation: json.data.motivation || "",
@@ -129,12 +162,13 @@ export default function CompleteProfilePage() {
       return;
     }
 
-    // 2. Validasi Usia Minimal 15 Tahun
-    if (!formData.birthDate) {
-      toast.error("Tanggal lahir wajib dipilih.");
+    // 2. Validasi Tanggal Lahir (Minimal 15 Tahun)
+    if (!birthDay || !birthMonth || !birthYear) {
+      toast.error("Silakan lengkapi Tanggal, Bulan, dan Tahun Lahir.");
       return;
     }
-    const birth = new Date(formData.birthDate);
+    const combinedBirthDate = `${birthYear}-${birthMonth}-${birthDay}`;
+    const birth = new Date(combinedBirthDate);
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
@@ -187,6 +221,7 @@ export default function CompleteProfilePage() {
         body: JSON.stringify({
           ...formData,
           name: formData.name.trim().toUpperCase(),
+          birthDate: combinedBirthDate,
           phoneNumber: finalPhone,
         }),
       });
@@ -303,74 +338,137 @@ export default function CompleteProfilePage() {
             </div>
           )}
 
-          {/* 2. Tanggal Lahir (Min 15 Tahun) & Jenis Kelamin Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Tanggal Lahir */}
-            <div className="space-y-1.5 min-w-0">
-              <label className="text-slate-300 font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-1.5 truncate">
-                  <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Tanggal Lahir <span className="text-rose-400">*</span></span>
-                </span>
-                <span className="text-[10px] text-slate-500 shrink-0">Min. 15 thn</span>
-              </label>
-              <div className="relative w-full min-w-0">
-                <input
-                  type="date"
+          {/* 2. Tanggal Lahir (3 Dropdown: Tgl, Bulan, Tahun - 100% Rapi & Tidak Keluar Outline) */}
+          <div className="space-y-1.5">
+            <label className="text-slate-300 font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-emerald-400" />
+                <span>Tanggal Lahir <span className="text-rose-400">*</span></span>
+              </span>
+              <span className="text-[11px] text-slate-500">Min. 15 thn (Maks. {maxAllowedYear})</span>
+            </label>
+
+            <div className="grid grid-cols-3 gap-2">
+              {/* Tanggal */}
+              <div className="relative">
+                <select
                   required
-                  max={maxBirthDate}
-                  value={formData.birthDate}
-                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                  className="w-full min-w-0 block [color-scheme:dark] px-3.5 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors box-border"
+                  value={birthDay}
+                  onChange={(e) => setBirthDay(e.target.value)}
+                  className="w-full px-3 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
                   style={{ minHeight: "44px" }}
-                />
+                >
+                  <option value="" disabled className="bg-slate-950 text-slate-500">
+                    Tgl
+                  </option>
+                  {DAYS.map((d) => (
+                    <option key={d} value={d} className="bg-slate-950 text-slate-200">
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
-            </div>
 
-            {/* Jenis Kelamin */}
-            <div className="space-y-1.5 min-w-0">
-              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-emerald-400" />
-                <span>Jenis Kelamin <span className="text-rose-400">*</span></span>
-              </label>
-              <div className="grid grid-cols-2 gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, gender: "Laki-laki" })}
-                  className={`py-3 px-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    formData.gender === "Laki-laki"
-                      ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
-                      : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
-                  }`}
+              {/* Bulan */}
+              <div className="relative">
+                <select
+                  required
+                  value={birthMonth}
+                  onChange={(e) => setBirthMonth(e.target.value)}
+                  className="w-full px-2.5 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
                   style={{ minHeight: "44px" }}
                 >
-                  <span>👨 Laki-laki</span>
-                </button>
+                  <option value="" disabled className="bg-slate-950 text-slate-500">
+                    Bulan
+                  </option>
+                  {MONTHS.map((m) => (
+                    <option key={m.value} value={m.value} className="bg-slate-950 text-slate-200">
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, gender: "Perempuan" })}
-                  className={`py-3 px-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    formData.gender === "Perempuan"
-                      ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
-                      : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
-                  }`}
+              {/* Tahun */}
+              <div className="relative">
+                <select
+                  required
+                  value={birthYear}
+                  onChange={(e) => setBirthYear(e.target.value)}
+                  className="w-full px-3 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
                   style={{ minHeight: "44px" }}
                 >
-                  <span>👩 Perempuan</span>
-                </button>
+                  <option value="" disabled className="bg-slate-950 text-slate-500">
+                    Tahun
+                  </option>
+                  {YEARS.map((y) => (
+                    <option key={y} value={y} className="bg-slate-950 text-slate-200">
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* 3. Kelas (Dropdown Pilihan SMKN 1: 5 Jurusan x 3 Angkatan) */}
+          {/* 3. Jenis Kelamin */}
+          <div className="space-y-1.5">
+            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-emerald-400" />
+              <span>Jenis Kelamin <span className="text-rose-400">*</span></span>
+            </label>
+            <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, gender: "Laki-laki" })}
+                className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  formData.gender === "Laki-laki"
+                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
+                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                }`}
+                style={{ minHeight: "44px" }}
+              >
+                <span>👨 Laki-laki</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, gender: "Perempuan" })}
+                className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  formData.gender === "Perempuan"
+                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
+                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                }`}
+                style={{ minHeight: "44px" }}
+              >
+                <span>👩 Perempuan</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4. Kelas (Dropdown Pilihan SMKN 1: 5 Jurusan x 3 Angkatan) */}
           <div className="space-y-1.5">
             <label className="text-slate-300 font-semibold flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <GraduationCap className="w-4 h-4 text-emerald-400" />
                 <span>Kelas Asal SMKN 1 <span className="text-rose-400">*</span></span>
               </span>
-              <span className="text-[11px] text-slate-500">Pilih dari daftar</span>
+              <span className="text-[11px] text-slate-500">Pilih dari 45 kelas</span>
             </label>
             <div className="relative">
               <select
@@ -401,7 +499,7 @@ export default function CompleteProfilePage() {
             </div>
           </div>
 
-          {/* 4. Alasan / Motivasi Join */}
+          {/* 5. Alasan / Motivasi Join */}
           <div className="space-y-1.5">
             <label className="text-slate-300 font-semibold flex items-center gap-1.5">
               <Target className="w-4 h-4 text-emerald-400" />
@@ -417,7 +515,7 @@ export default function CompleteProfilePage() {
             />
           </div>
 
-          {/* 5. Hobi */}
+          {/* 6. Hobi */}
           <div className="space-y-1.5">
             <label className="text-slate-300 font-semibold flex items-center gap-1.5">
               <Heart className="w-4 h-4 text-emerald-400" />
