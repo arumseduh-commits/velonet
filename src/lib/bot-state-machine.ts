@@ -84,9 +84,9 @@ export async function processIncomingMessage(
   }
 
   // STRICT RULE: If participant is NOT in the database, DO NOT REPLY!
-  // KECUALI jika pesan berisi perintah registrasi (REG_xxx)
+  // KECUALI jika pesan berisi perintah registrasi (REG_xxx) atau login (AUTH_xxx)
   if (!participant) {
-    const matchRegPayload = messageText.match(/REG_[a-f0-9]+/i);
+    const matchRegPayload = messageText.match(/REG_[a-f0-9]+/i) || messageText.match(/AUTH_[a-f0-9]+/i);
     if (matchRegPayload && matchRegPayload[0]) {
       // Buat partisipan baru
       participant = await prisma.user.create({
