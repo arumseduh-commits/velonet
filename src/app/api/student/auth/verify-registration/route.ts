@@ -6,8 +6,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
 
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
+  const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
+
   if (!token) {
-    return NextResponse.redirect(new URL("/student/login?error=missing_token", req.url));
+    return NextResponse.redirect(`${origin}/student/expired?reason=missing_token`);
   }
 
   try {
@@ -16,7 +20,7 @@ export async function GET(req: Request) {
     });
 
     if (!setting) {
-      return NextResponse.redirect(new URL("/student/login?error=invalid_or_expired_link", req.url));
+      return NextResponse.redirect(`${origin}/student/expired?reason=already_used`);
     }
 
     const data = JSON.parse(setting.value);
@@ -24,7 +28,7 @@ export async function GET(req: Request) {
     // Cek kadaluwarsa
     if (new Date() > new Date(data.expiresAt)) {
       await prisma.systemSetting.delete({ where: { key: `login_payload:${token}` } }).catch(() => {});
-      return NextResponse.redirect(new URL("/student/login?error=invalid_or_expired_link", req.url));
+      return NextResponse.redirect(`${origin}/student/expired?reason=expired`);
     }
 
     if (data.status === "VERIFIED" && data.participantId) {
@@ -34,10 +38,6 @@ export async function GET(req: Request) {
       // Buat session cookie
       const userAgent = req.headers.get("user-agent") || undefined;
       const sessionToken = await createStudentSession(data.participantId, userAgent);
-
-      const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
-      const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
-      const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
 
       const response = NextResponse.redirect(`${origin}/student/complete-profile`);
       response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {
@@ -51,9 +51,9 @@ export async function GET(req: Request) {
       return response;
     }
 
-    return NextResponse.redirect(new URL("/student/login?error=not_verified", req.url));
+    return NextResponse.redirect(`${origin}/student/expired?reason=not_verified`);
   } catch (err) {
     console.error("[VerifyRegistration] Error:", err);
-    return NextResponse.redirect(new URL("/student/login?error=server_error", req.url));
+    return NextResponse.redirect(`${origin}/student/expired?reason=server_error`);
   }
 }

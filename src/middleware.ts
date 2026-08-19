@@ -25,8 +25,12 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 3. Protect Student Routes (/student/* except /student/login)
-  if (pathname.startsWith("/student") && !pathname.startsWith("/student/login")) {
+  // 3. Protect Student Routes (/student/* except /student/login & /student/expired)
+  if (
+    pathname.startsWith("/student") &&
+    !pathname.startsWith("/student/login") &&
+    !pathname.startsWith("/student/expired")
+  ) {
     if (!studentToken && !adminToken) {
       const loginUrl = new URL("/student/login", req.url);
       loginUrl.searchParams.set("callbackUrl", pathname);

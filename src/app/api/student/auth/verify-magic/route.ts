@@ -6,8 +6,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
 
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
+  const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
+
   if (!token) {
-    return NextResponse.redirect(new URL("/student/login?error=missing_token", req.url));
+    return NextResponse.redirect(`${origin}/student/expired?reason=missing_token`);
   }
 
   try {
@@ -16,14 +20,20 @@ export async function GET(req: Request) {
       include: { user: true },
     });
 
-    if (
-      !otpRecord ||
-      otpRecord.isUsed ||
-      new Date() > new Date(otpRecord.expiresAt) ||
-      !otpRecord.user ||
-      otpRecord.user.isExcluded
-    ) {
-      return NextResponse.redirect(new URL("/student/login?error=invalid_or_expired_link", req.url));
+    if (!otpRecord) {
+      return NextResponse.redirect(`${origin}/student/expired?reason=not_found`);
+    }
+
+    if (otpRecord.isUsed) {
+      return NextResponse.redirect(`${origin}/student/expired?reason=already_used`);
+    }
+
+    if (new Date() > new Date(otpRecord.expiresAt)) {
+      return NextResponse.redirect(`${origin}/student/expired?reason=expired`);
+    }
+
+    if (!otpRecord.user || otpRecord.user.isExcluded) {
+      return NextResponse.redirect(`${origin}/student/expired?reason=account_disabled`);
     }
 
     // Mark token as used
@@ -36,12 +46,12 @@ export async function GET(req: Request) {
     const userAgent = req.headers.get("user-agent") || undefined;
     const sessionToken = await createStudentSession(otpRecord.user.id, userAgent);
 
-    // Construct redirect response and explicitly attach HTTP-Only Cookie
-    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
-    const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
-    const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
+    // Redirect to complete profile if not COMPLETED, else to student dashboard
+    const destination = otpRecord.user.status === "COMPLETED" && otpRecord.user.name
+      ? `${origin}/student`
+      : `${origin}/student/complete-profile`;
 
-    const response = NextResponse.redirect(`${origin}/student`);
+    const response = NextResponse.redirect(destination);
     response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -53,10 +63,6 @@ export async function GET(req: Request) {
     return response;
   } catch (err) {
     console.error("[VerifyMagic] Error:", err);
-    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
-    const protocol = req.headers.get("x-forwarded-proto") || (url.protocol.startsWith("https") ? "https" : "http");
-    const origin = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
-    return NextResponse.redirect(`${origin}/student/login?error=server_error`);
+    return NextResponse.redirect(`${origin}/student/expired?reason=server_error`);
   }
-
 }

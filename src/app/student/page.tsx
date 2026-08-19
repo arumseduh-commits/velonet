@@ -68,38 +68,25 @@ export default function StudentDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState(false);
 
-  // Form Registration State
-  const [regName, setRegName] = useState("");
-  const [regClass, setRegClass] = useState("");
-  const [regGender, setRegGender] = useState<"Laki-laki" | "Perempuan" | "">("");
-  const [regMotivation, setRegMotivation] = useState("");
-  const [regHobby, setRegHobby] = useState("");
-  const [submittingReg, setSubmittingReg] = useState(false);
-
   const fetchStudentData = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/student/auth/me");
       const json = await res.json();
-      if (json.success) {
+      if (json.success && json.data?.student) {
+        if (json.data.student.status !== "COMPLETED" || !json.data.student.name) {
+          router.replace("/student/complete-profile");
+          return;
+        }
         setStudent(json.data.student);
         setStats(json.data.stats);
         setRecords(json.data.recentAttendances);
-
-        // Pre-fill form if data already partially exists
-        if (json.data.student) {
-          if (json.data.student.name) setRegName(json.data.student.name.toUpperCase());
-          if (json.data.student.studentClass) setRegClass(json.data.student.studentClass);
-          if (json.data.student.gender) setRegGender(json.data.student.gender);
-          if (json.data.student.motivation) setRegMotivation(json.data.student.motivation);
-          if (json.data.student.hobby) setRegHobby(json.data.student.hobby);
-        }
       } else {
-        router.push("/student/login");
+        router.replace("/student/login");
       }
     } catch (err) {
       console.error("Failed to fetch student data:", err);
-      router.push("/student/login");
+      router.replace("/student/login");
     } finally {
       setLoading(false);
     }
@@ -116,60 +103,6 @@ export default function StudentDashboardPage() {
       router.push("/student/login");
     } catch (e) {
       router.push("/student/login");
-    }
-  };
-
-  // Submit Web Registration Form
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!regName.trim()) {
-      toast.error("Nama Lengkap wajib diisi.");
-      return;
-    }
-    if (!regClass.trim()) {
-      toast.error("Kelas wajib diisi.");
-      return;
-    }
-    if (!regGender) {
-      toast.error("Jenis Kelamin wajib dipilih.");
-      return;
-    }
-    if (!regMotivation.trim()) {
-      toast.error("Alasan / Motivasi wajib diisi.");
-      return;
-    }
-    if (!regHobby.trim()) {
-      toast.error("Hobi wajib diisi.");
-      return;
-    }
-
-    setSubmittingReg(true);
-
-    try {
-      const res = await fetch("/api/student/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: regName.trim().toUpperCase(), // Default Uppercase
-          studentClass: regClass.trim(),
-          gender: regGender,
-          motivation: regMotivation.trim(),
-          hobby: regHobby.trim(),
-        }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        toast.success("Pendaftaran Berhasil! Selamat datang di Komunitas Velocity. 🎉");
-        fetchStudentData(); // Refresh and load full dashboard
-      } else {
-        toast.error(json.error || "Gagal menyimpan pendaftaran.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Gagal menghubungi server.");
-    } finally {
-      setSubmittingReg(false);
     }
   };
 

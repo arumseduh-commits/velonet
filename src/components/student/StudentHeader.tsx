@@ -50,8 +50,14 @@ export function StudentHeader() {
     }
   };
 
-  // Don't render header on login page
-  if (pathname === "/student/login") return null;
+  // Don't render header on login, complete-profile, or expired pages
+  if (
+    pathname === "/student/login" ||
+    pathname === "/student/complete-profile" ||
+    pathname === "/student/expired"
+  ) {
+    return null;
+  }
 
   return (
     <header className="h-16 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">

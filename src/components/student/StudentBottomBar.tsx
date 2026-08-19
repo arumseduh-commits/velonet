@@ -8,8 +8,14 @@ import { LayoutDashboard, Navigation, FileText, User } from "lucide-react";
 export function StudentBottomBar() {
   const pathname = usePathname();
 
-  // Don't render on login page
-  if (pathname === "/student/login") return null;
+  // Don't render on login, complete-profile, or expired pages
+  if (
+    pathname === "/student/login" ||
+    pathname === "/student/complete-profile" ||
+    pathname === "/student/expired"
+  ) {
+    return null;
+  }
 
   const navItems = [
     {

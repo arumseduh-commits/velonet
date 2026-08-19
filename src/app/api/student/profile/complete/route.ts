@@ -18,12 +18,12 @@ export async function POST(req: Request) {
     await prisma.user.update({
       where: { id: student.id },
       data: {
-        name,
+        name: name.trim().toUpperCase(),
         birthDate: new Date(birthDate),
-        gender,
-        studentClass,
-        motivation,
-        hobby,
+        gender: gender.trim(),
+        studentClass: studentClass.trim(),
+        motivation: motivation.trim(),
+        hobby: hobby.trim(),
         status: "COMPLETED",
       },
     });

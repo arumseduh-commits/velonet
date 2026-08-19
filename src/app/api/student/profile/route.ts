@@ -2,6 +2,39 @@ import { NextResponse } from "next/server";
 import { getLoggedInStudent } from "@/lib/student-auth";
 import { prisma } from "@/lib/prisma";
 
+export async function GET() {
+  try {
+    const student = await getLoggedInStudent();
+    if (!student) {
+      return NextResponse.json(
+        { success: false, error: "Sesi Anda telah berakhir. Silakan login kembali." },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: student.id,
+        name: student.name || "",
+        phoneNumber: student.phoneNumber,
+        studentClass: student.studentClass || "",
+        gender: student.gender || "",
+        birthDate: student.birthDate ? student.birthDate.toISOString().split("T")[0] : "",
+        motivation: student.motivation || "",
+        hobby: student.hobby || "",
+        status: student.status,
+      },
+    });
+  } catch (err: any) {
+    console.error("[StudentProfileGET] Error:", err);
+    return NextResponse.json(
+      { success: false, error: "Terjadi kesalahan server." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(req: Request) {
   try {
     const student = await getLoggedInStudent();
