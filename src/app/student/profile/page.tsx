@@ -3,7 +3,8 @@
 export const dynamic = "force-dynamic";
 
 import React, { useEffect, useState } from "react";
-import { User, Phone, BookOpen, Heart, Sparkles, ShieldCheck, RefreshCw, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { User, Phone, BookOpen, Heart, Sparkles, ShieldCheck, RefreshCw, CheckCircle2, Camera } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 interface StudentData {
@@ -13,6 +14,8 @@ interface StudentData {
   studentClass: string;
   motivation: string;
   hobby: string;
+  isFaceRegistered?: boolean;
+  facePhoto?: string | null;
 }
 
 export default function StudentProfilePage() {
@@ -91,6 +94,40 @@ export default function StudentProfilePage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Face Biometrics Status Banner */}
+      <div className="p-5 rounded-3xl glass-panel border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+            <Camera className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white">Biometrik Wajah AI (Face ID)</h3>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                student?.isFaceRegistered
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                  : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+              }`}>
+                {student?.isFaceRegistered ? "Terdaftar & Aktif ✅" : "Belum Direkam ⚠️"}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {student?.isFaceRegistered
+                ? "Data vektor biometrik Anda siap digunakan untuk absensi kehadiran otomatis di lokasi kumpul."
+                : "Anda belum merekam sampel wajah. Rekam sekarang untuk mempermudah absensi."}
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/student/attendance"
+          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+        >
+          <Camera className="w-4 h-4" />
+          <span>{student?.isFaceRegistered ? "Buka Absensi / Rekam Ulang" : "Rekam Wajah Sekarang"}</span>
+        </Link>
       </div>
 
       {/* Profile Form Card */}

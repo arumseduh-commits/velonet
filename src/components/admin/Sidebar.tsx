@@ -16,6 +16,7 @@ import {
   BarChart3,
   X,
   LogOut,
+  Camera,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -140,6 +141,19 @@ export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
           >
             <CalendarCheck className={`w-5 h-5 ${pathname.startsWith("/admin/sessions") ? "text-emerald-400" : "text-slate-400"}`} />
             <span>Sesi Absensi</span>
+          </Link>
+
+          {/* 4. Terminal Wajah (Live Kiosk) */}
+          <Link
+            href="/admin/face-terminal"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+              pathname.startsWith("/admin/face-terminal")
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-md shadow-blue-500/10"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+          >
+            <Camera className={`w-5 h-5 ${pathname.startsWith("/admin/face-terminal") ? "text-blue-400" : "text-slate-400"}`} />
+            <span>Terminal Wajah</span>
           </Link>
 
           {/* 4. Laporan Kumulatif */}

@@ -13,7 +13,7 @@ export async function GET(
       include: {
         attendances: {
           include: {
-            participant: true,
+            user: true,
           },
         },
       },
@@ -27,7 +27,7 @@ export async function GET(
     }
 
     // Fetch all active completed/registered participants
-    const allParticipants = await prisma.participant.findMany({
+    const allParticipants = await prisma.user.findMany({
       where: {
         isExcluded: false,
       },
@@ -35,7 +35,7 @@ export async function GET(
     });
 
     const attendanceMap = new Map(
-      session.attendances.map((a) => [a.participantId, a])
+      session.attendances.map((a) => [a.userId, a])
     );
 
     const now = new Date();

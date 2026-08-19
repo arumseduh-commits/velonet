@@ -9,7 +9,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, birthDate, gender, studentClass, motivation, hobby, phoneNumber } = await req.json();
+    const { name, birthDate, gender, studentClass, motivation, hobby, phoneNumber, faceDescriptor, facePhoto } = await req.json();
 
     if (!name || !studentClass || !motivation || !hobby || !birthDate || !gender) {
       return NextResponse.json({ success: false, error: "Harap isi semua kolom pendaftaran." }, { status: 400 });
@@ -48,18 +48,26 @@ export async function POST(req: Request) {
       }
     }
 
+    const updateData: any = {
+      name: name.trim().toUpperCase(),
+      phoneNumber: updatedPhone,
+      birthDate: birth,
+      gender: gender.trim(),
+      studentClass: studentClass.trim(),
+      motivation: motivation.trim(),
+      hobby: hobby.trim(),
+      status: "COMPLETED",
+    };
+
+    if (Array.isArray(faceDescriptor) && faceDescriptor.length === 128) {
+      updateData.faceDescriptor = JSON.stringify(faceDescriptor);
+      updateData.facePhoto = typeof facePhoto === "string" ? facePhoto : null;
+      updateData.faceRegisteredAt = new Date();
+    }
+
     await prisma.user.update({
       where: { id: student.id },
-      data: {
-        name: name.trim().toUpperCase(),
-        phoneNumber: updatedPhone,
-        birthDate: birth,
-        gender: gender.trim(),
-        studentClass: studentClass.trim(),
-        motivation: motivation.trim(),
-        hobby: hobby.trim(),
-        status: "COMPLETED",
-      },
+      data: updateData,
     });
 
     return NextResponse.json({ success: true });

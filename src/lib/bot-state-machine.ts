@@ -445,20 +445,90 @@ export async function processIncomingMessage(
     };
   }
 
-  const upperText = text.toUpperCase();
+  const upperText = text.toUpperCase().trim();
 
-  // Allow user to cancel registration at any step
-  if (upperText === 'BATAL' || upperText === 'CANCEL' || upperText === 'STOP') {
-    if (participant.status !== RegistrationStatus.COMPLETED && participant.status !== RegistrationStatus.OPTED_OUT) {
+  // 1. Tangani penolakan / pembatalan keikutsertaan ekskul (Masuk ke Kick List)
+  const isDeclining =
+    upperText === 'TIDAK' ||
+    upperText === 'GA' ||
+    upperText === 'GAK' ||
+    upperText === 'ENGGAK' ||
+    upperText === 'BATAL' ||
+    upperText === 'CANCEL' ||
+    upperText === 'STOP' ||
+    upperText === 'TIDAK MAU' ||
+    upperText === 'TIDAK IKUT' ||
+    upperText === 'TIDAK BERSEDIA' ||
+    upperText === 'KELUAR';
+
+  if (isDeclining) {
+    if (participant.status !== RegistrationStatus.COMPLETED) {
       await prisma.user.update({
         where: { id: participant.id },
-        data: { status: RegistrationStatus.OPTED_OUT },
+        data: {
+          status: RegistrationStatus.OPTED_OUT,
+          isKickedFromGrp: false,
+        },
       });
       return {
         newStatus: RegistrationStatus.OPTED_OUT,
-        replyMessage: 'Pendaftaran dibatalkan. Jika berubah pikiran, ketik *DAFTAR* untuk mendaftar ulang.',
+        replyMessage: `❌ *KONFIRMASI PENOLAKAN DITERIMA*\n\nBaik, terima kasih atas konfirmasinya. Anda telah memilih untuk *TIDAK BERGABUNG* dengan Komunitas Velocity.\n\nNomor Anda telah dimasukkan ke dalam daftar peninjauan/pengeluaran dari grup WhatsApp.\n\n_Jika sewaktu-waktu Anda berubah pikiran dan ingin bergabung kembali, silakan hubungi admin atau ketik *DAFTAR*._`,
       };
     }
+  }
+
+  // 2. Tangani persetujuan / permintaan link pendaftaran
+  const isAccepting =
+    upperText === 'YA' ||
+    upperText === 'DAFTAR' ||
+    upperText === 'JOIN' ||
+    upperText === 'MAU' ||
+    upperText === 'IKUT' ||
+    upperText === 'BERSEDIA';
+
+  if (isAccepting && participant.status !== RegistrationStatus.COMPLETED) {
+    const magicToken = crypto.randomBytes(32).toString("hex");
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+
+    await prisma.otpVerification.updateMany({
+      where: { userId: participant.id, isUsed: false },
+      data: { isUsed: true },
+    });
+
+    await prisma.otpVerification.create({
+      data: {
+        userId: participant.id,
+        phoneNumber: participant.phoneNumber,
+        otpCode,
+        magicToken,
+        expiresAt,
+      },
+    });
+
+    let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
+    if (!baseUrl) {
+      try {
+        const setting = await prisma.systemSetting.findUnique({
+          where: { key: "app_base_url" },
+        });
+        if (setting && setting.value && !setting.value.includes("localhost")) {
+          baseUrl = setting.value;
+        }
+      } catch (e) {}
+    }
+    if (!baseUrl || baseUrl.includes("localhost")) {
+      const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+      baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
+    }
+    baseUrl = baseUrl.replace(/\/$/, "");
+
+    const directRegUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
+
+    return {
+      newStatus: participant.status as RegistrationStatusType,
+      replyMessage: `📝 *LINK PENDAFTARAN VELOCITY*\n\nSilakan klik link di bawah ini untuk melengkapi data pendaftaran Anda:\n🔗 ${directRegUrl}\n\n_⏱️ Link pendaftaran aktif selama 2 jam._`,
+    };
   }
 
   switch (participant.status) {
@@ -467,11 +537,50 @@ export async function processIncomingMessage(
     case RegistrationStatus.WAITING_NAME:
     case RegistrationStatus.WAITING_CLASS:
     case RegistrationStatus.WAITING_MOTIVATION:
-    case RegistrationStatus.WAITING_HOBBY:
+    case RegistrationStatus.WAITING_HOBBY: {
+      const magicToken = crypto.randomBytes(32).toString("hex");
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+
+      await prisma.otpVerification.updateMany({
+        where: { userId: participant.id, isUsed: false },
+        data: { isUsed: true },
+      });
+
+      await prisma.otpVerification.create({
+        data: {
+          userId: participant.id,
+          phoneNumber: participant.phoneNumber,
+          otpCode,
+          magicToken,
+          expiresAt,
+        },
+      });
+
+      let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
+      if (!baseUrl) {
+        try {
+          const setting = await prisma.systemSetting.findUnique({
+            where: { key: "app_base_url" },
+          });
+          if (setting && setting.value && !setting.value.includes("localhost")) {
+            baseUrl = setting.value;
+          }
+        } catch (e) {}
+      }
+      if (!baseUrl || baseUrl.includes("localhost")) {
+        const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+        baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
+      }
+      baseUrl = baseUrl.replace(/\/$/, "");
+
+      const directRegUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
+
       return {
         newStatus: participant.status as RegistrationStatusType,
-        replyMessage: "Halo! Sistem pendaftaran sekarang menggunakan Web Form.\n\nSilakan daftar atau lengkapi profil Anda melalui Portal Siswa kami:\nhttps://velonet.onrender.com/student/login",
+        replyMessage: `Halo! Silakan lengkapi formulir pendaftaran ekskul Velocity melalui link berikut:\n\n🔗 ${directRegUrl}\n\n_⏱️ Link pendaftaran aktif selama 2 jam._\n\n_Ketik *TIDAK* jika Anda tidak bersedia bergabung._`,
       };
+    }
 
     case RegistrationStatus.COMPLETED: {
       const cleanLower = text.toLowerCase().trim().replace(/^[.\s/!\\]+/, "");

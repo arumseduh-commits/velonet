@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const format = searchParams.get("format") || "csv"; // 'csv' or 'excel'
 
-    const participants = await prisma.participant.findMany({
+    const participants = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });
 

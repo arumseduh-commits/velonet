@@ -25,6 +25,7 @@ import {
   Target,
   Send,
   ShieldCheck,
+  Camera,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -255,35 +256,30 @@ export default function StudentDashboardPage() {
       </div>
 
 
-      {/* Quick Action Banner: Web GPS Check-In Button */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+      {/* Quick Action Banner: Face Recognition & Smart Location Attendance */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
         <div className="space-y-1 text-center sm:text-left">
-          <h2 className="text-base font-bold text-white flex items-center gap-2 justify-center sm:justify-start">
-            <Navigation className="w-5 h-5 text-emerald-400" />
-            <span>Absensi GPS Langsung dari Browser</span>
-          </h2>
-          <p className="text-xs text-slate-400">
-            Saat kumpul di lokasi sore ini, Anda bisa menekan tombol di samping untuk absen GPS tanpa membuka WA!
+          <div className="flex items-center gap-2 justify-center sm:justify-start">
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+              AI BIOMETRIK
+            </span>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Camera className="w-5 h-5 text-emerald-400" />
+              <span>Absensi Face Recognition & Smart Lokasi</span>
+            </h2>
+          </div>
+          <p className="text-xs text-slate-300">
+            Pindai wajah Anda di depan kamera dan verifikasi koordinat lokasi kegiatan secara otomatis!
           </p>
         </div>
 
-        <button
-          onClick={handleWebCheckIn}
-          disabled={checkingIn}
-          className="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+        <Link
+          href="/student/attendance"
+          className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
-          {checkingIn ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Memproses Lokasi GPS...</span>
-            </>
-          ) : (
-            <>
-              <MapPin className="w-4 h-4" />
-              <span>Absen GPS Sekarang</span>
-            </>
-          )}
-        </button>
+          <Camera className="w-4 h-4 text-emerald-200" />
+          <span>Buka Pemindai Wajah</span>
+        </Link>
       </div>
 
       {/* Stat Cards Grid (Mobile Responsive: grid-cols-1 sm:grid-cols-2 md:grid-cols-4) */}

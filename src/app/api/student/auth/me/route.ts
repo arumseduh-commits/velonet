@@ -42,6 +42,9 @@ export async function GET() {
           hobby: student.hobby || "",
           gender: student.gender || "",
           status: student.status,
+          isFaceRegistered: Boolean(student.faceDescriptor),
+          facePhoto: student.facePhoto || null,
+          faceRegisteredAt: student.faceRegisteredAt || null,
         },
 
         stats: {

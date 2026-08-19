@@ -30,6 +30,10 @@ model User {
   isKickedFromGrp Boolean   @default(false)
   lastSentAt      DateTime?
 
+  faceDescriptor   String? // JSON string array of 128-float embedding vector
+  facePhoto        String? // Base64 or image URL of reference face
+  faceRegisteredAt DateTime?
+
   attendances      Attendance[]
   otpVerifications OtpVerification[]
   studentSessions  StudentSession[]
@@ -128,6 +132,8 @@ model Attendance {
   latitude      Float?
   longitude     Float?
   distanceMeter Float?
+  faceConfidence Float? // Similarity confidence (0.0 - 1.0)
+  facePhotoCaptured String? // Base64 snapshot during check-in
   notes         String? // Catatan alasan izin/sakit
 
   createdAt DateTime @default(now())

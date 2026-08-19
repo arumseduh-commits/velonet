@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",
+    "@vladmandic/face-api": "^1.7.15",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",

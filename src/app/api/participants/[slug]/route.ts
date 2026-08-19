@@ -10,49 +10,73 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const slug = resolvedParams.slug;
+    const rawSlug = resolvedParams?.slug;
 
-    if (!slug) {
+    if (!rawSlug) {
       return NextResponse.json(
-        { success: false, error: "Slug parameters required." },
+        { success: false, error: "Parameter ID/Slug peserta wajib diisi." },
         { status: 400 }
       );
     }
 
-    const cleanNum = slug.replace(/\D/g, "");
+    const decodedSlug = decodeURIComponent(rawSlug).trim();
+    const cleanNum = decodedSlug.replace(/\D/g, "");
+    const formatted62 = cleanNum.startsWith("0") ? "62" + cleanNum.slice(1) : cleanNum;
 
-    const allParticipants = await prisma.participant.findMany();
-
-    // Match by ID, exact phoneNumber, cleanNum, or slugified name
-    const participant = allParticipants.find((p) => {
-      if (p.id === slug) return true;
-      if (p.phoneNumber === slug || p.phoneNumber === cleanNum) return true;
-      if (p.name && slugify(p.name) === slug) return true;
-      return false;
+    // Direct search by ID, exact phoneNumber, clean phone number, or formatted 62 number
+    let participant = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: decodedSlug },
+          { phoneNumber: decodedSlug },
+          ...(cleanNum ? [{ phoneNumber: cleanNum }] : []),
+          ...(formatted62 ? [{ phoneNumber: formatted62 }] : []),
+          { name: { equals: decodedSlug, mode: "insensitive" } },
+        ],
+      },
     });
+
+    // Fallback: search by slugified name if not found by direct match
+    if (!participant) {
+      const allUsers = await prisma.user.findMany({
+        select: { id: true, name: true, phoneNumber: true },
+      });
+      const matched = allUsers.find(
+        (u) => u.name && slugify(u.name) === slugify(decodedSlug)
+      );
+      if (matched) {
+        participant = await prisma.user.findUnique({ where: { id: matched.id } });
+      }
+    }
 
     if (!participant) {
       return NextResponse.json(
-        { success: false, error: `Peserta dengan ID/Slug "${slug}" tidak ditemukan.` },
+        { success: false, error: `Peserta dengan ID/Slug "${decodedSlug}" tidak ditemukan.` },
         { status: 404 }
       );
     }
 
     // Fetch all meeting sessions to build participant's attendance history
-    const allSessions = await prisma.meetingSession.findMany({
-      orderBy: { date: "desc" },
-      include: {
-        attendances: true,
-      },
-    });
+    let allSessions: any[] = [];
+    try {
+      allSessions = await prisma.meetingSession.findMany({
+        orderBy: { date: "desc" },
+        include: {
+          attendances: true,
+        },
+      });
+    } catch (sessionErr) {
+      console.error("[ParticipantDetailAPI] Error fetching sessions:", sessionErr);
+      allSessions = [];
+    }
 
     const now = new Date();
     let hadirCount = 0;
     let izinCount = 0;
     let alpaCount = 0;
 
-    const attendanceHistory = allSessions.map((s) => {
-      const att = s.attendances.find((a) => a.participantId === participant.id);
+    const attendanceHistory = (allSessions || []).map((s) => {
+      const att = s.attendances?.find((a: any) => a.userId === participant!.id);
       const isClosed = now > new Date(s.endTime) || s.isCancelled;
 
       let status = att?.status || "BELUM_ABSEN";
@@ -98,6 +122,7 @@ export async function GET(
       },
     });
   } catch (error: any) {
+    console.error("[ParticipantDetailAPI] Fatal Error:", error);
     return NextResponse.json(
       { success: false, error: error.message || "Gagal mengambil data peserta." },
       { status: 500 }

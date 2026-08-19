@@ -22,6 +22,7 @@ import {
   Send,
   ShieldAlert,
   Users,
+  Camera,
 } from "lucide-react";
 
 interface Participant {
@@ -35,6 +36,8 @@ interface Participant {
   isExcluded: boolean;
   isKickedFromGrp: boolean;
   lastSentAt: string | null;
+  faceDescriptor?: string | null;
+  facePhoto?: string | null;
   createdAt: string;
 }
 
@@ -512,6 +515,7 @@ export default function ParticipantsPage() {
                 <th className="py-3.5 px-4">No. WhatsApp</th>
                 <th className="py-3.5 px-4">Nama Lengkap</th>
                 <th className="py-3.5 px-4">Kelas</th>
+                <th className="py-3.5 px-4">Face ID</th>
                 <th className="py-3.5 px-4">Status Pendaftaran</th>
                 <th className="py-3.5 px-4">Terakhir Kontak</th>
                 <th className="py-3.5 px-4 text-right">Aksi</th>
@@ -520,14 +524,14 @@ export default function ParticipantsPage() {
             <tbody className="divide-y divide-slate-800/60 text-sm text-slate-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-400" />
                     Memuat data peserta...
                   </td>
                 </tr>
               ) : participants.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     Tidak ada peserta ditemukan pada tab ini.
                   </td>
                 </tr>
@@ -561,6 +565,17 @@ export default function ParticipantsPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         {p.studentClass || <span className="text-slate-500">-</span>}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {p.faceDescriptor ? (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-semibold inline-flex items-center gap-1">
+                            <Camera className="w-3 h-3 text-emerald-400" /> Terdaftar
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[11px] font-medium">
+                            Belum
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         {getStatusBadge(p.status, p.isExcluded)}

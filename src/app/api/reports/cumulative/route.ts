@@ -8,7 +8,7 @@ export async function GET(req: Request) {
     const yearParam = searchParams.get("year");   // e.g. "2026" or "ALL"
 
     // 1. Fetch all completed/registered participants
-    const participants = await prisma.participant.findMany({
+    const participants = await prisma.user.findMany({
       where: {
         isExcluded: false,
       },
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
       let alpaCount = 0;
 
       filteredSessions.forEach((s) => {
-        const att = s.attendances.find((a) => a.participantId === p.id);
+        const att = s.attendances.find((a) => a.userId === p.id);
         const isClosed = now > new Date(s.endTime) || s.isCancelled;
 
         if (att) {

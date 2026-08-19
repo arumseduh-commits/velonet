@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw, LogOut, ShieldCheck } from "lucide-react";
+import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw, LogOut, ShieldCheck, Camera, CameraOff, Sparkles, Smile } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { loadFaceApiModels, detectFaceWithDescriptor, captureFrameBase64 } from "@/lib/client-face-api";
 
 // Daftar Kelas SMKN 1: 5 Jurusan (RPL 2, BD 4, AK 3, LP 2, MP 4) x 3 Angkatan (X, XI, XII)
 const SCHOOL_CLASSES = {
@@ -65,6 +66,64 @@ export default function CompleteProfilePage() {
     motivation: "",
     hobby: "",
   });
+
+  // Face Enrollment State for Onboarding
+  const [faceDescriptor, setFaceDescriptor] = useState<number[] | null>(null);
+  const [facePhoto, setFacePhoto] = useState<string | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [capturingFace, setCapturingFace] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const startCamera = async () => {
+    try {
+      await loadFaceApiModels();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCameraActive(true);
+      }
+    } catch (e: any) {
+      toast.error(`Kamera tidak dapat dibuka: ${e.message || "Periksa izin browser."}`);
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  };
+
+  const handleCaptureFace = async () => {
+    if (!videoRef.current || !cameraActive) return;
+    setCapturingFace(true);
+    toast.info("Menganalisis wajah Anda...");
+
+    try {
+      const detection = await detectFaceWithDescriptor(videoRef.current);
+      if (!detection) {
+        toast.warning("Wajah tidak terdeteksi! Pastikan wajah Anda berada di tengah kamera.");
+        setCapturingFace(false);
+        return;
+      }
+
+      const photoBase64 = captureFrameBase64(videoRef.current, detection.box);
+      setFaceDescriptor(detection.descriptor);
+      setFacePhoto(photoBase64);
+      stopCamera();
+      toast.success("Foto & vektor biometrik wajah berhasil diambil!");
+    } catch (e: any) {
+      toast.error("Gagal mendeteksi wajah.");
+    } finally {
+      setCapturingFace(false);
+    }
+  };
 
   // Batas tahun maksimal (Minimal 15 Tahun dari tahun sekarang)
   const maxAllowedYear = useMemo(() => {
@@ -206,6 +265,8 @@ export default function CompleteProfilePage() {
           ...formData,
           name: formData.name.trim().toUpperCase(),
           birthDate: combinedBirthDate,
+          faceDescriptor: faceDescriptor || undefined,
+          facePhoto: facePhoto || undefined,
         }),
       });
       const json = await res.json();
@@ -492,6 +553,95 @@ export default function CompleteProfilePage() {
               placeholder="Contoh: Coding, Desain Grafis, Membaca, Musik, Badminton..."
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium transition-colors"
             />
+          </div>
+
+          {/* 7. Perekaman Wajah (Face Enrollment) */}
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-slate-200 font-bold text-xs flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>Sampel Wajah untuk Absensi AI</span>
+              </label>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">
+                {faceDescriptor ? "Wajah Terekam ✅" : "Disarankan"}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Ambil sampel foto wajah untuk kemudahan absensi kehadiran berbasis AI saat kegiatan ekskul.
+            </p>
+
+            {/* Video preview / Photo snapshot */}
+            {cameraActive ? (
+              <div className="space-y-2">
+                <div className="relative aspect-video max-h-[220px] rounded-xl overflow-hidden bg-slate-950 border border-slate-700">
+                  <video
+                    ref={videoRef}
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCaptureFace}
+                    disabled={capturingFace}
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {capturingFace ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Menganalisis...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Ambil & Analisis Wajah</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="py-2 px-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                </div>
+              </div>
+            ) : facePhoto ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
+                <img
+                  src={facePhoto}
+                  alt="Face Sample"
+                  className="w-14 h-14 rounded-xl object-cover border border-emerald-500/40"
+                />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-bold text-white flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Wajah Siap Digunakan</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400">Vektor biometrik 128-d telah terekstrak.</p>
+                  <button
+                    type="button"
+                    onClick={startCamera}
+                    className="text-[11px] font-semibold text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    Ambil Ulang Foto
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={startCamera}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>Nyalakan Kamera untuk Rekam Wajah</span>
+              </button>
+            )}
           </div>
 
           {/* Submit Button */}

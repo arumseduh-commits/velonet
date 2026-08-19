@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDialog } from "@/components/ui/DialogProvider";
@@ -27,7 +27,11 @@ import {
   Award,
   Loader2,
   TrendingUp,
+  Camera,
+  CameraOff,
+  X,
 } from "lucide-react";
+import { loadFaceApiModels, detectFaceWithDescriptor, captureFrameBase64 } from "@/lib/client-face-api";
 
 interface Participant {
   id: string;
@@ -40,6 +44,9 @@ interface Participant {
   isExcluded: boolean;
   isKickedFromGrp: boolean;
   lastSentAt: string | null;
+  faceDescriptor?: string | null;
+  facePhoto?: string | null;
+  faceRegisteredAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,6 +94,79 @@ export default function ParticipantDetailPage({
   const [showDirectMsgModal, setShowDirectMsgModal] = useState(false);
   const [directMsgText, setDirectMsgText] = useState("");
   const [sendingDirectMsg, setSendingDirectMsg] = useState(false);
+
+  // Admin Face Capture Modal State
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [faceCamActive, setFaceCamActive] = useState(false);
+  const [capturingFace, setCapturingFace] = useState(false);
+  const adminVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const startAdminCamera = async () => {
+    try {
+      await loadFaceApiModels();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      if (adminVideoRef.current) {
+        adminVideoRef.current.srcObject = stream;
+        await adminVideoRef.current.play();
+        setFaceCamActive(true);
+      }
+    } catch (e: any) {
+      toast.error(`Kamera tidak dapat diakses: ${e.message}`);
+    }
+  };
+
+  const stopAdminCamera = () => {
+    if (adminVideoRef.current && adminVideoRef.current.srcObject) {
+      const stream = adminVideoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      adminVideoRef.current.srcObject = null;
+    }
+    setFaceCamActive(false);
+  };
+
+  const handleCaptureAdminFace = async () => {
+    if (!adminVideoRef.current || !participant) return;
+    setCapturingFace(true);
+    toast.info("Menganalisis wajah peserta...");
+
+    try {
+      const detection = await detectFaceWithDescriptor(adminVideoRef.current);
+      if (!detection) {
+        toast.warning("Wajah peserta tidak terdeteksi! Posisikan wajah di tengah kamera.");
+        setCapturingFace(false);
+        return;
+      }
+
+      const photoBase64 = captureFrameBase64(adminVideoRef.current, detection.box);
+
+      const res = await fetch("/api/admin/face/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: participant.id,
+          faceDescriptor: detection.descriptor,
+          photoBase64,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message || "Data wajah peserta berhasil disimpan!");
+        stopAdminCamera();
+        setShowFaceModal(false);
+        fetchParticipant();
+      } else {
+        toast.error(json.error || "Gagal mendaftarkan wajah peserta.");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Terjadi kesalahan.");
+    } finally {
+      setCapturingFace(false);
+    }
+  };
 
   const fetchParticipant = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -349,7 +429,18 @@ export default function ParticipantDetailPage({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => {
+                setShowFaceModal(true);
+                startAdminCamera();
+              }}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Camera className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{participant.faceDescriptor ? "Update Foto Wajah" : "Rekam Wajah"}</span>
+            </button>
+
             <button
               onClick={() => setShowDirectMsgModal(true)}
               className="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer"
@@ -588,7 +679,7 @@ export default function ParticipantDetailPage({
       </div>
 
       {/* Details Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         {/* Kelas */}
         <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-2">
           <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
@@ -604,7 +695,7 @@ export default function ParticipantDetailPage({
           <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
             <Heart className="w-4 h-4 text-rose-400" /> Hobi & Minat
           </div>
-          <div className="text-xl font-bold text-white">
+          <div className="text-xl font-bold text-white truncate">
             {participant.hobby || <span className="text-slate-500 text-sm font-normal">Belum diisi</span>}
           </div>
         </div>
@@ -616,6 +707,45 @@ export default function ParticipantDetailPage({
           </div>
           <div className="text-sm font-medium text-slate-200">
             {new Date(participant.createdAt).toLocaleString("id-ID")}
+          </div>
+        </div>
+
+        {/* Biometrik Wajah Face ID */}
+        <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+              <Camera className="w-4 h-4 text-amber-400" /> Face ID
+            </div>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              participant.faceDescriptor
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                : "bg-slate-800 text-slate-400"
+            }`}>
+              {participant.faceDescriptor ? "Terdaftar" : "Belum"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            {participant.facePhoto ? (
+              <img
+                src={participant.facePhoto}
+                alt="Foto Wajah"
+                className="w-10 h-10 rounded-xl object-cover border border-emerald-500/40"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500">
+                <User className="w-5 h-5" />
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setShowFaceModal(true);
+                startAdminCamera();
+              }}
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold hover:underline cursor-pointer"
+            >
+              {participant.faceDescriptor ? "Ubah Foto" : "Rekam Sekarang"}
+            </button>
           </div>
         </div>
       </div>
@@ -698,6 +828,89 @@ export default function ParticipantDetailPage({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Admin Face Capture */}
+      {showFaceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col space-y-4 p-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Perekaman Wajah Peserta</h3>
+                  <p className="text-xs text-slate-400">{participant.name || participant.phoneNumber}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  stopAdminCamera();
+                  setShowFaceModal(false);
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="relative aspect-square max-h-[280px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center shadow-inner">
+                <video
+                  ref={adminVideoRef}
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+
+                {faceCamActive && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-40 h-52 rounded-[35px] border-2 border-emerald-400/80 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse" />
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-slate-400 text-center">
+                Posisikan wajah siswa di dalam garis panduan, lalu tekan tombol di bawah.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  stopAdminCamera();
+                  setShowFaceModal(false);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                Tutup
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCaptureAdminFace}
+                disabled={capturingFace || !faceCamActive}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {capturingFace ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Menganalisis Wajah...</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4" />
+                    <span>Ambil & Simpan Wajah</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

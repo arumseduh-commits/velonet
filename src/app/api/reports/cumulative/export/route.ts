@@ -7,7 +7,7 @@ export async function GET(req: Request) {
     const monthParam = searchParams.get("month");
     const yearParam = searchParams.get("year");
 
-    const participants = await prisma.participant.findMany({
+    const participants = await prisma.user.findMany({
       where: { isExcluded: false },
       orderBy: { name: "asc" },
     });
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
       "Kelas",
       "No. WhatsApp",
       "Total Sesi",
-      "Hadir (GPS)",
+      "Hadir (GPS / Wajah)",
       "Izin / Sakit",
       "Tidak Hadir (Alpa)",
       "Persentase Kehadiran (%)",
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
       let alpaCount = 0;
 
       filteredSessions.forEach((s) => {
-        const att = s.attendances.find((a) => a.participantId === p.id);
+        const att = s.attendances.find((a) => a.userId === p.id);
         const isClosed = now > new Date(s.endTime) || s.isCancelled;
 
         if (att) {

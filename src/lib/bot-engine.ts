@@ -13,6 +13,7 @@ import { usePrismaAuthState } from "./baileys-db-auth";
 import { processIncomingMessage } from "./bot-state-machine";
 import { startAutoCronScheduler } from "./auto-cron-scheduler";
 import { buildConfirmationMessage } from "./message-variations";
+import crypto from "crypto";
 
 
 export type BotConnectionState = "DISCONNECTED" | "CONNECTING" | "CONNECTED";
@@ -596,7 +597,6 @@ class WhatsAppBotEngine extends EventEmitter {
       const cleanMemberNum = fullJid.split("@")[0].split(":")[0];
       const cleanMemberPn = pnJid ? pnJid.split("@")[0].split(":")[0] : "";
 
-      // Strictly skip bot's own account (matches phone number or LID)
       if (
         (cleanBotNum && (cleanMemberNum === cleanBotNum || cleanMemberPn === cleanBotNum)) ||
         (cleanBotLid && (cleanMemberNum === cleanBotLid || cleanMemberPn === cleanBotLid))
@@ -604,49 +604,44 @@ class WhatsAppBotEngine extends EventEmitter {
         continue;
       }
 
-      let participant = displayPhone
-        ? await prisma.user.findFirst({
-            where: {
-              OR: [
-                { phoneNumber: displayPhone },
-                ...(pnJid ? [{ phoneNumber: pnJid.split("@")[0] }] : []),
-              ],
+      let participant = await prisma.user.findFirst({
+        where: {
+          OR: [
+            ...(displayPhone ? [{ phoneNumber: displayPhone }] : []),
+            ...(pnJid ? [{ phoneNumber: pnJid.split("@")[0] }] : []),
+            { phoneNumber: cleanMemberNum },
+          ],
+        },
+      });
+
+      // If we have displayPhone (real 62 number), auto-update participant's phoneNumber in DB if it was previously an LID
+      if (participant && displayPhone && displayPhone.startsWith("62") && participant.phoneNumber !== displayPhone) {
+        const existingReal = await prisma.user.findUnique({
+          where: { phoneNumber: displayPhone },
+        });
+
+        if (existingReal && existingReal.id !== participant.id) {
+          const merged = await prisma.user.update({
+            where: { id: existingReal.id },
+            data: {
+              name: participant.name || existingReal.name || null,
+              studentClass: participant.studentClass || existingReal.studentClass || null,
+              motivation: participant.motivation || existingReal.motivation || null,
+              hobby: participant.hobby || existingReal.hobby || null,
+              status: participant.status !== "NOT_STARTED" ? participant.status : existingReal.status,
             },
-          })
-        : null;
-
-      // If pnJid resolved a real 62 number, auto-update participant's phoneNumber in DB if it was previously an LID
-      if (participant && pnJid) {
-        const cleanPn = pnJid.split("@")[0].split(":")[0];
-        const formattedPn = cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
-        if (formattedPn.startsWith("62") && participant.phoneNumber !== formattedPn) {
-          const existingReal = await prisma.user.findUnique({
-            where: { phoneNumber: formattedPn },
           });
-
-          if (existingReal && existingReal.id !== participant.id) {
-            const merged = await prisma.user.update({
-              where: { id: existingReal.id },
-              data: {
-                name: participant.name || existingReal.name || null,
-                studentClass: participant.studentClass || existingReal.studentClass || null,
-                motivation: participant.motivation || existingReal.motivation || null,
-                hobby: participant.hobby || existingReal.hobby || null,
-                status: participant.status !== "NOT_STARTED" ? participant.status : existingReal.status,
-              },
+          try {
+            await prisma.user.delete({ where: { id: participant.id } });
+          } catch (e) {}
+          participant = merged;
+        } else {
+          try {
+            participant = await prisma.user.update({
+              where: { id: participant.id },
+              data: { phoneNumber: displayPhone },
             });
-            try {
-              await prisma.user.delete({ where: { id: participant.id } });
-            } catch (e) {}
-            participant = merged;
-          } else {
-            try {
-              participant = await prisma.user.update({
-                where: { id: participant.id },
-                data: { phoneNumber: formattedPn },
-              });
-            } catch (e) {}
-          }
+          } catch (e) {}
         }
       }
 
@@ -660,56 +655,25 @@ class WhatsAppBotEngine extends EventEmitter {
       if (!targetJid && participant?.phoneNumber && participant.phoneNumber.startsWith("62")) {
         targetJid = `${participant.phoneNumber}@s.whatsapp.net`;
       }
-      if (!targetJid && fullJid.endsWith("@s.whatsapp.net")) {
-        targetJid = fullJid;
-      }
       if (!targetJid) {
-        targetJid = fullJid; // Fallback to LID JID if no phone number available
+        targetJid = fullJid;
       }
 
       membersList.push({
-        id: participant?.id || null,
         jid: targetJid,
-        pnJid: pnJid || (fullJid.endsWith("@s.whatsapp.net") ? fullJid : null),
         phoneNumber: finalPhone,
-        isLid: fullJid.endsWith("@lid") && !pnJid,
-        name: participant?.name || null,
-        studentClass: participant?.studentClass || null,
-        status: participant?.status || "NOT_CONTACTED",
+        name: participant?.name || (p as any).name || (p as any).notify || null,
+        status: participant?.status || "NOT_STARTED",
         isExcluded: participant?.isExcluded || false,
-        isKickedFromGrp: participant?.isKickedFromGrp || false,
-        lastSentAt: participant?.lastSentAt ? new Date(participant.lastSentAt).toISOString() : null,
+        isRegistered: participant?.status === "COMPLETED",
+        faceRegistered: Boolean(participant?.faceDescriptor),
       });
     }
 
-    // Save group to SystemSetting for persistent dropdown selector
-    try {
-      await prisma.systemSetting.upsert({
-        where: { key: `group:${metadata.id}` },
-        create: {
-          key: `group:${metadata.id}`,
-          value: JSON.stringify({
-            id: metadata.id,
-            subject: metadata.subject,
-            size: membersList.length,
-            updatedAt: Date.now(),
-          }),
-        },
-        update: {
-          value: JSON.stringify({
-            id: metadata.id,
-            subject: metadata.subject,
-            size: membersList.length,
-            updatedAt: Date.now(),
-          }),
-        },
-      });
-    } catch (e) {}
-
     return {
-      groupId: metadata.id,
+      groupId: cleanGroupId,
       groupSubject: metadata.subject,
-      totalMembers: membersList.length,
+      totalMembers: metadata.participants.length,
       members: membersList,
     };
   }
@@ -720,13 +684,32 @@ class WhatsAppBotEngine extends EventEmitter {
     }
 
     const rawNum = jidOrPhone.split("@")[0].split(":")[0];
-    const cleanNum = rawNum.startsWith("0") ? "62" + rawNum.slice(1) : rawNum;
+    let cleanNum = rawNum.startsWith("0") ? "62" + rawNum.slice(1) : rawNum;
+
+    // Check if jidOrPhone is an LID and we can resolve it from group metadata
+    let realPhone = cleanNum.startsWith("62") ? cleanNum : "";
+    if (!realPhone) {
+      try {
+        const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
+        if (setting && setting.value) {
+          const groupData = await this.fetchGroupMembersWithStatus(setting.value);
+          const matched = groupData.members.find(
+            (m) => m.jid?.includes(rawNum) && m.phoneNumber && m.phoneNumber.startsWith("62")
+          );
+          if (matched && matched.phoneNumber) {
+            realPhone = matched.phoneNumber;
+            cleanNum = realPhone;
+          }
+        }
+      } catch (e) {}
+    }
 
     let participant = await prisma.user.findFirst({
       where: {
         OR: [
           { phoneNumber: cleanNum },
           { phoneNumber: rawNum },
+          ...(realPhone ? [{ phoneNumber: realPhone }] : []),
         ],
       },
     });
@@ -744,18 +727,74 @@ class WhatsAppBotEngine extends EventEmitter {
         },
       });
     } else {
+      const targetPhone = realPhone || (cleanNum.startsWith("62") ? cleanNum : participant.phoneNumber);
       await prisma.user.update({
         where: { id: participant.id },
         data: {
+          phoneNumber: targetPhone,
           status: "WAITING_CONFIRMATION",
           isExcluded: false,
         },
       });
     }
 
-    // Build a unique varied confirmation message to avoid WhatsApp spam detection
-    const initMsg = buildConfirmationMessage(participant.name || undefined);
+    // Generate 2-Hour Magic Token for Registration Link
+    const magicToken = require('crypto').randomBytes(32).toString("hex");
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
 
+    // Invalidate existing unused tokens for this user
+    await prisma.otpVerification.updateMany({
+      where: { userId: participant.id, isUsed: false },
+      data: { isUsed: true },
+    });
+
+    await prisma.otpVerification.create({
+      data: {
+        userId: participant.id,
+        phoneNumber: participant.phoneNumber,
+        otpCode,
+        magicToken,
+        expiresAt,
+      },
+    });
+
+    let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
+    if (!baseUrl) {
+      try {
+        const setting = await prisma.systemSetting.findUnique({
+          where: { key: "app_base_url" },
+        });
+        if (setting && setting.value && !setting.value.includes("localhost")) {
+          baseUrl = setting.value;
+        }
+      } catch (e) {}
+    }
+    if (!baseUrl || baseUrl.includes("localhost")) {
+      const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+      baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
+    }
+    baseUrl = baseUrl.replace(/\/$/, "");
+
+    const directRegUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
+
+    const confirmationMsg = `Halo${participant.name ? ` Kak *${participant.name}*` : ""}! 👋
+
+Kami dari *Komunitas English Club Velocity SMKN 1* ingin mengonfirmasi keikutsertaan Anda di ekstrakurikuler.
+
+❓ *Apakah Anda bersedia bergabung dan aktif sebagai anggota ekskul Velocity?*
+
+👉 *Jika BERSEDIA / INGIN MENDAFTAR:*
+Silakan klik link pendaftaran di bawah ini untuk melengkapi data diri Anda:
+🔗 ${directRegUrl}
+
+_⏱️ Link pendaftaran di atas aktif selama 2 jam._
+
+❌ *Jika TIDAK INGIN BERGABUNG:*
+Silakan balas pesan ini dengan mengetik: *TIDAK*
+_(Nomor Anda akan otomatis dimasukkan ke daftar pengeluaran dari grup WhatsApp)_
+
+Terima kasih atas kerjasamanya! 🙏✨`;
 
     // Prioritize standard phone number (628xxx@s.whatsapp.net) over @lid to prevent WA session revocation!
     let targetToSend = jidOrPhone;
@@ -763,7 +802,7 @@ class WhatsAppBotEngine extends EventEmitter {
       targetToSend = `${participant.phoneNumber}@s.whatsapp.net`;
     }
 
-    const sent = await this.sendToJid(targetToSend, initMsg);
+    const sent = await this.sendToJid(targetToSend, confirmationMsg);
     if (sent) {
       await prisma.user.update({
         where: { id: participant.id },
@@ -791,7 +830,7 @@ class WhatsAppBotEngine extends EventEmitter {
     const mentions: string[] = [];
     let memberListText = "";
     for (const m of waitingMembers) {
-      const jid = m.pnJid || m.jid;
+      const jid = m.jid;
       if (jid) mentions.push(jid);
       const numDisplay = m.phoneNumber.startsWith("62") ? `+${m.phoneNumber}` : m.name || m.phoneNumber;
       memberListText += `• ${numDisplay}\n`;

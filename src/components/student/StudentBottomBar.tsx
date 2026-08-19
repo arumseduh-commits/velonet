@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Navigation, FileText, User } from "lucide-react";
+import { LayoutDashboard, Navigation, FileText, User, Camera } from "lucide-react";
 
 export function StudentBottomBar() {
   const pathname = usePathname();
@@ -26,11 +26,11 @@ export function StudentBottomBar() {
       activeBg: "bg-emerald-500/15 border-emerald-500/30",
     },
     {
-      href: "/student/leave",
-      label: "Form Izin",
-      icon: FileText,
-      activeColor: "text-amber-400",
-      activeBg: "bg-amber-500/15 border-amber-500/30",
+      href: "/student/attendance",
+      label: "Absen Wajah",
+      icon: Camera,
+      activeColor: "text-emerald-400",
+      activeBg: "bg-emerald-500/15 border-emerald-500/30",
     },
     {
       href: "/student/profile",

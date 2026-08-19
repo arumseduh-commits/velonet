@@ -13,7 +13,7 @@ export async function GET(
       include: {
         attendances: {
           include: {
-            participant: true,
+            user: true,
           },
         },
       },
@@ -26,13 +26,13 @@ export async function GET(
       );
     }
 
-    const allParticipants = await prisma.participant.findMany({
+    const allParticipants = await prisma.user.findMany({
       where: { isExcluded: false },
       orderBy: { name: "asc" },
     });
 
     const attendanceMap = new Map(
-      session.attendances.map((a) => [a.participantId, a])
+      session.attendances.map((a) => [a.userId, a])
     );
 
     // Build CSV Header

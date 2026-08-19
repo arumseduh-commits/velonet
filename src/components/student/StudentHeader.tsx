@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Sparkles, LayoutDashboard, FileText, User, LogOut, Navigation } from "lucide-react";
+import { Sparkles, LayoutDashboard, FileText, User, LogOut, Navigation, Camera } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 interface StudentProfile {
@@ -96,15 +96,15 @@ export function StudentHeader() {
         </Link>
 
         <Link
-          href="/student/leave"
+          href="/student/attendance"
           className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-            pathname === "/student/leave"
-              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm"
+            pathname === "/student/attendance"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm"
               : "text-slate-400 hover:text-white hover:bg-slate-800/60"
           }`}
         >
-          <FileText className="w-4 h-4" />
-          <span>Form Izin / Sakit</span>
+          <Camera className="w-4 h-4 text-emerald-400" />
+          <span>Absensi Wajah</span>
         </Link>
 
         <Link

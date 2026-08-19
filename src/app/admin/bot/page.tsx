@@ -20,7 +20,6 @@ import {
   Check,
   UserX,
   Clock,
-  SendHorizontal,
   Sparkles,
   ShieldAlert,
   UserPlus,
@@ -87,8 +86,6 @@ export default function BotControlPage() {
   const [loadingGroupMembers, setLoadingGroupMembers] = useState(false);
   const [groupData, setGroupData] = useState<GroupInfo | null>(null);
   const [sendingSingleMember, setSendingSingleMember] = useState<string | null>(null);
-  const [sendingAllGroup, setSendingAllGroup] = useState(false);
-  const [sendingGroupAnnouncement, setSendingGroupAnnouncement] = useState(false);
   const [inspectorMsg, setInspectorMsg] = useState<string | null>(null);
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
   const [exclusionSearchQuery, setExclusionSearchQuery] = useState("");
@@ -462,93 +459,6 @@ export default function BotControlPage() {
       toast.error(`Error: ${err.message}`);
     } finally {
       setSendingSingleMember(null);
-    }
-  };
-
-  // Broadcast confirmation DM to all members of the group
-  const handleSendAllMembers = async () => {
-    if (!groupData) return;
-    if (status.state !== "CONNECTED") {
-      toast.error("Bot belum terhubung! Silakan klik 'Mulai Service Bot' atau tautkan WhatsApp terlebih dahulu.");
-      return;
-    }
-    const confirmed = await confirm({
-      title: "Broadcast Semua Anggota Grup",
-      message: `Kirim pesan konfirmasi pendaftaran secara personal (DM) ke seluruh ${groupData.totalMembers} anggota grup "${groupData.groupSubject}"?`,
-      confirmText: "Ya, Broadcast Semua",
-      cancelText: "Batal",
-      variant: "warning",
-      icon: "send",
-    });
-
-    if (!confirmed) return;
-
-    setSendingAllGroup(true);
-    setInspectorMsg(null);
-    try {
-      const res = await fetch("/api/bot/groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "send_all_group_members",
-          groupId: groupData.groupId,
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setInspectorMsg(json.message);
-        toast.success(json.message);
-        await fetchMembersForJid(inputGroupJid);
-      } else {
-        setInspectorMsg(`Gagal: ${json.error}`);
-        toast.error(`Gagal: ${json.error}`);
-      }
-    } catch (err: any) {
-      setInspectorMsg(`Error: ${err.message}`);
-      toast.error(`Error: ${err.message}`);
-    } finally {
-      setSendingAllGroup(false);
-    }
-  };
-
-  const handleSendGroupAnnouncement = async () => {
-    if (!groupData) return;
-    if (status.state !== "CONNECTED") {
-      toast.error("Bot belum terhubung! Silakan klik 'Mulai Service Bot' atau tautkan WhatsApp terlebih dahulu.");
-      return;
-    }
-    const confirmed = await confirm({
-      title: "📢 Kirim Pengumuman di Dalam Grup WA",
-      message: `Kirim pengumuman konfirmasi pendaftaran langsung ke dalam grup WA "${groupData.groupSubject}" dengan men-tag (@mention) seluruh anggota yang belum konfirmasi?\n\n(Metode ini 100% AMAN & BEBAS DARI RESIKO ACCOUNT BAN / LOGOUT)`,
-      confirmText: "Ya, Kirim Pengumuman Grup",
-      cancelText: "Batal",
-      variant: "info",
-      icon: "send",
-    });
-
-    if (!confirmed) return;
-
-    setSendingGroupAnnouncement(true);
-    try {
-      const res = await fetch("/api/bot/groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "send_group_announcement",
-          groupId: groupData.groupId,
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(json.message);
-        setInspectorMsg(json.message);
-      } else {
-        toast.error(`Gagal: ${json.error}`);
-      }
-    } catch (err: any) {
-      toast.error(`Error: ${err.message}`);
-    } finally {
-      setSendingGroupAnnouncement(false);
     }
   };
 
@@ -1000,33 +910,10 @@ export default function BotControlPage() {
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <button
-                    onClick={handleSendGroupAnnouncement}
-                    disabled={sendingGroupAnnouncement}
-                    className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    title="Kirim pengumuman tagging anggota langsung di dalam grup WA (100% Bebas Blokir/Logout)"
-                  >
-                    {sendingGroupAnnouncement ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Users className="w-3.5 h-3.5" />
-                    )}
-                    <span>📢 Kirim Pengumuman di Grup (100% Aman)</span>
-                  </button>
-
-                  <button
-                    onClick={handleSendAllMembers}
-                    disabled={sendingAllGroup}
-                    className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    {sendingAllGroup ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <SendHorizontal className="w-3.5 h-3.5" />
-                    )}
-                    <span>DM Ke Semua Anggota</span>
-                  </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 font-medium">
+                    Kirim konfirmasi per anggota melalui tombol aksi di bawah
+                  </span>
                 </div>
               </div>
 
