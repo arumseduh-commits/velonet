@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw, LogOut, Phone, ShieldCheck } from "lucide-react";
+import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw, LogOut, ShieldCheck } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 // Daftar Kelas SMKN 1: 5 Jurusan (RPL 2, BD 4, AK 3, LP 2, MP 4) x 3 Angkatan (X, XI, XII)
@@ -52,7 +52,6 @@ export default function CompleteProfilePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [initialPhone, setInitialPhone] = useState("");
-  const [customPhone, setCustomPhone] = useState("");
   
   // State Tanggal Lahir (Pemisahan Tanggal, Bulan, Tahun agar 100% rapi di semua HP)
   const [birthDay, setBirthDay] = useState("");
@@ -99,9 +98,6 @@ export default function CompleteProfilePage() {
             if (isMounted) {
               const rawPhone = json.data.phoneNumber || "";
               setInitialPhone(rawPhone);
-              if (rawPhone && !rawPhone.length && !rawPhone.startsWith("62")) {
-                setCustomPhone(rawPhone);
-              }
 
               // Prefill tanggal lahir jika ada
               if (json.data.birthDate) {
@@ -202,17 +198,6 @@ export default function CompleteProfilePage() {
       return;
     }
 
-    // 6. Validasi Nomor HP jika diisi manual
-    let finalPhone = initialPhone;
-    if (isLidNumber && customPhone.trim()) {
-      const cleanPhone = customPhone.trim().replace(/\D/g, "");
-      if (cleanPhone.length < 10 || cleanPhone.length > 14) {
-        toast.error("Nomor WhatsApp tidak valid (harus 10-14 digit).");
-        return;
-      }
-      finalPhone = cleanPhone;
-    }
-
     setSubmitting(true);
     try {
       const res = await fetch("/api/student/profile/complete", {
@@ -222,7 +207,6 @@ export default function CompleteProfilePage() {
           ...formData,
           name: formData.name.trim().toUpperCase(),
           birthDate: combinedBirthDate,
-          phoneNumber: finalPhone,
         }),
       });
       const json = await res.json();
@@ -317,26 +301,6 @@ export default function CompleteProfilePage() {
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-semibold tracking-wide uppercase transition-colors"
             />
           </div>
-
-          {/* Konfirmasi Nomor WhatsApp Asli jika sebelumnya terdeteksi ID Privasi / LID */}
-          {isLidNumber && (
-            <div className="space-y-1.5">
-              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                <Phone className="w-4 h-4 text-emerald-400" />
-                <span>Konfirmasi Nomor WhatsApp Aktif <span className="text-slate-500 font-normal">(Opsional)</span></span>
-              </label>
-              <input
-                type="tel"
-                value={customPhone}
-                onChange={(e) => setCustomPhone(e.target.value)}
-                placeholder="Contoh: 081234567890"
-                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono transition-colors"
-              />
-              <p className="text-[11px] text-slate-500">
-                Masukkan nomor WhatsApp aktif Anda agar data kontak Anda tersimpan dengan akurat.
-              </p>
-            </div>
-          )}
 
           {/* 2. Tanggal Lahir (3 Dropdown: Tgl, Bulan, Tahun - 100% Rapi & Tidak Keluar Outline) */}
           <div className="space-y-1.5">
