@@ -11,9 +11,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Nomor HP dan Password wajib diisi." }, { status: 400 });
     }
 
-    // 1. Cari user berdasarkan nomor HP
-    const user = await prisma.user.findUnique({
-      where: { phoneNumber },
+    // 1. Cari user berdasarkan nomor HP (dukung 08xx dan 628xx)
+    const cleanPhone = phoneNumber.replace(/\D/g, "");
+    const formattedPhone = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { phoneNumber: formattedPhone },
+          { phoneNumber: cleanPhone },
+          { phoneNumber: phoneNumber.trim() },
+        ],
+      },
     });
 
     if (!user) {
@@ -43,7 +52,10 @@ export async function POST(req: Request) {
     const userAgent = req.headers.get("user-agent");
     await createStudentSession(user.id, userAgent || "", ip || "");
 
-    return NextResponse.json({ success: true, redirectUrl: "/student/dashboard" });
+    const isCompleted = user.status === "COMPLETED" || Boolean(user.name && user.name !== "Siswa Baru" && user.studentClass);
+    const redirectUrl = isCompleted ? "/student" : "/student/complete-profile";
+
+    return NextResponse.json({ success: true, redirectUrl });
   } catch (err) {
     console.error("[LoginPassword] Error:", err);
     return NextResponse.json({ success: false, error: "Terjadi kesalahan internal server." }, { status: 500 });

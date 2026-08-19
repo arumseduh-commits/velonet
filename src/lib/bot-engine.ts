@@ -544,12 +544,49 @@ class WhatsAppBotEngine extends EventEmitter {
       return raw.startsWith("0") ? "62" + raw.slice(1) : raw;
     }
 
+    // 1. Check BaileysAuth table for stored LID mapping from WhatsApp handshake
+    try {
+      const authRecord = await prisma.baileysAuth.findUnique({
+        where: { key: `lid-mapping-${raw}_reverse` },
+      });
+      if (authRecord && authRecord.value) {
+        let val = authRecord.value.trim();
+        try {
+          val = JSON.parse(val);
+        } catch (e) {}
+        if (typeof val === "string") {
+          const clean = val.replace(/\D/g, "");
+          if ((clean.startsWith("62") || clean.startsWith("08")) && clean.length >= 10 && clean.length <= 15) {
+            return clean.startsWith("0") ? "62" + clean.slice(1) : clean;
+          }
+        }
+      }
+
+      const forwardRecord = await prisma.baileysAuth.findUnique({
+        where: { key: `lid-mapping-${raw}` },
+      });
+      if (forwardRecord && forwardRecord.value) {
+        let val = forwardRecord.value.trim();
+        try {
+          val = JSON.parse(val);
+        } catch (e) {}
+        if (typeof val === "string") {
+          const clean = val.replace(/\D/g, "");
+          if ((clean.startsWith("62") || clean.startsWith("08")) && clean.length >= 10 && clean.length <= 15) {
+            return clean.startsWith("0") ? "62" + clean.slice(1) : clean;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[BotEngine] Error checking BaileysAuth for LID mapping:", e);
+    }
+
     if (!this.socket || this.connectionState !== "CONNECTED") {
       return null;
     }
 
     try {
-      // 1. Try resolving via Primary Group Metadata participants
+      // 2. Try resolving via Primary Group Metadata participants
       const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
       if (setting && setting.value) {
         let cleanGroupId = setting.value.trim();

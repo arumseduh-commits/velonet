@@ -58,19 +58,45 @@ export async function processIncomingMessage(
 ): Promise<StateMachineResult | null> {
   const cleanJid = rawSenderJid.split("@")[0].split(":")[0];
   const incomingNum = normalizePhoneNumber(cleanJid);
-  const normalizedRealPhone = realPhoneNum ? normalizePhoneNumber(realPhoneNum) : undefined;
+  let normalizedRealPhone = realPhoneNum ? normalizePhoneNumber(realPhoneNum) : undefined;
 
-  // 1. Find participant by LID number OR real phone number
-  let participant = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { phoneNumber: incomingNum },
-        ...(normalizedRealPhone ? [{ phoneNumber: normalizedRealPhone }] : []),
-      ],
-    },
-  });
+  // 0. If real phone number is not provided and incoming is an LID, lookup BaileysAuth LID mapping
+  if (!normalizedRealPhone && (rawSenderJid.endsWith("@lid") || incomingNum.length > 13)) {
+    try {
+      const authRecord = await prisma.baileysAuth.findUnique({
+        where: { key: `lid-mapping-${incomingNum}_reverse` },
+      });
+      if (authRecord && authRecord.value) {
+        let val = authRecord.value.trim();
+        try {
+          val = JSON.parse(val);
+        } catch (e) {}
+        if (typeof val === "string") {
+          const clean = val.replace(/\D/g, "");
+          if ((clean.startsWith("62") || clean.startsWith("08")) && clean.length >= 10 && clean.length <= 15) {
+            normalizedRealPhone = clean.startsWith("0") ? "62" + clean.slice(1) : clean;
+          }
+        }
+      }
+    } catch (e) {}
+  }
 
-  // 2. Fallback: If not found and incoming JID is LID or unknown, search by pushName
+  // 1. Find participant by real phone number FIRST if available
+  let participant = null;
+  if (normalizedRealPhone) {
+    participant = await prisma.user.findUnique({
+      where: { phoneNumber: normalizedRealPhone },
+    });
+  }
+
+  // 2. If not found by real phone, search by incoming number (LID or raw phone)
+  if (!participant) {
+    participant = await prisma.user.findUnique({
+      where: { phoneNumber: incomingNum },
+    });
+  }
+
+  // 3. Fallback: If not found and incoming JID is LID or unknown, search by pushName
   if (!participant && (rawSenderJid.endsWith("@lid") || incomingNum.length > 13)) {
     if (pushName && pushName.trim().length >= 2) {
       const cleanPush = pushName.replace(/[^\w\s]/gi, "").trim();
@@ -101,10 +127,22 @@ export async function processIncomingMessage(
     }
   }
 
+  // Clean up dummy uncompleted LID user if real participant is found
+  if (participant && normalizedRealPhone && incomingNum !== normalizedRealPhone) {
+    try {
+      const dummyLidUser = await prisma.user.findUnique({
+        where: { phoneNumber: incomingNum },
+      });
+      if (dummyLidUser && dummyLidUser.id !== participant.id) {
+        await prisma.user.delete({ where: { id: dummyLidUser.id } }).catch(() => {});
+      }
+    } catch (e) {}
+  }
+
   // STRICT RULE: If participant is NOT in the database, DO NOT REPLY!
   // KECUALI jika pesan berisi perintah registrasi (REG_xxx) atau login (AUTH_xxx)
   if (!participant) {
-    const matchRegPayload = messageText.match(/REG_[a-f0-9]+/i) || messageText.match(/AUTH_[a-f0-9]+/i);
+    const matchRegPayload = messageText.match(/REG_[a-zA-Z0-9_]+/i) || messageText.match(/AUTH_[a-zA-Z0-9_]+/i);
     if (matchRegPayload && matchRegPayload[0]) {
       // Buat partisipan baru
       participant = await prisma.user.create({
@@ -266,7 +304,7 @@ export async function processIncomingMessage(
   }
 
   // Handle Registration Command (REG_...)
-  const matchRegPayload = text.match(/REG_[a-f0-9]+/i);
+  const matchRegPayload = text.match(/REG_[a-zA-Z0-9_]+/i);
   if (matchRegPayload && matchRegPayload[0]) {
     const payloadId = matchRegPayload[0];
     
@@ -277,26 +315,32 @@ export async function processIncomingMessage(
       };
     }
 
+    const isAlreadyCompleted =
+      participant.status === RegistrationStatus.COMPLETED ||
+      Boolean(participant.name && participant.name !== "Siswa Baru" && participant.studentClass);
+
     // Cek keberadaan di Grup Utama
-    let isInGroup = true;
-    if (checkGroup) {
-      isInGroup = await checkGroup(participant.phoneNumber);
+    if (!isAlreadyCompleted) {
+      let isInGroup = true;
+      if (checkGroup) {
+        isInGroup = await checkGroup(participant.phoneNumber);
+      }
+
+      if (!isInGroup) {
+        let inviteLink = "Hubungi admin untuk mendapatkan link grup.";
+        try {
+          const linkSetting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_invite_link" } });
+          if (linkSetting && linkSetting.value) inviteLink = linkSetting.value;
+        } catch (e) {}
+
+        return {
+          newStatus: participant.status as RegistrationStatusType,
+          replyMessage: `Maaf, kamu belum bergabung di grup komunitas kami. Silakan join grup melalui link berikut terlebih dahulu:\n\n${inviteLink}`,
+        };
+      }
     }
 
-    if (!isInGroup) {
-      let inviteLink = "Hubungi admin untuk mendapatkan link grup.";
-      try {
-        const linkSetting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_invite_link" } });
-        if (linkSetting && linkSetting.value) inviteLink = linkSetting.value;
-      } catch (e) {}
-
-      return {
-        newStatus: participant.status as RegistrationStatusType,
-        replyMessage: `Maaf, kamu belum bergabung di grup komunitas kami. Silakan join grup melalui link berikut terlebih dahulu:\n\n${inviteLink}`,
-      };
-    }
-
-    // Jika ada di grup, set verified dan kirim link
+    // Set verified di payload
     try {
       const payloadSetting = await prisma.systemSetting.findUnique({
         where: { key: `login_payload:${payloadId}` },
@@ -328,6 +372,13 @@ export async function processIncomingMessage(
       baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
     }
     baseUrl = baseUrl.replace(/\/$/, "");
+
+    if (isAlreadyCompleted) {
+      return {
+        newStatus: RegistrationStatus.COMPLETED,
+        replyMessage: `ℹ️ *AKUN ANDA SUDAH TERDAFTAR*\n\nHalo Kak *${participant.name}*!\n\nNomor WhatsApp Anda sudah terdaftar di Portal Siswa Velocity (*${participant.studentClass ? "Kelas " + participant.studentClass : "Aktif"}*).\n\nKlik link di bawah ini untuk *LANGSUNG MASUK* ke akun Portal Siswa Anda tanpa perlu mendaftar ulang:\n\n🔗 ${baseUrl}/api/student/auth/verify-registration?token=${payloadId}\n\n_⚠️ Link ini berlaku 10 menit. Selamat belajar! 🚀_`,
+      };
+    }
 
     const greetingName = participant.name && participant.name !== "Siswa Baru" ? `Kak *${participant.name}*` : "Kak";
 
@@ -379,7 +430,7 @@ export async function processIncomingMessage(
     }
 
     // Extract payloadId if provided (e.g., "!login AUTH_e8f92a10b4c7_984102")
-    const matchPayload = text.match(/AUTH_[a-f0-9]+/i);
+    const matchPayload = text.match(/AUTH_[a-zA-Z0-9_]+/i);
     if (matchPayload && matchPayload[0]) {
       const payloadId = matchPayload[0];
       try {
