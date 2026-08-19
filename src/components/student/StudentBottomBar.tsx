@@ -8,11 +8,12 @@ import { LayoutDashboard, Navigation, FileText, User, Camera } from "lucide-reac
 export function StudentBottomBar() {
   const pathname = usePathname();
 
-  // Don't render on login, complete-profile, or expired pages
+  // Don't render on login, complete-profile, expired, or full-camera attendance pages
   if (
     pathname === "/student/login" ||
     pathname === "/student/complete-profile" ||
-    pathname === "/student/expired"
+    pathname === "/student/expired" ||
+    pathname === "/student/attendance"
   ) {
     return null;
   }

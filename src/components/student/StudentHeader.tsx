@@ -50,11 +50,12 @@ export function StudentHeader() {
     }
   };
 
-  // Don't render header on login, complete-profile, or expired pages
+  // Don't render header on login, complete-profile, expired, or full-camera attendance pages
   if (
     pathname === "/student/login" ||
     pathname === "/student/complete-profile" ||
-    pathname === "/student/expired"
+    pathname === "/student/expired" ||
+    pathname === "/student/attendance"
   ) {
     return null;
   }

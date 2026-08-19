@@ -18,17 +18,16 @@ import {
   Clock,
   Navigation,
   SwitchCamera,
-  Smile,
-  Zap,
+  ArrowLeft,
   User,
-  History,
+  X,
+  Zap,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import {
   loadFaceApiModels,
   detectFaceWithDescriptor,
   captureFrameBase64,
-  DetectedFaceData,
 } from "@/lib/client-face-api";
 
 interface StudentProfile {
@@ -74,7 +73,6 @@ export default function StudentAttendancePage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [modelsReady, setModelsReady] = useState(false);
-  const [scanning, setScanning] = useState(false);
   const [submittingAttendance, setSubmittingAttendance] = useState(false);
 
   // Recognition Result Modal Popup State
@@ -175,8 +173,8 @@ export default function StudentAttendancePage() {
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: mode,
-          width: { ideal: 640 },
-          height: { ideal: 640 },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
         audio: false,
       };
@@ -209,7 +207,7 @@ export default function StudentAttendancePage() {
     startCamera(nextMode);
   };
 
-  // Auto-start camera when models are loaded
+  // Auto-start camera when models and data are ready
   useEffect(() => {
     if (!loading && modelsReady && !cameraActive) {
       startCamera("user");
@@ -235,7 +233,6 @@ export default function StudentAttendancePage() {
       return;
     }
 
-    setScanning(true);
     setSubmittingAttendance(true);
     setLastCheckInResult(null);
 
@@ -245,7 +242,6 @@ export default function StudentAttendancePage() {
 
       if (!detection) {
         toast.warning("Wajah tidak terdeteksi di kamera! Posisikan wajah Anda tepat di dalam lingkaran.");
-        setScanning(false);
         setSubmittingAttendance(false);
         return;
       }
@@ -311,135 +307,130 @@ export default function StudentAttendancePage() {
     } catch (err: any) {
       toast.error(err.message || "Gagal memproses absensi wajah.");
     } finally {
-      setScanning(false);
       setSubmittingAttendance(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
-        <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
-        <span className="text-sm font-medium">Menyiapkan Kamera Absensi Wajah...</span>
+      <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
+        <RefreshCw className="w-9 h-9 animate-spin text-emerald-400" />
+        <span className="text-sm font-semibold text-slate-200">Membuka Kamera Absensi Wajah...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 space-y-5 max-w-4xl mx-auto pb-24 md:pb-8">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40 border border-emerald-500/20 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 shrink-0">
-            <Camera className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-white tracking-wide flex items-center gap-2">
-              <span>Absen Wajah (Face Recognition)</span>
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Pindai wajah Anda untuk verifikasi kehadiran dan pencatatan lokasi GPS
-            </p>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-50 bg-black text-white w-screen h-screen overflow-hidden select-none flex flex-col justify-between">
+      {/* 1. FULL-BLEED BACKGROUND LIVE VIDEO */}
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        className={`absolute inset-0 w-full h-full object-cover ${
+          facingMode === "user" ? "transform -scale-x-100" : ""
+        }`}
+      />
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/student/profile"
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5"
-          >
-            <History className="w-3.5 h-3.5 text-blue-400" />
-            <span>Lihat Riwayat di Profil</span>
-          </Link>
-        </div>
-      </div>
+      {/* Dark Gradient Overlays for Readability */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/70 via-transparent to-black/80" />
 
-      {/* Smart GPS Geofence Radar Bar */}
-      <div className="p-3.5 sm:p-4 rounded-2xl glass-panel border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
-            <Navigation className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="font-semibold text-white">Status Radar GPS: </span>
-            {gpsLocation ? (
-              <span className="text-emerald-400 font-mono">
-                {gpsLocation.latitude.toFixed(5)}, {gpsLocation.longitude.toFixed(5)} (±{Math.round(gpsLocation.accuracy || 0)}m)
-              </span>
-            ) : gpsLoading ? (
-              <span className="text-amber-400 animate-pulse">Mendeteksi koordinat...</span>
-            ) : (
-              <span className="text-rose-400">{gpsError || "Lokasi belum terdeteksi"}</span>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={acquireGps}
-          disabled={gpsLoading}
-          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-700 shrink-0"
+      {/* 2. TOP FLOATING NAVIGATION & RADAR BAR */}
+      <div className="relative z-30 flex items-center justify-between p-4 sm:p-6">
+        {/* Tombol Back di Pojok Kiri Atas */}
+        <Link
+          href="/student"
+          onClick={stopCamera}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-slate-900/85 hover:bg-slate-800/90 text-white text-xs font-bold border border-slate-700/70 shadow-2xl backdrop-blur-md transition-all cursor-pointer group"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${gpsLoading ? "animate-spin text-blue-400" : ""}`} />
-          <span>Refresh GPS</span>
-        </button>
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+          <span>Kembali</span>
+        </Link>
+
+        {/* Pop-up / Chip Melayang Lokasi GPS */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={acquireGps}
+            disabled={gpsLoading}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/70 text-white text-xs font-semibold shadow-2xl backdrop-blur-md transition-all cursor-pointer"
+            title="Klik untuk segarkan GPS"
+          >
+            <div className="relative flex items-center justify-center">
+              <Navigation className={`w-3.5 h-3.5 ${gpsLoading ? "animate-spin text-blue-400" : "text-emerald-400"}`} />
+              <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${gpsLocation ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`} />
+            </div>
+
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] text-slate-400 font-normal leading-tight">Radar Lokasi GPS</span>
+              <span className="font-mono text-[11px] text-emerald-300 font-bold leading-tight truncate max-w-[130px] sm:max-w-[180px]">
+                {gpsLocation ? (
+                  `${gpsLocation.latitude.toFixed(4)}, ${gpsLocation.longitude.toFixed(4)}`
+                ) : gpsLoading ? (
+                  "Mencari..."
+                ) : (
+                  "GPS Belum Aktif"
+                )}
+              </span>
+            </div>
+
+            <RefreshCw className={`w-3 h-3 text-slate-400 ${gpsLoading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       </div>
 
-      {/* FULL CAMERA SCANNER VIEWPORT */}
-      <div className="p-4 sm:p-6 rounded-3xl glass-panel border border-slate-800 space-y-4 shadow-2xl relative overflow-hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="text-xs font-bold text-slate-200">Kamera Pemindai AI</span>
-          </div>
+      {/* 3. CENTER BIOMETRIC SCANNING VIEWFINDER */}
+      <div className="relative z-20 flex flex-col items-center justify-center my-auto px-4 pointer-events-none">
+        {/* Oval Face Scanning Guide Frame */}
+        <div className="relative w-60 h-76 sm:w-72 sm:h-92 rounded-[110px] border-2 border-dashed border-emerald-400/90 shadow-[0_0_50px_rgba(16,185,129,0.35)] flex items-center justify-center animate-pulse">
+          {/* Inner Corner Accents */}
+          <div className="absolute inset-2 border border-white/20 rounded-[102px]" />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleCameraFacing}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <SwitchCamera className="w-3.5 h-3.5" />
-              <span>Ganti Kamera</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Camera Container with Oval Guide */}
-        <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] max-h-[500px] rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className={`w-full h-full object-cover ${facingMode === "user" ? "transform -scale-x-100" : ""}`}
-          />
-
-          {/* Oval Face Scanning Guide Overlay */}
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="w-52 h-64 sm:w-64 sm:h-80 rounded-[100px] border-2 border-dashed border-emerald-400/70 shadow-[0_0_50px_rgba(16,185,129,0.2)] animate-pulse" />
-          </div>
-
-          {/* Scanning Overlay Animation */}
-          {scanning && (
-            <div className="absolute inset-0 bg-emerald-950/40 backdrop-blur-xs flex flex-col items-center justify-center gap-3">
+          {submittingAttendance && (
+            <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs rounded-[108px] flex flex-col items-center justify-center gap-3">
               <RefreshCw className="w-10 h-10 text-emerald-400 animate-spin" />
-              <span className="text-xs font-bold text-white bg-slate-950/80 px-4 py-1.5 rounded-full border border-emerald-500/40">
-                Mencocokkan Biometrik Wajah & GPS...
+              <span className="text-xs font-bold text-white bg-slate-900/90 px-4 py-1.5 rounded-full border border-emerald-500/40 shadow-lg">
+                Mencocokkan Wajah AI...
               </span>
             </div>
           )}
         </div>
 
-        {/* Scan Action Button */}
-        <div className="pt-2">
+        {/* Live Guide Floating Pill */}
+        <div className="mt-5 pointer-events-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/85 border border-slate-700/80 shadow-2xl backdrop-blur-md">
+            <Camera className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-xs font-bold text-white">
+              {submittingAttendance
+                ? "Sedang memproses biometrik..."
+                : "Arahkan wajah Anda ke dalam lingkaran"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. BOTTOM FLOATING CONTROLS */}
+      <div className="relative z-30 p-4 sm:p-6 flex flex-col items-center gap-3 max-w-lg mx-auto w-full">
+        <div className="w-full flex items-center gap-3">
+          {/* Switch Camera Button */}
+          <button
+            onClick={toggleCameraFacing}
+            type="button"
+            className="p-3.5 rounded-2xl bg-slate-900/85 hover:bg-slate-800 text-white border border-slate-700/70 shadow-2xl backdrop-blur-md transition-all cursor-pointer shrink-0"
+            title="Ganti Kamera Depan/Belakang"
+          >
+            <SwitchCamera className="w-5 h-5" />
+          </button>
+
+          {/* Main Scan Button */}
           <button
             onClick={handlePerformFaceCheckIn}
             disabled={submittingAttendance || !cameraActive}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm shadow-xl shadow-emerald-600/30 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+            className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm tracking-wide shadow-2xl shadow-emerald-600/40 border border-emerald-400/30 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
           >
             {submittingAttendance ? (
               <>
                 <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>Memproses Absensi Wajah...</span>
+                <span>MEMPROSES ABSENSI...</span>
               </>
             ) : (
               <>
@@ -449,11 +440,15 @@ export default function StudentAttendancePage() {
             )}
           </button>
         </div>
+
+        <p className="text-[11px] text-slate-400 text-center font-medium drop-shadow-md">
+          Pastikan pencahayaan cukup dan wajah terlihat jelas di kamera.
+        </p>
       </div>
 
-      {/* CUSTOM POPUP MODAL DIALOG: HASIL ABSENSI, AKURASI & LOKASI */}
+      {/* 5. INTERACTIVE FLOATING RESULT POP-UP (Wajah Terdaftar / Orang Lain / Unknown / Out of Radius) */}
       {lastCheckInResult && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-center">
             {/* Status Icon */}
             <div className="mx-auto w-16 h-16 rounded-3xl flex items-center justify-center shadow-xl">
@@ -469,6 +464,10 @@ export default function StudentAttendancePage() {
                 <div className="w-full h-full rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
                   <MapPin className="w-9 h-9" />
                 </div>
+              ) : lastCheckInResult.status === "UNKNOWN_FACE" ? (
+                <div className="w-full h-full rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <User className="w-9 h-9" />
+                </div>
               ) : (
                 <div className="w-full h-full rounded-3xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
                   <XCircle className="w-9 h-9" />
@@ -482,9 +481,11 @@ export default function StudentAttendancePage() {
                 {lastCheckInResult.status === "SUCCESS"
                   ? "Absensi Berhasil Diverifikasi! 🎉"
                   : lastCheckInResult.status === "ACCOUNT_MISMATCH"
-                  ? "Wajah Akun Tidak Cocok"
+                  ? "Wajah Akun Tidak Cocok! ⚠️"
                   : lastCheckInResult.status === "OUT_OF_RADIUS"
-                  ? "Di Luar Radius Lokasi Kumpul"
+                  ? "Di Luar Area Lokasi Kumpul! 📍"
+                  : lastCheckInResult.status === "UNKNOWN_FACE"
+                  ? "Wajah Belum Terdaftar! ⚠️"
                   : "Absensi Gagal"}
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
@@ -497,7 +498,9 @@ export default function StudentAttendancePage() {
               {lastCheckInResult.detectedName && (
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                   <span className="text-slate-400">Nama Siswa:</span>
-                  <span className="font-bold text-white">{lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})</span>
+                  <span className="font-bold text-white">
+                    {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
+                  </span>
                 </div>
               )}
 
@@ -533,16 +536,16 @@ export default function StudentAttendancePage() {
                 onClick={() => setLastCheckInResult(null)}
                 className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer"
               >
-                Tutup
+                {lastCheckInResult.status === "SUCCESS" ? "Tutup" : "Coba Lagi"}
               </button>
 
               {lastCheckInResult.status === "SUCCESS" && (
                 <Link
-                  href="/student/profile"
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                  href="/student"
+                  onClick={stopCamera}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20"
                 >
-                  <History className="w-3.5 h-3.5" />
-                  <span>Lihat di Profil</span>
+                  <span>Kembali ke Beranda</span>
                 </Link>
               )}
             </div>
