@@ -296,53 +296,56 @@ class WhatsAppBotEngine extends EventEmitter {
           const pushName = msg.pushName || undefined;
           let realPhoneNum: string | undefined = undefined;
 
-          if (remoteJid.endsWith("@s.whatsapp.net")) {
-            realPhoneNum = remoteJid.split("@")[0].split(":")[0];
-          } else if ((msg as any).participant && (msg as any).participant.endsWith("@s.whatsapp.net")) {
-            realPhoneNum = (msg as any).participant.split("@")[0].split(":")[0];
-          } else if (remoteJid.endsWith("@lid")) {
+          // 1. Cek participantPn dari Baileys jika tersedia
+          const pnField = (msg as any).participantPn || (msg.key as any).participantPn || (msg as any).senderPn;
+          if (pnField && typeof pnField === "string") {
+            const rawPn = pnField.split("@")[0].split(":")[0];
+            if (rawPn.startsWith("62") || rawPn.startsWith("08")) {
+              realPhoneNum = rawPn.startsWith("0") ? "62" + rawPn.slice(1) : rawPn;
+            }
+          }
+
+          // 2. Jika belum ketemu, selesaikan via resolveLidToRealPhone
+          if (!realPhoneNum) {
+            realPhoneNum = (await this.resolveLidToRealPhone(remoteJid)) || undefined;
+          }
+
+          // 3. Auto-healing user database secara realtime jika nomor sebelumnya tersimpan sebagai LID
+          if (realPhoneNum && remoteJid.endsWith("@lid")) {
             try {
-              // 1. Cek participantPn dari Baileys jika tersedia
-              const pnField = (msg as any).participantPn || (msg.key as any).participantPn || (msg as any).senderPn;
-              if (pnField && typeof pnField === "string" && pnField.includes("@s.whatsapp.net")) {
-                const raw = pnField.split("@")[0].split(":")[0];
-                if (raw.startsWith("62")) {
-                  realPhoneNum = raw;
-                }
-              }
+              const cleanLid = remoteJid.split("@")[0].split(":")[0];
+              const lidUser = await prisma.user.findFirst({
+                where: { phoneNumber: cleanLid },
+              });
 
-              // 2. Cek metadata grup utama untuk memetakan LID ke nomor HP asli
-              if (!realPhoneNum) {
-                const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
-                if (setting && setting.value) {
-                  const groupData = await this.fetchGroupMembersWithStatus(setting.value);
-                  const cleanLid = remoteJid.split("@")[0].split(":")[0];
-                  const matchedMember = groupData.members.find(
-                    (m) => m.jid?.includes(cleanLid) && m.phoneNumber && m.phoneNumber.startsWith("62")
-                  );
-                  if (matchedMember && matchedMember.phoneNumber) {
-                    realPhoneNum = matchedMember.phoneNumber;
-                  }
-                }
-              }
+              if (lidUser && lidUser.phoneNumber !== realPhoneNum) {
+                const existingReal = await prisma.user.findUnique({
+                  where: { phoneNumber: realPhoneNum },
+                });
 
-              // 3. Fallback onWhatsApp
-              if (!realPhoneNum) {
-                const res = await sock.onWhatsApp(remoteJid);
-                if (res && Array.isArray(res)) {
-                  for (const item of res) {
-                    if (item && item.jid) {
-                      const raw = item.jid.split("@")[0].split(":")[0];
-                      if (raw.startsWith("62")) {
-                        realPhoneNum = raw;
-                        break;
-                      }
-                    }
-                  }
+                if (existingReal && existingReal.id !== lidUser.id) {
+                  await prisma.user.update({
+                    where: { id: existingReal.id },
+                    data: {
+                      name: lidUser.name || existingReal.name,
+                      studentClass: lidUser.studentClass || existingReal.studentClass,
+                      motivation: lidUser.motivation || existingReal.motivation,
+                      hobby: lidUser.hobby || existingReal.hobby,
+                      status: lidUser.status !== "NOT_STARTED" ? lidUser.status : existingReal.status,
+                      faceDescriptor: lidUser.faceDescriptor || existingReal.faceDescriptor,
+                      facePhoto: lidUser.facePhoto || existingReal.facePhoto,
+                    },
+                  });
+                  await prisma.user.delete({ where: { id: lidUser.id } }).catch(() => {});
+                } else {
+                  await prisma.user.update({
+                    where: { id: lidUser.id },
+                    data: { phoneNumber: realPhoneNum },
+                  }).catch(() => {});
                 }
               }
             } catch (e) {
-              console.error("[BotEngine] Error resolving LID to real phone:", e);
+              console.error("[BotEngine] Error auto-healing LID user in DB:", e);
             }
           }
 
@@ -517,6 +520,79 @@ class WhatsAppBotEngine extends EventEmitter {
     }
 
     return list;
+  }
+
+  /**
+   * Resolves an LID or unknown JID to a real Indonesian mobile number (628xxx)
+   */
+  public async resolveLidToRealPhone(jidOrLid: string): Promise<string | null> {
+    if (!jidOrLid) return null;
+    const raw = jidOrLid.split("@")[0].split(":")[0];
+
+    // If it's already a valid Indonesian mobile number
+    if ((raw.startsWith("62") || raw.startsWith("08")) && raw.length >= 10 && raw.length <= 15) {
+      return raw.startsWith("0") ? "62" + raw.slice(1) : raw;
+    }
+
+    if (!this.socket || this.connectionState !== "CONNECTED") {
+      return null;
+    }
+
+    try {
+      // 1. Try resolving via Primary Group Metadata participants
+      const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
+      if (setting && setting.value) {
+        let cleanGroupId = setting.value.trim();
+        if (!cleanGroupId.includes("@g.us")) {
+          cleanGroupId = `${cleanGroupId.replace(/\D/g, "")}@g.us`;
+        }
+
+        const metadata = await this.socket.groupMetadata(cleanGroupId).catch(() => null);
+        if (metadata && metadata.participants) {
+          for (const p of metadata.participants) {
+            const pId = p.id || "";
+            const pLid = (p as any).lid || "";
+            const pPn = (p as any).pn || (p as any).phoneNumber || "";
+
+            if (pId.includes(raw) || pLid.includes(raw) || pPn.includes(raw)) {
+              if (pPn) {
+                const cleanPn = pPn.split("@")[0].split(":")[0];
+                if (cleanPn.startsWith("62") || cleanPn.startsWith("08")) {
+                  return cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
+                }
+              }
+              if (pId.endsWith("@s.whatsapp.net")) {
+                const cleanPn = pId.split("@")[0].split(":")[0];
+                if (cleanPn.startsWith("62") || cleanPn.startsWith("08")) {
+                  return cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Try onWhatsApp direct lookup
+      const onWaJid = jidOrLid.includes("@") ? jidOrLid : `${raw}@lid`;
+      const onWaPromise = this.socket.onWhatsApp(onWaJid);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+      const res = await Promise.race([onWaPromise, timeoutPromise]);
+
+      if (res && Array.isArray(res)) {
+        for (const item of res) {
+          if (item && item.jid) {
+            const cleanJid = item.jid.split("@")[0].split(":")[0];
+            if (cleanJid.startsWith("62") || cleanJid.startsWith("08")) {
+              return cleanJid.startsWith("0") ? "62" + cleanJid.slice(1) : cleanJid;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[BotEngine] resolveLidToRealPhone error:", err);
+    }
+
+    return null;
   }
 
   public async fetchGroupMembersWithStatus(groupIdInput: string) {

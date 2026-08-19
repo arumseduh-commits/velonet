@@ -35,9 +35,50 @@ export async function GET(req: NextRequest) {
       orderBy: { updatedAt: "desc" },
     });
 
+    // Auto-heal any LID phone numbers found in the results
+    const healedParticipants = await Promise.all(
+      participants.map(async (p) => {
+        const isLid = p.phoneNumber.length > 14 || (!p.phoneNumber.startsWith("62") && !p.phoneNumber.startsWith("08"));
+        if (isLid) {
+          try {
+            const { botEngine } = await import("@/lib/bot-engine");
+            const resolved = await botEngine.resolveLidToRealPhone(p.phoneNumber);
+            if (resolved && (resolved.startsWith("62") || resolved.startsWith("08"))) {
+              const existingReal = await prisma.user.findUnique({
+                where: { phoneNumber: resolved },
+              });
+              if (existingReal && existingReal.id !== p.id) {
+                // Merge
+                const merged = await prisma.user.update({
+                  where: { id: existingReal.id },
+                  data: {
+                    name: p.name || existingReal.name,
+                    studentClass: p.studentClass || existingReal.studentClass,
+                    motivation: p.motivation || existingReal.motivation,
+                    hobby: p.hobby || existingReal.hobby,
+                    status: p.status !== "NOT_STARTED" ? p.status : existingReal.status,
+                    faceDescriptor: p.faceDescriptor || existingReal.faceDescriptor,
+                    facePhoto: p.facePhoto || existingReal.facePhoto,
+                  },
+                });
+                await prisma.user.delete({ where: { id: p.id } }).catch(() => {});
+                return merged;
+              } else {
+                return await prisma.user.update({
+                  where: { id: p.id },
+                  data: { phoneNumber: resolved },
+                });
+              }
+            }
+          } catch (e) {}
+        }
+        return p;
+      })
+    );
+
     return NextResponse.json({
       success: true,
-      data: participants,
+      data: healedParticipants,
     });
   } catch (error: any) {
     return NextResponse.json(
