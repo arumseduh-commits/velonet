@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw } from "lucide-react";
-import toast from "react-hot-toast";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 export default function CompleteProfilePage() {
   const router = useRouter();
+  const { toast } = useDialog();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({

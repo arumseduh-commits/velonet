@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getStudentSession } from "@/lib/student-auth";
+import { getLoggedInStudent } from "@/lib/student-auth";
 
 export async function POST(req: Request) {
   try {
-    const session = await getStudentSession();
-    if (!session || !session.userId) {
+    const student = await getLoggedInStudent();
+    if (!student || !student.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     await prisma.user.update({
-      where: { id: session.userId },
+      where: { id: student.id },
       data: {
         name,
         birthDate: new Date(birthDate),
