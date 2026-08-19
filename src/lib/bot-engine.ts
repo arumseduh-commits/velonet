@@ -301,19 +301,48 @@ class WhatsAppBotEngine extends EventEmitter {
             realPhoneNum = (msg as any).participant.split("@")[0].split(":")[0];
           } else if (remoteJid.endsWith("@lid")) {
             try {
-              const res = await sock.onWhatsApp(remoteJid);
-              if (res && Array.isArray(res)) {
-                for (const item of res) {
-                  if (item && item.jid) {
-                    const raw = item.jid.split("@")[0].split(":")[0];
-                    if (raw.startsWith("62")) {
-                      realPhoneNum = raw;
-                      break;
+              // 1. Cek participantPn dari Baileys jika tersedia
+              const pnField = (msg as any).participantPn || (msg.key as any).participantPn || (msg as any).senderPn;
+              if (pnField && typeof pnField === "string" && pnField.includes("@s.whatsapp.net")) {
+                const raw = pnField.split("@")[0].split(":")[0];
+                if (raw.startsWith("62")) {
+                  realPhoneNum = raw;
+                }
+              }
+
+              // 2. Cek metadata grup utama untuk memetakan LID ke nomor HP asli
+              if (!realPhoneNum) {
+                const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
+                if (setting && setting.value) {
+                  const groupData = await this.fetchGroupMembersWithStatus(setting.value);
+                  const cleanLid = remoteJid.split("@")[0].split(":")[0];
+                  const matchedMember = groupData.members.find(
+                    (m) => m.jid?.includes(cleanLid) && m.phoneNumber && m.phoneNumber.startsWith("62")
+                  );
+                  if (matchedMember && matchedMember.phoneNumber) {
+                    realPhoneNum = matchedMember.phoneNumber;
+                  }
+                }
+              }
+
+              // 3. Fallback onWhatsApp
+              if (!realPhoneNum) {
+                const res = await sock.onWhatsApp(remoteJid);
+                if (res && Array.isArray(res)) {
+                  for (const item of res) {
+                    if (item && item.jid) {
+                      const raw = item.jid.split("@")[0].split(":")[0];
+                      if (raw.startsWith("62")) {
+                        realPhoneNum = raw;
+                        break;
+                      }
                     }
                   }
                 }
               }
-            } catch (e) {}
+            } catch (e) {
+              console.error("[BotEngine] Error resolving LID to real phone:", e);
+            }
           }
 
           let locationData: import("./bot-state-machine").LocationPayload | undefined = undefined;

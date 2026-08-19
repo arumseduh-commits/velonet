@@ -1,16 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw, LogOut } from "lucide-react";
+import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw, LogOut, Phone, ShieldCheck } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+
+// Daftar Kelas SMKN 1: 5 Jurusan (RPL 2, BD 4, AK 3, LP 2, MP 4) x 3 Angkatan (X, XI, XII)
+const SCHOOL_CLASSES = {
+  "Tingkat X (Kelas 10)": [
+    "X RPL 1", "X RPL 2",
+    "X BD 1", "X BD 2", "X BD 3", "X BD 4",
+    "X AK 1", "X AK 2", "X AK 3",
+    "X LP 1", "X LP 2",
+    "X MP 1", "X MP 2", "X MP 3", "X MP 4",
+  ],
+  "Tingkat XI (Kelas 11)": [
+    "XI RPL 1", "XI RPL 2",
+    "XI BD 1", "XI BD 2", "XI BD 3", "XI BD 4",
+    "XI AK 1", "XI AK 2", "XI AK 3",
+    "XI LP 1", "XI LP 2",
+    "XI MP 1", "XI MP 2", "XI MP 3", "XI MP 4",
+  ],
+  "Tingkat XII (Kelas 12)": [
+    "XII RPL 1", "XII RPL 2",
+    "XII BD 1", "XII BD 2", "XII BD 3", "XII BD 4",
+    "XII AK 1", "XII AK 2", "XII AK 3",
+    "XII LP 1", "XII LP 2",
+    "XII MP 1", "XII MP 2", "XII MP 3", "XII MP 4",
+  ],
+};
 
 export default function CompleteProfilePage() {
   const router = useRouter();
   const { toast } = useDialog();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [initialPhone, setInitialPhone] = useState("");
+  const [customPhone, setCustomPhone] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     birthDate: "",
@@ -19,6 +45,20 @@ export default function CompleteProfilePage() {
     motivation: "",
     hobby: "",
   });
+
+  // Hitung batas maksimal tanggal lahir (Minimal 15 Tahun)
+  const maxBirthDate = useMemo(() => {
+    const now = new Date();
+    const min15Date = new Date(now.getFullYear() - 15, now.getMonth(), now.getDate());
+    return min15Date.toISOString().split("T")[0];
+  }, []);
+
+  // Cek apakah nomor yang tersimpan adalah LID Baileys (bukan nomor HP nyata)
+  const isLidNumber = useMemo(() => {
+    if (!initialPhone) return false;
+    const clean = initialPhone.replace(/\D/g, "");
+    return clean.length > 13 || (!clean.startsWith("62") && !clean.startsWith("08"));
+  }, [initialPhone]);
 
   useEffect(() => {
     let isMounted = true;
@@ -29,12 +69,16 @@ export default function CompleteProfilePage() {
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
-            if (json.data.status === "COMPLETED") {
+            if (json.data.status === "COMPLETED" && json.data.name) {
               router.replace("/student");
               return;
             }
             if (isMounted) {
-              setPhoneNumber(json.data.phoneNumber || "");
+              const rawPhone = json.data.phoneNumber || "";
+              setInitialPhone(rawPhone);
+              if (rawPhone && !rawPhone.length && !rawPhone.startsWith("62")) {
+                setCustomPhone(rawPhone);
+              }
               setFormData({
                 name: (json.data.name || "").toUpperCase(),
                 birthDate: json.data.birthDate || "",
@@ -78,23 +122,80 @@ export default function CompleteProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Validasi Nama Minimal 4 Huruf
+    if (!formData.name || formData.name.trim().length < 4) {
+      toast.error("Nama Lengkap wajib diisi minimal 4 huruf / karakter.");
+      return;
+    }
+
+    // 2. Validasi Usia Minimal 15 Tahun
+    if (!formData.birthDate) {
+      toast.error("Tanggal lahir wajib dipilih.");
+      return;
+    }
+    const birth = new Date(formData.birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    if (age < 15) {
+      toast.error("Usia minimal pendaftaran adalah 15 tahun.");
+      return;
+    }
+
+    // 3. Validasi Jenis Kelamin
     if (!formData.gender) {
       toast.error("Silakan pilih jenis kelamin.");
       return;
     }
+
+    // 4. Validasi Kelas
+    if (!formData.studentClass) {
+      toast.error("Silakan pilih kelas asal Anda.");
+      return;
+    }
+
+    // 5. Validasi Motivasi & Hobi
+    if (!formData.motivation.trim()) {
+      toast.error("Alasan / Motivasi wajib diisi.");
+      return;
+    }
+    if (!formData.hobby.trim()) {
+      toast.error("Hobi & minat wajib diisi.");
+      return;
+    }
+
+    // 6. Validasi Nomor HP jika diisi manual
+    let finalPhone = initialPhone;
+    if (isLidNumber && customPhone.trim()) {
+      const cleanPhone = customPhone.trim().replace(/\D/g, "");
+      if (cleanPhone.length < 10 || cleanPhone.length > 14) {
+        toast.error("Nomor WhatsApp tidak valid (harus 10-14 digit).");
+        return;
+      }
+      finalPhone = cleanPhone;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/student/profile/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          name: formData.name.trim().toUpperCase(),
+          phoneNumber: finalPhone,
+        }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success("Pendaftaran berhasil dilengkapi! Selamat datang di VeloNet. 🎉");
+        toast.success("Pendaftaran berhasil disimpan! Selamat bergabung di VeloNet. 🎉");
         router.push("/student");
       } else {
-        toast.error(json.error || "Gagal menyimpan data.");
+        toast.error(json.error || "Gagal menyimpan pendaftaran.");
       }
     } catch (error) {
       toast.error("Terjadi kesalahan koneksi ke server.");
@@ -113,7 +214,7 @@ export default function CompleteProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 selection:bg-emerald-500 selection:text-white">
       <div className="w-full max-w-xl bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -123,10 +224,10 @@ export default function CompleteProfilePage() {
             </div>
             <div>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
-                Langkah Terakhir
+                Pendaftaran Anggota
               </span>
               <h1 className="text-xl sm:text-2xl font-bold text-white tracking-wide mt-1">
-                Lengkapi Pendaftaran
+                Lengkapi Data Diri
               </h1>
             </div>
           </div>
@@ -141,52 +242,93 @@ export default function CompleteProfilePage() {
           </button>
         </div>
 
-        <p className="text-xs text-slate-400 leading-relaxed">
-          {phoneNumber ? (
-            <>Nomor WhatsApp Anda (<strong>+{phoneNumber}</strong>) telah terverifikasi. </>
-          ) : (
-            <>WhatsApp Anda telah terverifikasi. </>
-          )}
-          Silakan lengkapi biodata berikut untuk mengaktifkan akun dan mengakses Portal Siswa Velocity.
-        </p>
+        {/* Info Banner WhatsApp */}
+        <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex items-start gap-3 text-xs">
+          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-white">WhatsApp Terverifikasi</span>
+              {!isLidNumber && initialPhone && (
+                <span className="font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 text-[11px]">
+                  +{initialPhone}
+                </span>
+              )}
+            </div>
+            <p className="text-slate-400 leading-relaxed text-[11px]">
+              Akun WhatsApp Anda telah tervalidasi di sistem VeloNet. Silakan lengkapi biodata di bawah ini untuk menyelesaikan pendaftaran.
+            </p>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* 1. Nama Lengkap (Otomatis Kapital) */}
+          {/* 1. Nama Lengkap (Otomatis Kapital, Min 4 Karakter) */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-              <User className="w-4 h-4 text-emerald-400" />
-              <span>Nama Lengkap <span className="text-rose-400">*</span></span>
+            <label className="text-slate-300 font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <User className="w-4 h-4 text-emerald-400" />
+                <span>Nama Lengkap <span className="text-rose-400">*</span></span>
+              </span>
+              <span className="text-[11px] text-slate-500">Min. 4 huruf (KAPITAL)</span>
             </label>
             <input
               type="text"
               required
+              minLength={4}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value.toUpperCase() })}
               placeholder="CONTOH: AHMAD FAUZI SYAHPUTRA"
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-semibold tracking-wide uppercase transition-colors"
             />
-            <p className="text-[11px] text-slate-500">Format otomatis menggunakan huruf KAPITAL.</p>
           </div>
 
-          {/* 2. Tanggal Lahir & Jenis Kelamin Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Tanggal Lahir */}
+          {/* Konfirmasi Nomor WhatsApp Asli jika sebelumnya terdeteksi ID Privasi / LID */}
+          {isLidNumber && (
             <div className="space-y-1.5">
               <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-emerald-400" />
-                <span>Tanggal Lahir <span className="text-rose-400">*</span></span>
+                <Phone className="w-4 h-4 text-emerald-400" />
+                <span>Konfirmasi Nomor WhatsApp Aktif <span className="text-slate-500 font-normal">(Opsional)</span></span>
               </label>
               <input
-                type="date"
-                required
-                value={formData.birthDate}
-                onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium transition-colors"
+                type="tel"
+                value={customPhone}
+                onChange={(e) => setCustomPhone(e.target.value)}
+                placeholder="Contoh: 081234567890"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono transition-colors"
               />
+              <p className="text-[11px] text-slate-500">
+                Masukkan nomor WhatsApp aktif Anda agar data kontak Anda tersimpan dengan akurat.
+              </p>
+            </div>
+          )}
+
+          {/* 2. Tanggal Lahir (Min 15 Tahun) & Jenis Kelamin Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Tanggal Lahir */}
+            <div className="space-y-1.5 min-w-0">
+              <label className="text-slate-300 font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-1.5 truncate">
+                  <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Tanggal Lahir <span className="text-rose-400">*</span></span>
+                </span>
+                <span className="text-[10px] text-slate-500 shrink-0">Min. 15 thn</span>
+              </label>
+              <div className="relative w-full min-w-0">
+                <input
+                  type="date"
+                  required
+                  max={maxBirthDate}
+                  value={formData.birthDate}
+                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                  className="w-full min-w-0 block [color-scheme:dark] px-3.5 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors box-border"
+                  style={{ minHeight: "44px" }}
+                />
+              </div>
             </div>
 
             {/* Jenis Kelamin */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <label className="text-slate-300 font-semibold flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-emerald-400" />
                 <span>Jenis Kelamin <span className="text-rose-400">*</span></span>
@@ -195,11 +337,12 @@ export default function CompleteProfilePage() {
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, gender: "Laki-laki" })}
-                  className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  className={`py-3 px-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     formData.gender === "Laki-laki"
                       ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
                       : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
                   }`}
+                  style={{ minHeight: "44px" }}
                 >
                   <span>👨 Laki-laki</span>
                 </button>
@@ -207,11 +350,12 @@ export default function CompleteProfilePage() {
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, gender: "Perempuan" })}
-                  className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  className={`py-3 px-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     formData.gender === "Perempuan"
                       ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
                       : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
                   }`}
+                  style={{ minHeight: "44px" }}
                 >
                   <span>👩 Perempuan</span>
                 </button>
@@ -219,34 +363,56 @@ export default function CompleteProfilePage() {
             </div>
           </div>
 
-          {/* 3. Kelas */}
+          {/* 3. Kelas (Dropdown Pilihan SMKN 1: 5 Jurusan x 3 Angkatan) */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-              <GraduationCap className="w-4 h-4 text-emerald-400" />
-              <span>Kelas Asal <span className="text-rose-400">*</span></span>
+            <label className="text-slate-300 font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <GraduationCap className="w-4 h-4 text-emerald-400" />
+                <span>Kelas Asal SMKN 1 <span className="text-rose-400">*</span></span>
+              </span>
+              <span className="text-[11px] text-slate-500">Pilih dari daftar</span>
             </label>
-            <input
-              type="text"
-              required
-              value={formData.studentClass}
-              onChange={(e) => setFormData({ ...formData, studentClass: e.target.value })}
-              placeholder="Contoh: X RPL 1 / XI IPA 2 / XII TKJ 1"
-              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium transition-colors"
-            />
+            <div className="relative">
+              <select
+                required
+                value={formData.studentClass}
+                onChange={(e) => setFormData({ ...formData, studentClass: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs"
+                style={{ minHeight: "44px" }}
+              >
+                <option value="" disabled className="bg-slate-950 text-slate-500">
+                  -- Pilih Kelas & Jurusan Asal --
+                </option>
+                {Object.entries(SCHOOL_CLASSES).map(([gradeGroup, classes]) => (
+                  <optgroup key={gradeGroup} label={gradeGroup} className="bg-slate-900 text-emerald-400 font-bold">
+                    {classes.map((cls) => (
+                      <option key={cls} value={cls} className="bg-slate-950 text-slate-200 font-normal py-1">
+                        {cls}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           {/* 4. Alasan / Motivasi Join */}
           <div className="space-y-1.5">
             <label className="text-slate-300 font-semibold flex items-center gap-1.5">
               <Target className="w-4 h-4 text-emerald-400" />
-              <span>Alasan / Motivasi Masuk <span className="text-rose-400">*</span></span>
+              <span>Alasan / Motivasi Masuk Ekskul <span className="text-rose-400">*</span></span>
             </label>
             <textarea
               required
               rows={3}
               value={formData.motivation}
               onChange={(e) => setFormData({ ...formData, motivation: e.target.value })}
-              placeholder="Ceritakan singkat mengapa Anda ingin bergabung dengan komunitas ini..."
+              placeholder="Ceritakan singkat mengapa Anda ingin bergabung dengan Komunitas Velocity..."
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium resize-none transition-colors"
             />
           </div>
@@ -262,7 +428,7 @@ export default function CompleteProfilePage() {
               required
               value={formData.hobby}
               onChange={(e) => setFormData({ ...formData, hobby: e.target.value })}
-              placeholder="Contoh: Coding, Desain Grafis, Membaca, Badminton..."
+              placeholder="Contoh: Coding, Desain Grafis, Membaca, Musik, Badminton..."
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium transition-colors"
             />
           </div>
