@@ -21,3 +21,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   - Modal Dialogs: Gunakan `w-full max-w-lg mx-auto` agar modal muat di layar HP tanpa terpotong.
   - Sidebar: Gunakan mobile drawer dengan tombol hamburger menu (`Menu`) di header seluler.
 
+# GitHub Deployment & Sync Standard (ATURAN MUTLAK DEPLOY GITHUB VELONET)
+- **MANDATORY**: Setiap kali selesai membuat, memperbaiki, atau memodifikasi fitur/kode dan verifikasi (`build` / `type-check`) telah sukses, SELALU lakukan commit dan push perubahan ke GitHub (`git add .`, `git commit -m "..."`, `git push origin main`).
+- **INTEGRITY**: Pastikan pesan commit jelas dan deskriptif sesuai perubahan yang dilakukan.
+
