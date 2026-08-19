@@ -35,11 +35,29 @@ export async function GET(req: Request) {
       // Hapus token agar tidak bisa dipakai 2x
       await prisma.systemSetting.delete({ where: { key: `login_payload:${token}` } }).catch(() => {});
 
+      // Fetch user to verify registration status
+      const user = await prisma.user.findUnique({
+        where: { id: data.participantId },
+      });
+
+      const isCompleted =
+        user &&
+        (user.status === "COMPLETED" ||
+          Boolean(user.name && user.name !== "Siswa Baru" && user.studentClass));
+
+      if (user && isCompleted && user.status !== "COMPLETED") {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { status: "COMPLETED" },
+        }).catch(() => {});
+      }
+
       // Buat session cookie
       const userAgent = req.headers.get("user-agent") || undefined;
       const sessionToken = await createStudentSession(data.participantId, userAgent);
 
-      const response = NextResponse.redirect(`${origin}/student/complete-profile`);
+      const destination = isCompleted ? `${origin}/student` : `${origin}/student/complete-profile`;
+      const response = NextResponse.redirect(destination);
       response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",

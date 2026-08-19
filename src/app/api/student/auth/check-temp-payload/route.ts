@@ -31,14 +31,33 @@ export async function GET(req: Request) {
       // Delete used payload
       await prisma.systemSetting.delete({ where: { key: `login_payload:${payloadId}` } }).catch(() => {});
 
+      // Fetch user to verify registration status
+      const user = await prisma.user.findUnique({
+        where: { id: data.participantId },
+      });
+
+      const isCompleted =
+        user &&
+        (user.status === "COMPLETED" ||
+          Boolean(user.name && user.name !== "Siswa Baru" && user.studentClass));
+
+      if (user && isCompleted && user.status !== "COMPLETED") {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { status: "COMPLETED" },
+        }).catch(() => {});
+      }
+
       // Create session and set cookie
       const userAgent = req.headers.get("user-agent") || undefined;
       const sessionToken = await createStudentSession(data.participantId, userAgent);
 
+      const redirectUrl = isCompleted ? "/student" : "/student/complete-profile";
+
       const response = NextResponse.json({
         success: true,
         verified: true,
-        redirectUrl: "/student",
+        redirectUrl,
       });
 
       response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {

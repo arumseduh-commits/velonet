@@ -58,29 +58,47 @@ export async function processIncomingMessage(
 ): Promise<StateMachineResult | null> {
   const cleanJid = rawSenderJid.split("@")[0].split(":")[0];
   const incomingNum = normalizePhoneNumber(cleanJid);
+  const normalizedRealPhone = realPhoneNum ? normalizePhoneNumber(realPhoneNum) : undefined;
 
-  // Find participant by LID number OR real phone number
+  // 1. Find participant by LID number OR real phone number
   let participant = await prisma.user.findFirst({
     where: {
       OR: [
         { phoneNumber: incomingNum },
-        ...(realPhoneNum ? [{ phoneNumber: normalizePhoneNumber(realPhoneNum) }] : []),
+        ...(normalizedRealPhone ? [{ phoneNumber: normalizedRealPhone }] : []),
       ],
     },
   });
 
-  // Fallback: If not found and incoming JID is LID, search by pushName or latest participant
-  if (!participant && rawSenderJid.endsWith("@lid")) {
-    if (pushName && pushName.trim().length > 2) {
-      participant = await prisma.user.findFirst({
-        where: {
-          name: { contains: pushName.trim(), mode: "insensitive" },
-          isExcluded: false,
-        },
-        orderBy: { updatedAt: "desc" },
-      });
+  // 2. Fallback: If not found and incoming JID is LID or unknown, search by pushName
+  if (!participant && (rawSenderJid.endsWith("@lid") || incomingNum.length > 13)) {
+    if (pushName && pushName.trim().length >= 2) {
+      const cleanPush = pushName.replace(/[^\w\s]/gi, "").trim();
+      if (cleanPush.length >= 2) {
+        // Try matching full pushName
+        participant = await prisma.user.findFirst({
+          where: {
+            name: { contains: cleanPush, mode: "insensitive" },
+            isExcluded: false,
+          },
+          orderBy: { updatedAt: "desc" },
+        });
+
+        // If not found and pushName contains multiple words, try first word (min 3 chars)
+        if (!participant && cleanPush.includes(" ")) {
+          const firstWord = cleanPush.split(/\s+/)[0];
+          if (firstWord.length >= 3) {
+            participant = await prisma.user.findFirst({
+              where: {
+                name: { startsWith: firstWord, mode: "insensitive" },
+                isExcluded: false,
+              },
+              orderBy: { updatedAt: "desc" },
+            });
+          }
+        }
+      }
     }
-    // DO NOT add any additional fallback - if we can't identify, return null silently
   }
 
   // STRICT RULE: If participant is NOT in the database, DO NOT REPLY!
@@ -91,7 +109,7 @@ export async function processIncomingMessage(
       // Buat partisipan baru
       participant = await prisma.user.create({
         data: {
-          phoneNumber: realPhoneNum ? normalizePhoneNumber(realPhoneNum) : incomingNum,
+          phoneNumber: normalizedRealPhone || incomingNum,
           name: pushName || "Siswa Baru",
           status: RegistrationStatus.NOT_STARTED,
         },
@@ -102,11 +120,10 @@ export async function processIncomingMessage(
   }
 
   // Auto-upgrade participant's phoneNumber to REAL Phone Number if we now have realPhoneNum
-  if (realPhoneNum && realPhoneNum !== participant.phoneNumber) {
-    const formattedRealNum = normalizePhoneNumber(realPhoneNum);
-    if (formattedRealNum.startsWith("62")) {
+  if (normalizedRealPhone && normalizedRealPhone !== participant.phoneNumber) {
+    if (normalizedRealPhone.startsWith("62")) {
       const existingReal = await prisma.user.findUnique({
-        where: { phoneNumber: formattedRealNum },
+        where: { phoneNumber: normalizedRealPhone },
       });
 
       if (existingReal && existingReal.id !== participant.id) {
@@ -119,6 +136,8 @@ export async function processIncomingMessage(
             motivation: participant.motivation || existingReal.motivation || null,
             hobby: participant.hobby || existingReal.hobby || null,
             status: participant.status !== RegistrationStatus.NOT_STARTED ? participant.status : existingReal.status,
+            faceDescriptor: participant.faceDescriptor || existingReal.faceDescriptor,
+            facePhoto: participant.facePhoto || existingReal.facePhoto,
           },
         });
         try {
@@ -130,18 +149,33 @@ export async function processIncomingMessage(
           participant = await prisma.user.update({
             where: { id: participant.id },
             data: {
-              phoneNumber: formattedRealNum,
+              phoneNumber: normalizedRealPhone,
               name: participant.name || pushName || null,
             },
           });
         } catch (e) {}
       }
     }
-  } else if (pushName && !participant.name) {
+  } else if (pushName && (!participant.name || participant.name === "Siswa Baru")) {
     try {
       participant = await prisma.user.update({
         where: { id: participant.id },
         data: { name: pushName },
+      });
+    } catch (e) {}
+  }
+
+  // Auto-heal status: If participant already has name and studentClass, ensure status is COMPLETED
+  if (
+    participant.status !== RegistrationStatus.COMPLETED &&
+    participant.name &&
+    participant.name !== "Siswa Baru" &&
+    (participant.studentClass || participant.faceDescriptor)
+  ) {
+    try {
+      participant = await prisma.user.update({
+        where: { id: participant.id },
+        data: { status: RegistrationStatus.COMPLETED },
       });
     } catch (e) {}
   }
@@ -295,9 +329,11 @@ export async function processIncomingMessage(
     }
     baseUrl = baseUrl.replace(/\/$/, "");
 
+    const greetingName = participant.name && participant.name !== "Siswa Baru" ? `Kak *${participant.name}*` : "Kak";
+
     return {
       newStatus: participant.status as RegistrationStatusType,
-      replyMessage: `Hello, this is your registration link:\n${baseUrl}/api/student/auth/verify-registration?token=${payloadId}`,
+      replyMessage: `📝 *LINK PENDAFTARAN SISWA VELOCITY*\n\nHalo ${greetingName}!\n\nSilakan klik link di bawah ini untuk melengkapi formulir pendaftaran anggota ekskul Velocity:\n\n🔗 ${baseUrl}/api/student/auth/verify-registration?token=${payloadId}\n\n_⚠️ Link ini berlaku 10 menit. Silakan lengkapi biodata Anda._`,
     };
   }
 
@@ -317,8 +353,12 @@ export async function processIncomingMessage(
       };
     }
 
-    // Jika belum registrasi, cek grup dulu
-    if (participant.status !== RegistrationStatus.COMPLETED) {
+    const isProfileCompleted =
+      participant.status === RegistrationStatus.COMPLETED ||
+      Boolean(participant.name && participant.name !== "Siswa Baru" && participant.studentClass);
+
+    // Jika belum registrasi sama sekali, cek grup dulu
+    if (!isProfileCompleted) {
       let isInGroup = true;
       if (checkGroup) {
         isInGroup = await checkGroup(participant.phoneNumber);
@@ -406,15 +446,16 @@ export async function processIncomingMessage(
 
     const directLoginUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
 
-    if (participant.status !== RegistrationStatus.COMPLETED) {
+    if (!isProfileCompleted) {
+      const displayName = participant.name && participant.name !== "Siswa Baru" ? participant.name : "Peserta";
       return {
         newStatus: participant.status as RegistrationStatusType,
-        replyMessage: `Hello, this is your registration link:\n${directLoginUrl}\n\n_(Silakan klik link di atas untuk melengkapi data pendaftaran Anda)_`,
+        replyMessage: `📝 *LINK PENDAFTARAN SISWA VELOCITY*\n\nHalo Kak *${displayName}*!\n\nAnda belum melengkapi data pendaftaran Portal Siswa. Silakan klik link di bawah ini untuk melengkapi formulir pendaftaran:\n\n🔗 ${directLoginUrl}\n\n_⚠️ Link ini berlaku 10 menit. Selamat bergabung! 🚀_`,
       };
     }
 
     return {
-      newStatus: participant.status as RegistrationStatusType,
+      newStatus: RegistrationStatus.COMPLETED,
       replyMessage: `🔓 *LINK PORTAL SISWA VELOCITY*\n\nHalo Kak *${
         participant.name || "Peserta"
       }*!\n\nKlik link di bawah ini untuk *LANGSUNG MASUK* ke akun Portal Siswa Anda tanpa perlu mengetik password:\n\n🔗 ${directLoginUrl}\n\n_⚠️ Link ini berlaku 10 menit. Selamat belajar! 🚀_`,

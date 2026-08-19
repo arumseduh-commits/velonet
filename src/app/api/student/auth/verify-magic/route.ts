@@ -47,7 +47,20 @@ export async function GET(req: Request) {
     const sessionToken = await createStudentSession(otpRecord.user.id, userAgent);
 
     // Redirect to complete profile if not COMPLETED, else to student dashboard
-    const destination = otpRecord.user.status === "COMPLETED" && otpRecord.user.name
+    const user = otpRecord.user;
+    const isCompleted =
+      user &&
+      (user.status === "COMPLETED" ||
+        Boolean(user.name && user.name !== "Siswa Baru" && user.studentClass));
+
+    if (user && isCompleted && user.status !== "COMPLETED") {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: "COMPLETED" },
+      }).catch(() => {});
+    }
+
+    const destination = isCompleted
       ? `${origin}/student`
       : `${origin}/student/complete-profile`;
 

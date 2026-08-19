@@ -47,6 +47,17 @@ export async function GET() {
       } catch (e) {}
     }
 
+    // Auto-heal status if user has completed profile
+    if (student.status !== "COMPLETED" && student.name && student.name !== "Siswa Baru" && student.studentClass) {
+      try {
+        await prisma.user.update({
+          where: { id: student.id },
+          data: { status: "COMPLETED" },
+        });
+        student.status = "COMPLETED";
+      } catch (e) {}
+    }
+
     return NextResponse.json({
       success: true,
       data: {

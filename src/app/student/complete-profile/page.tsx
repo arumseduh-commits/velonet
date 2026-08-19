@@ -131,7 +131,12 @@ export default function CompleteProfilePage() {
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
-            if (json.data.status === "COMPLETED" && json.data.name && json.data.faceDescriptor) {
+            if (
+              (json.data.status === "COMPLETED" ||
+                Boolean(json.data.name && json.data.studentClass)) &&
+              json.data.name &&
+              json.data.name !== "Siswa Baru"
+            ) {
               router.replace("/student");
               return;
             }

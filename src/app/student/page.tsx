@@ -75,7 +75,15 @@ export default function StudentDashboardPage() {
       const res = await fetch("/api/student/auth/me");
       const json = await res.json();
       if (json.success && json.data?.student) {
-        if (json.data.student.status !== "COMPLETED" || !json.data.student.name) {
+        const isCompleted =
+          json.data.student.status === "COMPLETED" ||
+          Boolean(
+            json.data.student.name &&
+            json.data.student.name !== "Siswa Baru" &&
+            json.data.student.studentClass
+          );
+
+        if (!isCompleted || !json.data.student.name || json.data.student.name === "Siswa Baru") {
           router.replace("/student/complete-profile");
           return;
         }
@@ -158,7 +166,11 @@ export default function StudentDashboardPage() {
     );
   }
 
-  const isRegistrationIncomplete = student?.status !== "COMPLETED" || !student?.name;
+  const isRegistrationIncomplete =
+    !student ||
+    (student.status !== "COMPLETED" && !(student.name && student.studentClass)) ||
+    !student.name ||
+    student.name === "Siswa Baru";
 
   // Render Web Registration Form if Student profile is not COMPLETED
   if (isRegistrationIncomplete) {

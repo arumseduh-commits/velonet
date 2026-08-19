@@ -296,16 +296,26 @@ class WhatsAppBotEngine extends EventEmitter {
           const pushName = msg.pushName || undefined;
           let realPhoneNum: string | undefined = undefined;
 
-          // 1. Cek participantPn dari Baileys jika tersedia
-          const pnField = (msg as any).participantPn || (msg.key as any).participantPn || (msg as any).senderPn;
-          if (pnField && typeof pnField === "string") {
-            const rawPn = pnField.split("@")[0].split(":")[0];
+          // 1. Cek jika remoteJid sudah merupakan nomor @s.whatsapp.net
+          if (remoteJid.endsWith("@s.whatsapp.net")) {
+            const rawPn = remoteJid.split("@")[0].split(":")[0];
             if (rawPn.startsWith("62") || rawPn.startsWith("08")) {
               realPhoneNum = rawPn.startsWith("0") ? "62" + rawPn.slice(1) : rawPn;
             }
           }
 
-          // 2. Jika belum ketemu, selesaikan via resolveLidToRealPhone
+          // 2. Cek participantPn dari Baileys jika tersedia
+          if (!realPhoneNum) {
+            const pnField = (msg as any).participantPn || (msg.key as any).participantPn || (msg as any).senderPn;
+            if (pnField && typeof pnField === "string") {
+              const rawPn = pnField.split("@")[0].split(":")[0];
+              if (rawPn.startsWith("62") || rawPn.startsWith("08")) {
+                realPhoneNum = rawPn.startsWith("0") ? "62" + rawPn.slice(1) : rawPn;
+              }
+            }
+          }
+
+          // 3. Jika belum ketemu dan LID, selesaikan via resolveLidToRealPhone
           if (!realPhoneNum) {
             realPhoneNum = (await this.resolveLidToRealPhone(remoteJid)) || undefined;
           }

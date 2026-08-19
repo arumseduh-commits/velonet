@@ -41,6 +41,8 @@ export async function GET() {
         motivation: student.motivation || "",
         hobby: student.hobby || "",
         status: student.status,
+        isFaceRegistered: Boolean(student.faceDescriptor),
+        faceDescriptor: student.faceDescriptor || null,
       },
     });
   } catch (err: any) {
