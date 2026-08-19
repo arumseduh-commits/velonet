@@ -97,6 +97,7 @@ export default function ParticipantDetailPage({
 
   // Admin Face Capture Modal State
   const [showFaceModal, setShowFaceModal] = useState(false);
+  const [showFacePreviewModal, setShowFacePreviewModal] = useState(false);
   const [faceCamActive, setFaceCamActive] = useState(false);
   const [capturingFace, setCapturingFace] = useState(false);
   const adminVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -233,43 +234,6 @@ export default function ParticipantDetailPage({
       toast.error(err.message || "Gagal mengirim pesan WhatsApp.");
     } finally {
       setSendingDirectMsg(false);
-    }
-  };
-
-  const handleResendConfirmation = async () => {
-    if (!participant) return;
-    const confirmed = await confirm({
-      title: "Kirim Ulang Konfirmasi DM",
-      message: `Kirim ulang pesan konfirmasi DM ke +${participant.phoneNumber} (${participant.name || "Peserta"})?`,
-      confirmText: "Ya, Kirim Konfirmasi",
-      cancelText: "Batal",
-      variant: "info",
-      icon: "send",
-    });
-
-    if (!confirmed) return;
-
-    setActionLoading(true);
-    try {
-      const res = await fetch("/api/bot/groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "send_member_confirmation",
-          phoneNumber: participant.phoneNumber,
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success("Pesan konfirmasi berhasil dikirim ulang via DM!");
-        fetchParticipant();
-      } else {
-        toast.error(`Gagal: ${json.error}`);
-      }
-    } catch (err: any) {
-      toast.error(`Error: ${err.message}`);
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -430,6 +394,16 @@ export default function ParticipantDetailPage({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {participant.facePhoto && (
+              <button
+                onClick={() => setShowFacePreviewModal(true)}
+                className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Camera className="w-3.5 h-3.5 text-purple-400" />
+                <span>Lihat Foto Wajah</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 setShowFaceModal(true);
@@ -447,15 +421,6 @@ export default function ParticipantDetailPage({
             >
               <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
               <span>Kirim WA Personal</span>
-            </button>
-
-            <button
-              onClick={handleResendConfirmation}
-              disabled={actionLoading}
-              className="px-3.5 py-2 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Resend DM</span>
             </button>
 
             <button
@@ -730,22 +695,35 @@ export default function ParticipantDetailPage({
               <img
                 src={participant.facePhoto}
                 alt="Foto Wajah"
-                className="w-10 h-10 rounded-xl object-cover border border-emerald-500/40"
+                onClick={() => setShowFacePreviewModal(true)}
+                className="w-12 h-12 rounded-xl object-cover border border-emerald-500/40 hover:scale-105 hover:border-purple-400 transition-all cursor-pointer shadow-md"
+                title="Klik untuk melihat foto resolusi penuh"
               />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500">
+              <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500">
                 <User className="w-5 h-5" />
               </div>
             )}
-            <button
-              onClick={() => {
-                setShowFaceModal(true);
-                startAdminCamera();
-              }}
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold hover:underline cursor-pointer"
-            >
-              {participant.faceDescriptor ? "Ubah Foto" : "Rekam Sekarang"}
-            </button>
+            <div className="flex flex-col gap-1">
+              {participant.facePhoto && (
+                <button
+                  onClick={() => setShowFacePreviewModal(true)}
+                  className="text-xs text-purple-400 hover:text-purple-300 font-semibold text-left hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>Lihat Foto Wajah</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setShowFaceModal(true);
+                  startAdminCamera();
+                }}
+                className="text-xs text-blue-400 hover:text-blue-300 font-semibold text-left hover:underline cursor-pointer"
+              >
+                {participant.faceDescriptor ? "Ubah / Rekam Ulang" : "Rekam Sekarang"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -909,6 +887,96 @@ export default function ParticipantDetailPage({
                     <span>Ambil & Simpan Wajah</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN FACE PREVIEW MODAL */}
+      {showFacePreviewModal && participant && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Preview Face ID Biometrik</h3>
+                  <p className="text-[11px] text-slate-400">{participant.name || "Peserta"}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowFacePreviewModal(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-center">
+              <div className="relative aspect-square max-h-[300px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-purple-500/30 flex items-center justify-center shadow-xl mx-auto">
+                {participant.facePhoto ? (
+                  <img
+                    src={participant.facePhoto}
+                    alt={`Foto Wajah ${participant.name}`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-slate-500 gap-2">
+                    <User className="w-12 h-12 text-slate-600" />
+                    <span className="text-xs">Foto biometrik belum tersedia.</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 text-left text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Status Biometrik:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    participant.faceDescriptor
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      : "bg-slate-800 text-slate-400"
+                  }`}>
+                    {participant.faceDescriptor ? "Vektor 128-d Terdaftar ✅" : "Belum Direkam ⚠️"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Kelas / Tingkat:</span>
+                  <span className="font-semibold text-white">{participant.studentClass || "-"}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Nomor WhatsApp:</span>
+                  <span className="font-mono text-emerald-400 font-bold">+{participant.phoneNumber}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowFacePreviewModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                Tutup
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFacePreviewModal(false);
+                  setShowFaceModal(true);
+                  startAdminCamera();
+                }}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>{participant.faceDescriptor ? "Ubah / Rekam Ulang" : "Rekam Sekarang"}</span>
               </button>
             </div>
           </div>

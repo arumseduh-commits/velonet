@@ -29,6 +29,7 @@ export async function loadFaceApiModels(): Promise<boolean> {
         api.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         api.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
         api.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        api.nets.faceExpressionNet.loadFromUri(MODEL_URL),
       ]);
 
       modelsLoaded = true;
@@ -52,6 +53,37 @@ export interface DetectedFaceData {
     height: number;
   };
   score: number;
+}
+
+export interface FaceLivenessData {
+  detected: boolean;
+  descriptor?: number[];
+  box?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  score?: number;
+  isBlinking: boolean;
+  leftEar: number;
+  rightEar: number;
+  avgEar: number;
+  isSmiling: boolean;
+  smileScore: number;
+  expressions?: Record<string, number>;
+}
+
+/**
+ * Calculates Eye Aspect Ratio (EAR) from 6 landmark points of an eye
+ */
+function calculateEAR(eyeLandmarks: { x: number; y: number }[]): number {
+  if (!eyeLandmarks || eyeLandmarks.length < 6) return 0.3;
+  // Points: 0: outer corner, 1: top-left, 2: top-right, 3: inner corner, 4: bottom-right, 5: bottom-left
+  const v1 = Math.hypot(eyeLandmarks[1].x - eyeLandmarks[5].x, eyeLandmarks[1].y - eyeLandmarks[5].y);
+  const v2 = Math.hypot(eyeLandmarks[2].x - eyeLandmarks[4].x, eyeLandmarks[2].y - eyeLandmarks[4].y);
+  const h = Math.hypot(eyeLandmarks[0].x - eyeLandmarks[3].x, eyeLandmarks[0].y - eyeLandmarks[3].y);
+  return (v1 + v2) / (2.0 * (h || 1));
 }
 
 /**
@@ -90,6 +122,75 @@ export async function detectFaceWithDescriptor(
     },
     score: detection.detection.score,
   };
+}
+
+/**
+ * Full Liveness and Biometric Inspector (Detects Face, Blink EAR, Smile Expression, and Descriptor)
+ */
+export async function detectFaceLivenessAndDescriptor(
+  element: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement
+): Promise<FaceLivenessData> {
+  const api = await getFaceApi();
+  if (!api || !modelsLoaded) {
+    const loaded = await loadFaceApiModels();
+    if (!loaded) return { detected: false, isBlinking: false, leftEar: 0, rightEar: 0, avgEar: 0, isSmiling: false, smileScore: 0 };
+  }
+
+  const options = new api.TinyFaceDetectorOptions({
+    inputSize: 320,
+    scoreThreshold: 0.45,
+  });
+
+  try {
+    const detection = await api
+      .detectSingleFace(element, options)
+      .withFaceLandmarks(true)
+      .withFaceExpressions()
+      .withFaceDescriptor();
+
+    if (!detection) {
+      return { detected: false, isBlinking: false, leftEar: 0, rightEar: 0, avgEar: 0, isSmiling: false, smileScore: 0 };
+    }
+
+    // Extract eye landmarks
+    // Left eye: landmarks 36 to 41, Right eye: landmarks 42 to 47
+    const landmarks = detection.landmarks;
+    const leftEye = landmarks.getLeftEye();
+    const rightEye = landmarks.getRightEye();
+
+    const leftEar = calculateEAR(leftEye);
+    const rightEar = calculateEAR(rightEye);
+    const avgEar = (leftEar + rightEar) / 2;
+
+    // A blink is detected when average EAR drops below 0.225
+    const isBlinking = avgEar < 0.225;
+
+    // Smile detection via happy expression probability (> 0.60)
+    const smileScore = detection.expressions?.happy || 0;
+    const isSmiling = smileScore >= 0.60;
+
+    return {
+      detected: true,
+      descriptor: detection.descriptor ? Array.from(detection.descriptor) : undefined,
+      box: {
+        x: detection.detection.box.x,
+        y: detection.detection.box.y,
+        width: detection.detection.box.width,
+        height: detection.detection.box.height,
+      },
+      score: detection.detection.score,
+      isBlinking,
+      leftEar,
+      rightEar,
+      avgEar,
+      isSmiling,
+      smileScore,
+      expressions: detection.expressions ? { ...detection.expressions } : undefined,
+    };
+  } catch (err) {
+    console.error("[FaceApi] Liveness detection error:", err);
+    return { detected: false, isBlinking: false, leftEar: 0, rightEar: 0, avgEar: 0, isSmiling: false, smileScore: 0 };
+  }
 }
 
 /**

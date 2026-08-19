@@ -1,10 +1,32 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { User, Calendar, Users, GraduationCap, Target, Heart, CheckCircle2, RefreshCw, LogOut, ShieldCheck, Camera, CameraOff, Sparkles, Smile } from "lucide-react";
+import {
+  User,
+  Calendar,
+  Users,
+  GraduationCap,
+  Target,
+  Heart,
+  CheckCircle2,
+  RefreshCw,
+  LogOut,
+  ShieldCheck,
+  Camera,
+  Smile,
+  Sparkles,
+  Eye,
+  Zap,
+  ArrowRight,
+  AlertCircle,
+} from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
-import { loadFaceApiModels, detectFaceWithDescriptor, captureFrameBase64 } from "@/lib/client-face-api";
+import {
+  loadFaceApiModels,
+  detectFaceLivenessAndDescriptor,
+  captureFrameBase64,
+} from "@/lib/client-face-api";
 
 // Daftar Kelas SMKN 1: 5 Jurusan (RPL 2, BD 4, AK 3, LP 2, MP 4) x 3 Angkatan (X, XI, XII)
 const SCHOOL_CLASSES = {
@@ -47,14 +69,18 @@ const MONTHS = [
   { value: "12", label: "12 - Des" },
 ];
 
+type RegistrationStep = "FORM" | "KYC_SCAN";
+type LivenessStage = "CENTER" | "BLINK" | "SMILE" | "FLASH" | "CAPTURING" | "DONE";
+
 export default function CompleteProfilePage() {
   const router = useRouter();
   const { toast } = useDialog();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [initialPhone, setInitialPhone] = useState("");
-  
-  // State Tanggal Lahir (Pemisahan Tanggal, Bulan, Tahun agar 100% rapi di semua HP)
+  const [step, setStep] = useState<RegistrationStep>("FORM");
+
+  // State Tanggal Lahir (Pemisahan Tanggal, Bulan, Tahun)
   const [birthDay, setBirthDay] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [birthYear, setBirthYear] = useState("");
@@ -67,63 +93,18 @@ export default function CompleteProfilePage() {
     hobby: "",
   });
 
-  // Face Enrollment State for Onboarding
-  const [faceDescriptor, setFaceDescriptor] = useState<number[] | null>(null);
-  const [facePhoto, setFacePhoto] = useState<string | null>(null);
-  const [cameraActive, setCameraActive] = useState(false);
-  const [capturingFace, setCapturingFace] = useState(false);
+  // KYC Liveness Camera & Verification State
   const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  const startCamera = async () => {
-    try {
-      await loadFaceApiModels();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraActive(true);
-      }
-    } catch (e: any) {
-      toast.error(`Kamera tidak dapat dibuka: ${e.message || "Periksa izin browser."}`);
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setCameraActive(false);
-  };
-
-  const handleCaptureFace = async () => {
-    if (!videoRef.current || !cameraActive) return;
-    setCapturingFace(true);
-    toast.info("Menganalisis wajah Anda...");
-
-    try {
-      const detection = await detectFaceWithDescriptor(videoRef.current);
-      if (!detection) {
-        toast.warning("Wajah tidak terdeteksi! Pastikan wajah Anda berada di tengah kamera.");
-        setCapturingFace(false);
-        return;
-      }
-
-      const photoBase64 = captureFrameBase64(videoRef.current, detection.box);
-      setFaceDescriptor(detection.descriptor);
-      setFacePhoto(photoBase64);
-      stopCamera();
-      toast.success("Foto & vektor biometrik wajah berhasil diambil!");
-    } catch (e: any) {
-      toast.error("Gagal mendeteksi wajah.");
-    } finally {
-      setCapturingFace(false);
-    }
-  };
+  const animationFrameRef = useRef<number | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [livenessStage, setLivenessStage] = useState<LivenessStage>("CENTER");
+  const [guideText, setGuideText] = useState("Posisikan wajah Anda tepat di dalam lingkaran");
+  const [blinkProgress, setBlinkProgress] = useState(false);
+  const [smileProgress, setSmileProgress] = useState(false);
+  const [flashColor, setFlashColor] = useState<string | null>(null); // 'red' | 'yellow' | 'green' | 'blue' | null
+  const [faceDescriptorCaptured, setFaceDescriptorCaptured] = useState<number[] | null>(null);
+  const [photoBase64Captured, setPhotoBase64Captured] = useState<string | null>(null);
 
   // Batas tahun maksimal (Minimal 15 Tahun dari tahun sekarang)
   const maxAllowedYear = useMemo(() => {
@@ -150,7 +131,7 @@ export default function CompleteProfilePage() {
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
-            if (json.data.status === "COMPLETED" && json.data.name) {
+            if (json.data.status === "COMPLETED" && json.data.name && json.data.faceDescriptor) {
               router.replace("/student");
               return;
             }
@@ -207,7 +188,46 @@ export default function CompleteProfilePage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Start Camera for Full-Screen KYC Liveness
+  const startKYCCamera = useCallback(async () => {
+    setCameraLoading(true);
+    try {
+      await loadFaceApiModels();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
+        audio: false,
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCameraActive(true);
+        setLivenessStage("CENTER");
+        setGuideText("Posisikan wajah Anda tepat di dalam lingkaran");
+      }
+    } catch (err: any) {
+      console.error("[KYC Camera Error]", err);
+      toast.error(`Kamera tidak dapat diakses: ${err.message || "Periksa izin kamera browser."}`);
+    } finally {
+      setCameraLoading(false);
+    }
+  }, [toast]);
+
+  const stopKYCCamera = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((t) => t.stop());
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  }, []);
+
+  // Submit Step 1: Form Validation & Move to KYC Screen
+  const handleProceedToKYC = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // 1. Validasi Nama Minimal 4 Huruf
@@ -256,6 +276,7 @@ export default function CompleteProfilePage() {
       return;
     }
 
+    // Simpan data profil awal ke backend
     setSubmitting(true);
     try {
       const res = await fetch("/api/student/profile/complete", {
@@ -265,23 +286,145 @@ export default function CompleteProfilePage() {
           ...formData,
           name: formData.name.trim().toUpperCase(),
           birthDate: combinedBirthDate,
-          faceDescriptor: faceDescriptor || undefined,
-          facePhoto: facePhoto || undefined,
         }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success("Pendaftaran berhasil disimpan! Selamat bergabung di VeloNet. 🎉");
-        router.push("/student");
+        setStep("KYC_SCAN");
+        startKYCCamera();
       } else {
-        toast.error(json.error || "Gagal menyimpan pendaftaran.");
+        toast.error(json.error || "Gagal menyimpan data biodata.");
       }
     } catch (error) {
-      toast.error("Terjadi kesalahan koneksi ke server.");
+      toast.error("Terjadi kesalahan koneksi saat menyimpan biodata.");
     } finally {
       setSubmitting(false);
     }
   };
+
+  // Run Flash Sequence (Merah -> Kuning -> Hijau -> Biru)
+  const triggerScreenFlashSequence = useCallback(async (
+    descriptor: number[],
+    photo: string
+  ) => {
+    setLivenessStage("FLASH");
+    setGuideText("Tatap layar saat verifikasi warna cahaya...");
+
+    // Color sequence
+    setFlashColor("red");
+    await new Promise((r) => setTimeout(r, 450));
+    setFlashColor("yellow");
+    await new Promise((r) => setTimeout(r, 450));
+    setFlashColor("green");
+    await new Promise((r) => setTimeout(r, 450));
+    setFlashColor("blue");
+    await new Promise((r) => setTimeout(r, 450));
+    setFlashColor(null);
+
+    // Save biometrics to server
+    setLivenessStage("CAPTURING");
+    setGuideText("Menyimpan & memverifikasi biometrik...");
+
+    try {
+      const res = await fetch("/api/student/face/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          faceDescriptor: descriptor,
+          photoBase64: photo,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setLivenessStage("DONE");
+        setGuideText("Verifikasi Biometrik Berhasil! 🎉");
+        stopKYCCamera();
+        toast.success("Pendaftaran & Verifikasi Wajah Berhasil! Selamat datang di VeloNet. 🎉");
+        setTimeout(() => {
+          router.replace("/student");
+        }, 1500);
+      } else {
+        toast.error(json.error || "Gagal menyimpan data wajah.");
+        setLivenessStage("CENTER");
+        setBlinkProgress(false);
+        setSmileProgress(false);
+        setGuideText("Posisikan wajah Anda kembali di dalam lingkaran");
+      }
+    } catch (e) {
+      toast.error("Gagal mengirim data wajah ke server.");
+      setLivenessStage("CENTER");
+      setBlinkProgress(false);
+      setSmileProgress(false);
+      setGuideText("Posisikan wajah Anda kembali di dalam lingkaran");
+    }
+  }, [router, stopKYCCamera, toast]);
+
+  // Liveness Detection Loop
+  useEffect(() => {
+    if (step !== "KYC_SCAN" || !cameraActive || !videoRef.current) return;
+
+    let isSubmitting = false;
+    let blinkDetected = false;
+    let smileDetected = false;
+    let faceCenteredCount = 0;
+
+    const processFrame = async () => {
+      if (!videoRef.current || !cameraActive || isSubmitting) return;
+
+      try {
+        const liveness = await detectFaceLivenessAndDescriptor(videoRef.current);
+
+        if (liveness.detected && liveness.box) {
+          faceCenteredCount++;
+
+          // 1. Stage: Center
+          if (!blinkDetected && livenessStage === "CENTER" && faceCenteredCount > 5) {
+            setLivenessStage("BLINK");
+            setGuideText("Silakan KEDIPKAN MATA Anda secara natural 👁️");
+          }
+
+          // 2. Stage: Blink Detection (EAR < 0.225)
+          if (livenessStage === "BLINK" && liveness.isBlinking && !blinkDetected) {
+            blinkDetected = true;
+            setBlinkProgress(true);
+            setLivenessStage("SMILE");
+            setGuideText("Bagus! Sekarang silakan TERSENYUM ke kamera 😊");
+          }
+
+          // 3. Stage: Smile Detection (Smile Score > 0.60)
+          if (livenessStage === "SMILE" && (liveness.isSmiling || (liveness.smileScore && liveness.smileScore > 0.55)) && !smileDetected) {
+            smileDetected = true;
+            setSmileProgress(true);
+
+            // Extract reference snapshot and descriptor
+            if (liveness.descriptor && videoRef.current) {
+              isSubmitting = true;
+              const photo = captureFrameBase64(videoRef.current, liveness.box);
+              if (photo) {
+                setFaceDescriptorCaptured(liveness.descriptor);
+                setPhotoBase64Captured(photo);
+                await triggerScreenFlashSequence(liveness.descriptor, photo);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // continue loop
+      }
+
+      if (cameraActive && !isSubmitting) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(processFrame);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [step, cameraActive, livenessStage, triggerScreenFlashSequence]);
 
   if (loading) {
     return (
@@ -292,6 +435,150 @@ export default function CompleteProfilePage() {
     );
   }
 
+  // --- FULL SCREEN KYC LIVENESS SCANNER VIEW ---
+  if (step === "KYC_SCAN") {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col items-center justify-between p-4 sm:p-6 select-none overflow-hidden">
+        {/* Full-Screen Colored Light Flash Overlay (Anti-Spoofing Screen Reflection) */}
+        {flashColor && (
+          <div
+            className={`fixed inset-0 z-50 pointer-events-none transition-colors duration-200 animate-pulse ${
+              flashColor === "red"
+                ? "bg-rose-600/90"
+                : flashColor === "yellow"
+                ? "bg-amber-400/90"
+                : flashColor === "green"
+                ? "bg-emerald-500/90"
+                : "bg-blue-600/90"
+            }`}
+          />
+        )}
+
+        {/* Top Header */}
+        <div className="w-full max-w-md flex items-center justify-between pt-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white font-extrabold text-sm shadow-lg shadow-emerald-500/20">
+              V
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <span>Verifikasi Biometrik Wajah</span>
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              </h2>
+              <p className="text-[11px] text-slate-400">KYC Liveness Detection VeloNet</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              stopKYCCamera();
+              setStep("FORM");
+            }}
+            type="button"
+            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 transition-colors"
+          >
+            Kembali ke Form
+          </button>
+        </div>
+
+        {/* Circular / Oval Biometric Camera Frame */}
+        <div className="relative flex flex-col items-center justify-center my-auto">
+          {/* Oval Glowing Guide Border */}
+          <div
+            className={`relative w-64 h-80 sm:w-72 sm:h-96 rounded-[120px] overflow-hidden border-4 shadow-2xl transition-all duration-500 ${
+              livenessStage === "DONE"
+                ? "border-emerald-400 shadow-emerald-500/40"
+                : livenessStage === "FLASH"
+                ? "border-amber-400 shadow-amber-500/50"
+                : livenessStage === "SMILE"
+                ? "border-teal-400 shadow-teal-500/30 animate-pulse"
+                : livenessStage === "BLINK"
+                ? "border-blue-400 shadow-blue-500/30 animate-pulse"
+                : "border-emerald-500/60 shadow-emerald-500/20"
+            }`}
+          >
+            {/* Live Video */}
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              className="w-full h-full object-cover transform -scale-x-100"
+            />
+
+            {/* Circular Guide Overlay Lines */}
+            <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-white/20 rounded-[116px]" />
+
+            {cameraLoading && (
+              <div className="absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center gap-2">
+                <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+                <span className="text-xs text-slate-300">Menyiapkan kamera biometrik...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Real-time Instructions Badge */}
+          <div className="mt-6 text-center space-y-2 max-w-sm px-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+              {livenessStage === "BLINK" ? (
+                <Eye className="w-4 h-4 text-blue-400 animate-bounce" />
+              ) : livenessStage === "SMILE" ? (
+                <Smile className="w-4 h-4 text-amber-400 animate-bounce" />
+              ) : livenessStage === "FLASH" ? (
+                <Zap className="w-4 h-4 text-yellow-400 animate-pulse" />
+              ) : livenessStage === "DONE" ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Camera className="w-4 h-4 text-emerald-400" />
+              )}
+              <span className="text-xs font-bold text-white">{guideText}</span>
+            </div>
+
+            {/* Progress Badges */}
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <span
+                className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 border transition-all ${
+                  blinkProgress
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : "bg-slate-900 text-slate-500 border-slate-800"
+                }`}
+              >
+                {blinkProgress ? "✓" : "1."} Kedip Mata
+              </span>
+
+              <span
+                className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 border transition-all ${
+                  smileProgress
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : "bg-slate-900 text-slate-500 border-slate-800"
+                }`}
+              >
+                {smileProgress ? "✓" : "2."} Senyum
+              </span>
+
+              <span
+                className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 border transition-all ${
+                  livenessStage === "DONE"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : "bg-slate-900 text-slate-500 border-slate-800"
+                }`}
+              >
+                {livenessStage === "DONE" ? "✓" : "3."} Refleksi Cahaya
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Safety Info */}
+        <div className="w-full max-w-md pb-2 text-center">
+          <p className="text-[11px] text-slate-400">
+            🔒 Data biometrik Anda dienkripsi dan hanya digunakan untuk absensi kehadiran resmi ekskul.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- STEP 1: FORMULIR BIODATA PENDAFTARAN ---
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 selection:bg-emerald-500 selection:text-white">
       <div className="w-full max-w-xl bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
@@ -336,12 +623,12 @@ export default function CompleteProfilePage() {
               )}
             </div>
             <p className="text-slate-400 leading-relaxed text-[11px]">
-              Akun WhatsApp Anda telah tervalidasi di sistem VeloNet. Silakan lengkapi biodata di bawah ini untuk menyelesaikan pendaftaran.
+              Akun WhatsApp Anda telah tervalidasi di sistem VeloNet. Silakan lengkapi biodata di bawah ini untuk lanjut ke verifikasi biometrik wajah.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form onSubmit={handleProceedToKYC} className="space-y-4 text-xs">
           {/* 1. Nama Lengkap (Otomatis Kapital, Min 4 Karakter) */}
           <div className="space-y-1.5">
             <label className="text-slate-300 font-semibold flex items-center justify-between">
@@ -555,96 +842,7 @@ export default function CompleteProfilePage() {
             />
           </div>
 
-          {/* 7. Perekaman Wajah (Face Enrollment) */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-slate-200 font-bold text-xs flex items-center gap-1.5">
-                <Camera className="w-4 h-4 text-emerald-400" />
-                <span>Sampel Wajah untuk Absensi AI</span>
-              </label>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">
-                {faceDescriptor ? "Wajah Terekam ✅" : "Disarankan"}
-              </span>
-            </div>
-
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Ambil sampel foto wajah untuk kemudahan absensi kehadiran berbasis AI saat kegiatan ekskul.
-            </p>
-
-            {/* Video preview / Photo snapshot */}
-            {cameraActive ? (
-              <div className="space-y-2">
-                <div className="relative aspect-video max-h-[220px] rounded-xl overflow-hidden bg-slate-950 border border-slate-700">
-                  <video
-                    ref={videoRef}
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover scale-x-[-1]"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCaptureFace}
-                    disabled={capturingFace}
-                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {capturingFace ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Menganalisis...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>Ambil & Analisis Wajah</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="py-2 px-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700 transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                </div>
-              </div>
-            ) : facePhoto ? (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
-                <img
-                  src={facePhoto}
-                  alt="Face Sample"
-                  className="w-14 h-14 rounded-xl object-cover border border-emerald-500/40"
-                />
-                <div className="space-y-0.5">
-                  <p className="text-xs font-bold text-white flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Wajah Siap Digunakan</span>
-                  </p>
-                  <p className="text-[10px] text-slate-400">Vektor biometrik 128-d telah terekstrak.</p>
-                  <button
-                    type="button"
-                    onClick={startCamera}
-                    className="text-[11px] font-semibold text-emerald-400 hover:underline cursor-pointer"
-                  >
-                    Ambil Ulang Foto
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={startCamera}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Camera className="w-4 h-4 text-emerald-400" />
-                <span>Nyalakan Kamera untuk Rekam Wajah</span>
-              </button>
-            )}
-          </div>
-
-          {/* Submit Button */}
+          {/* Submit & Go to KYC Liveness Button */}
           <button
             type="submit"
             disabled={submitting}
@@ -653,12 +851,12 @@ export default function CompleteProfilePage() {
             {submitting ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Menyimpan Pendaftaran...</span>
+                <span>Menyimpan Biodata...</span>
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>SELESAIKAN PENDAFTARAN</span>
+                <span>LANJUT KE VERIFIKASI WAJAH (KYC)</span>
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>

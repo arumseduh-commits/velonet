@@ -4,7 +4,22 @@ export const dynamic = "force-dynamic";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { User, Phone, BookOpen, Heart, Sparkles, ShieldCheck, RefreshCw, CheckCircle2, Camera } from "lucide-react";
+import {
+  User,
+  Phone,
+  BookOpen,
+  Heart,
+  Sparkles,
+  ShieldCheck,
+  RefreshCw,
+  CheckCircle2,
+  Camera,
+  History,
+  CalendarCheck,
+  Clock,
+  MapPin,
+  Award,
+} from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 interface StudentData {
@@ -18,12 +33,33 @@ interface StudentData {
   facePhoto?: string | null;
 }
 
+interface AttendanceRecord {
+  id: string;
+  sessionTitle: string;
+  sessionDate: string;
+  status: string;
+  method: string;
+  checkInTime: string;
+  distanceMeter: number | null;
+  notes: string | null;
+}
+
+interface Stats {
+  totalSessions: number;
+  hadirCount: number;
+  izinCount: number;
+  alpaCount: number;
+  ratePercentage: number;
+}
+
 export default function StudentProfilePage() {
   const { toast } = useDialog();
 
   const [student, setStudent] = useState<StudentData | null>(null);
   const [motivation, setMotivation] = useState("");
   const [hobby, setHobby] = useState("");
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -36,6 +72,8 @@ export default function StudentProfilePage() {
           setStudent(s);
           setMotivation(s.motivation || "");
           setHobby(s.hobby || "");
+          setRecords(json.data.recentAttendances || []);
+          setStats(json.data.stats || null);
         }
       })
       .catch(() => {})
@@ -94,16 +132,24 @@ export default function StudentProfilePage() {
             </p>
           </div>
         </div>
+
+        {stats && (
+          <div className="flex items-center gap-2 bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-800 self-start sm:self-auto">
+            <Award className="w-4 h-4 text-amber-400" />
+            <span className="text-xs text-slate-300 font-medium">Kehadiran:</span>
+            <span className="text-xs font-bold text-emerald-400 font-mono">{stats.ratePercentage}%</span>
+          </div>
+        )}
       </div>
 
       {/* Face Biometrics Status Banner */}
       <div className="p-5 rounded-3xl glass-panel border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+          <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shrink-0">
             <Camera className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-bold text-white">Biometrik Wajah AI (Face ID)</h3>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                 student?.isFaceRegistered
@@ -115,8 +161,8 @@ export default function StudentProfilePage() {
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               {student?.isFaceRegistered
-                ? "Data vektor biometrik Anda siap digunakan untuk absensi kehadiran otomatis di lokasi kumpul."
-                : "Anda belum merekam sampel wajah. Rekam sekarang untuk mempermudah absensi."}
+                ? "Data biometrik Anda aktif untuk verifikasi absensi kamera di lokasi kumpul."
+                : "Anda belum merekam sampel wajah. Buka menu absensi untuk merekam."}
             </p>
           </div>
         </div>
@@ -126,7 +172,7 @@ export default function StudentProfilePage() {
           className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
           <Camera className="w-4 h-4" />
-          <span>{student?.isFaceRegistered ? "Buka Absensi / Rekam Ulang" : "Rekam Wajah Sekarang"}</span>
+          <span>Buka Kamera Absen</span>
         </Link>
       </div>
 
@@ -222,6 +268,83 @@ export default function StudentProfilePage() {
           </div>
         </div>
       </form>
+
+      {/* RIWAYAT ABSENSI PERTEMUAN SISWA */}
+      <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4 shadow-xl">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+              <History className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white">Riwayat Kehadiran & Sesi</h2>
+              <p className="text-[11px] text-slate-400">Catatan kehadiran Anda pada setiap pertemuan ekskul</p>
+            </div>
+          </div>
+
+          <span className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1 rounded-xl border border-slate-800">
+            Total: {records.length} Pertemuan
+          </span>
+        </div>
+
+        {records.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 space-y-2">
+            <CalendarCheck className="w-8 h-8 mx-auto opacity-40 text-blue-400" />
+            <p className="text-xs">Belum ada riwayat absensi yang tercatat.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 font-semibold bg-slate-900/50">
+                  <th className="py-3 px-3">Sesi Pertemuan</th>
+                  <th className="py-3 px-3">Tanggal</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3">Metode</th>
+                  <th className="py-3 px-3">Waktu Masuk</th>
+                  <th className="py-3 px-3">Jarak</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {records.map((rec) => (
+                  <tr key={rec.id} className="hover:bg-slate-900/40 transition-colors">
+                    <td className="py-3 px-3 font-semibold text-white">
+                      {rec.sessionTitle}
+                    </td>
+                    <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">
+                      {rec.sessionDate}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          rec.status === "HADIR"
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                            : rec.status === "IZIN"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                        }`}
+                      >
+                        {rec.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="text-[11px] font-medium text-slate-400">
+                        {rec.method === "FACE" ? "📸 Wajah AI" : rec.method === "GEOFENCE" ? "📍 GPS" : "✍️ Manual"}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
+                      {rec.checkInTime || "-"}
+                    </td>
+                    <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
+                      {rec.distanceMeter !== null ? `${Math.round(rec.distanceMeter)}m` : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
