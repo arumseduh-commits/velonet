@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useDialog } from "@/components/ui/DialogProvider";
 import {
@@ -21,6 +22,19 @@ import {
   ChevronRight,
   Calendar,
 } from "lucide-react";
+
+const InteractiveLocationPicker = dynamic(
+  () => import("@/components/ui/InteractiveLocationPicker"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-64 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center gap-2">
+        <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+        <span className="text-xs text-slate-400">Memuat Peta Interaktif...</span>
+      </div>
+    ),
+  }
+);
 
 interface SessionItem {
   id: string;
@@ -58,9 +72,9 @@ export default function SessionsAdminPage() {
   const [startTime, setStartTime] = useState("15:30");
   const [endTime, setEndTime] = useState("17:30");
   const [locationPreset, setLocationPreset] = useState("Lainnya");
-  const [customLocation, setCustomLocation] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  const [customLocation, setCustomLocation] = useState("Kota Probolinggo");
+  const [latitude, setLatitude] = useState("-7.7543");
+  const [longitude, setLongitude] = useState("113.2159");
   const [radiusMeter, setRadiusMeter] = useState("50");
   const [isLocatingGps, setIsLocatingGps] = useState(false);
   const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
@@ -1158,28 +1172,28 @@ export default function SessionsAdminPage() {
                   </div>
                 )}
 
-                {/* STEP 3: Lokasi, Preset Koordinat & OpenStreetMap Display Card */}
+                {/* STEP 3: Lokasi, Preset Koordinat & Peta Interaktif Leaflet */}
                 {createStep === 3 && (
                   <div className="space-y-4 animate-in fade-in duration-200">
-                    <span className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                       <MapPin className="w-4 h-4" />
-                      3. Lokasi Perkumpulan & Preview Peta GPS
+                      3. Lokasi Perkumpulan & Peta Titik Kumpul
                     </span>
 
-                    {/* Preset Selection Dropdown */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="font-medium text-slate-300">
-                          Pilih Tempat Perkumpulan Preset <span className="text-rose-400">*</span>
+                    {/* Preset Selection Dropdown & Template Name */}
+                    <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-slate-300 text-xs">
+                          Template Tempat Tersimpan:
                         </label>
                         <button
                           type="button"
                           disabled={isSavingPreset}
                           onClick={handleSaveNewPreset}
-                          className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/30 transition-all cursor-pointer"
+                          className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 transition-all cursor-pointer"
                         >
                           {isSavingPreset ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                          <span>Simpan Sebagai Template Preset</span>
+                          <span>Simpan Titik Ini Jadi Template</span>
                         </button>
                       </div>
 
@@ -1187,9 +1201,9 @@ export default function SessionsAdminPage() {
                         <select
                           value={locationPreset}
                           onChange={(e) => handleLocationPresetChange(e.target.value)}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-purple-500 transition-colors text-xs font-medium"
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-emerald-500 transition-colors text-xs font-medium"
                         >
-                          <option value="Lainnya">✍️ Lainnya (Ketik Nama & Ambil GPS Sendiri)...</option>
+                          <option value="Lainnya">✍️ Lokasi Baru / Custom (Pilih di Peta)...</option>
                           {dbPresets.map((preset) => (
                             <option key={preset.id} value={preset.name}>
                               📍 {preset.name} (Tersimpan)
@@ -1204,7 +1218,7 @@ export default function SessionsAdminPage() {
                               const found = dbPresets.find((p) => p.name === locationPreset);
                               if (found) handleDeletePreset(found.id, found.name);
                             }}
-                            className="p-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 transition-colors shrink-0"
+                            className="p-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 transition-colors shrink-0 cursor-pointer"
                             title="Hapus Template Lokasi Ini"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1212,145 +1226,47 @@ export default function SessionsAdminPage() {
                         )}
                       </div>
 
-                      {locationPreset === "Lainnya" && (
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">
+                          Nama Tempat / Gedung / Ruangan <span className="text-rose-400">*</span>
+                        </label>
                         <input
                           type="text"
                           required
-                          placeholder="Ketik nama tempat perkumpulan (contoh: Ruang Rapat / Lapangan / Lab Komputer)"
-                          value={customLocation}
-                          onChange={(e) => setCustomLocation(e.target.value)}
-                          className="w-full mt-2 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors text-xs"
+                          placeholder="Contoh: Markas VeloNet Probolinggo / Alun-Alun / Cafe Kopi"
+                          value={locationPreset === "Lainnya" ? customLocation : locationPreset}
+                          onChange={(e) => {
+                            if (locationPreset === "Lainnya") {
+                              setCustomLocation(e.target.value);
+                            } else {
+                              setLocationPreset(e.target.value);
+                            }
+                          }}
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-xs"
                         />
-                      )}
-                    </div>
-
-                    {/* GPS Coordinates Inputs */}
-                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-purple-400 flex items-center gap-1.5">
-                          <Navigation className="w-3.5 h-3.5" />
-                          Koordinat GPS & Radius Toleransi
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleGetCurrentLocation}
-                          disabled={isLocatingGps}
-                          className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          {isLocatingGps ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />
-                              <span>Mengambil Lokasi GPS...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Navigation className="w-3.5 h-3.5" />
-                              <span>Ambil Lokasi GPS Saat Ini</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 text-[11px]">
-                        <div>
-                          <span className="text-slate-400 block mb-0.5">Latitude</span>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="Contoh: -7.9666"
-                            value={latitude}
-                            onChange={(e) => setLatitude(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
-                          />
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block mb-0.5">Longitude</span>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="Contoh: 112.6326"
-                            value={longitude}
-                            onChange={(e) => setLongitude(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
-                          />
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block mb-0.5">Max Radius (m)</span>
-                          <input
-                            type="number"
-                            value={radiusMeter}
-                            onChange={(e) => setRadiusMeter(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
-                          />
-                        </div>
                       </div>
                     </div>
 
-                    {/* OpenStreetMap Display Map Card & Fine-Tuning Controls */}
-                    {latitude && longitude && !isNaN(parseFloat(latitude)) && !isNaN(parseFloat(longitude)) && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                            Display Preview Peta Titik Kumpul (OpenStreetMap):
-                          </span>
-
-                          {/* Fine-Tuning Nudge Buttons */}
-                          <div className="flex items-center gap-1 text-[10px]">
-                            <button
-                              type="button"
-                              onClick={() => setLatitude((prev) => (parseFloat(prev) + 0.0001).toFixed(6))}
-                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                              title="Geser Utara (+Lat)"
-                            >
-                              ⬆ Utara
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setLatitude((prev) => (parseFloat(prev) - 0.0001).toFixed(6))}
-                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                              title="Geser Selatan (-Lat)"
-                            >
-                              ⬇ Selatan
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setLongitude((prev) => (parseFloat(prev) - 0.0001).toFixed(6))}
-                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                              title="Geser Barat (-Lng)"
-                            >
-                              ⬅ Barat
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setLongitude((prev) => (parseFloat(prev) + 0.0001).toFixed(6))}
-                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                              title="Geser Timur (+Lng)"
-                            >
-                              ➔ Timur
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl overflow-hidden border border-slate-800 h-40 bg-slate-950 relative">
-                          <iframe
-                            key={`${latitude}-${longitude}`}
-                            width="100%"
-                            height="100%"
-                            frameBorder="0"
-                            scrolling="no"
-                            marginHeight={0}
-                            marginWidth={0}
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${
-                              parseFloat(longitude) - 0.002
-                            },${parseFloat(latitude) - 0.002},${
-                              parseFloat(longitude) + 0.002
-                            },${parseFloat(latitude) + 0.002}&layer=mapnik&marker=${latitude},${longitude}`}
-                            className="w-full h-full"
-                          />
-                        </div>
-                      </div>
-                    )}
+                    {/* Interactive Leaflet Map Location Picker */}
+                    <InteractiveLocationPicker
+                      latitude={latitude}
+                      longitude={longitude}
+                      radiusMeter={radiusMeter}
+                      locationName={locationPreset === "Lainnya" ? customLocation : locationPreset}
+                      onLocationChange={(newLat, newLng, newName) => {
+                        setLatitude(newLat);
+                        setLongitude(newLng);
+                        if (newName && (locationPreset === "Lainnya" || !customLocation)) {
+                          setCustomLocation(newName);
+                        }
+                      }}
+                      onRadiusChange={(newRadius) => setRadiusMeter(newRadius)}
+                      onLocationNameChange={(newName) => {
+                        if (locationPreset === "Lainnya") {
+                          setCustomLocation(newName);
+                        }
+                      }}
+                    />
 
                     {/* Footer Nav Step 3 & Submit Button */}
                     <div className="flex items-center justify-between pt-3 border-t border-slate-800">
@@ -1364,7 +1280,7 @@ export default function SessionsAdminPage() {
 
                       <button
                         type="submit"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || !latitude || !longitude}
                         className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                       >
                         {isSubmitting ? (
