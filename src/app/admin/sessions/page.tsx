@@ -57,19 +57,18 @@ export default function SessionsAdminPage() {
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("15:30");
   const [endTime, setEndTime] = useState("17:30");
-  const [locationPreset, setLocationPreset] = useState("Ruang Caprice");
+  const [locationPreset, setLocationPreset] = useState("Lainnya");
   const [customLocation, setCustomLocation] = useState("");
-  const [latitude, setLatitude] = useState("-7.9666");
-  const [longitude, setLongitude] = useState("112.6326");
-  const [radiusMeter, setRadiusMeter] = useState("15");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [radiusMeter, setRadiusMeter] = useState("50");
+  const [isLocatingGps, setIsLocatingGps] = useState(false);
+  const [deletingPresetId, setDeletingPresetId] = useState<string | null>(null);
 
   // Location Presets database state
   const [dbPresets, setDbPresets] = useState<
     Array<{ id: string; name: string; latitude: number; longitude: number; radiusMeter: number }>
-  >([
-    { id: "default-caprice", name: "Ruang Caprice", latitude: -7.9666, longitude: 112.6326, radiusMeter: 15 },
-    { id: "default-bi", name: "Ruang BI", latitude: -7.9785, longitude: 112.6315, radiusMeter: 15 },
-  ]);
+  >([]);
   const [isSavingPreset, setIsSavingPreset] = useState(false);
 
   const fetchLocationPresets = async () => {
@@ -121,7 +120,7 @@ export default function SessionsAdminPage() {
           name: targetName,
           latitude: parseFloat(latitude),
           longitude: parseFloat(longitude),
-          radiusMeter: parseFloat(radiusMeter) || 150,
+          radiusMeter: parseFloat(radiusMeter) || 50,
         }),
       });
       const json = await res.json();
@@ -137,6 +136,89 @@ export default function SessionsAdminPage() {
     } finally {
       setIsSavingPreset(false);
     }
+  };
+
+  const handleDeletePreset = async (presetId: string, presetName: string) => {
+    const confirmed = await confirm({
+      title: "Hapus Template Lokasi",
+      message: `Apakah Anda yakin ingin menghapus template lokasi "${presetName}"?`,
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "trash",
+    });
+    if (!confirmed) return;
+
+    try {
+      setDeletingPresetId(presetId);
+      const res = await fetch(`/api/location-presets?id=${presetId}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Template lokasi "${presetName}" berhasil dihapus.`);
+        await fetchLocationPresets();
+        if (locationPreset === presetName) {
+          setLocationPreset("Lainnya");
+          setCustomLocation("");
+        }
+      } else {
+        toast.error(json.error || "Gagal menghapus template lokasi.");
+      }
+    } catch (err) {
+      toast.error("Gagal terhubung ke server.");
+    } finally {
+      setDeletingPresetId(null);
+    }
+  };
+
+  // Quick Time Preset Selector
+  const handleSetQuickTime = (type: "NOW" | "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT") => {
+    const now = new Date();
+    if (type === "NOW") {
+      const startD = new Date(now.getTime() - 5 * 60 * 1000); // 5 mins ago
+      const endD = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
+      const sH = String(startD.getHours()).padStart(2, "0");
+      const sM = String(startD.getMinutes()).padStart(2, "0");
+      const eH = String(endD.getHours()).padStart(2, "0");
+      const eM = String(endD.getMinutes()).padStart(2, "0");
+      setStartTime(`${sH}:${sM}`);
+      setEndTime(`${eH}:${eM}`);
+      // Ensure date is today local
+      const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      setDate(todayLocal);
+    } else if (type === "MORNING") {
+      setStartTime("08:00");
+      setEndTime("10:00");
+    } else if (type === "AFTERNOON") {
+      setStartTime("13:00");
+      setEndTime("15:00");
+    } else if (type === "EVENING") {
+      setStartTime("15:30");
+      setEndTime("17:30");
+    } else if (type === "NIGHT") {
+      setStartTime("19:30");
+      setEndTime("21:30");
+    }
+  };
+
+  const formatFriendlyTime = (t: string) => {
+    if (!t) return "";
+    const [hStr, mStr] = t.split(":");
+    const h = parseInt(hStr, 10);
+    const m = mStr || "00";
+    if (isNaN(h)) return t;
+
+    let period = "";
+    if (h >= 0 && h < 5) period = "Dini Hari";
+    else if (h >= 5 && h < 11) period = "Pagi";
+    else if (h >= 11 && h < 15) period = "Siang";
+    else if (h >= 15 && h < 18) period = "Sore";
+    else period = "Malam";
+
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    const ampm = h < 12 ? "AM" : "PM";
+    return `${t} WIB (${hour12}:${m} ${ampm} • ${period})`;
   };
 
   // Calendar View State
@@ -187,8 +269,9 @@ export default function SessionsAdminPage() {
 
   useEffect(() => {
     fetchSessions();
-    // Set default date to today YYYY-MM-DD
-    const today = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD local time
+    // Set default date to today YYYY-MM-DD in local time
+    const nowLocal = new Date();
+    const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
     setDate(today);
 
     // Real-time Auto-Sync Poller (Every 3.0s)
@@ -207,16 +290,19 @@ export default function SessionsAdminPage() {
       toast.error("Browser Anda tidak mendukung fitur Geolocation GPS.");
       return;
     }
+    setIsLocatingGps(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLatitude(pos.coords.latitude.toFixed(6));
         setLongitude(pos.coords.longitude.toFixed(6));
+        setIsLocatingGps(false);
         toast.success("Lokasi GPS berhasil diambil.");
       },
       (err) => {
+        setIsLocatingGps(false);
         toast.error(`Gagal mengambil lokasi GPS: ${err.message}`);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
   };
 
@@ -231,7 +317,8 @@ export default function SessionsAdminPage() {
       return;
     }
 
-    const todayStr = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD local time
+    const nowLocal = new Date();
+    const todayStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
     if (date < todayStr) {
       setActionMessage({
         type: "error",
@@ -246,6 +333,24 @@ export default function SessionsAdminPage() {
     try {
       setIsSubmitting(true);
       setActionMessage(null);
+
+      // Compute precise ISO timestamps from local date & time
+      const [year, month, day] = date.split("-").map(Number);
+      const [startH, startM] = startTime.split(":").map(Number);
+      const [endH, endM] = endTime.split(":").map(Number);
+
+      const startDateObj = new Date(year, month - 1, day, startH, startM, 0);
+      let endDateObj = new Date(year, month - 1, day, endH, endM, 0);
+
+      // Overnight check: if end time is <= start time, roll end date to next day
+      if (endDateObj <= startDateObj) {
+        endDateObj.setDate(endDateObj.getDate() + 1);
+      }
+
+      const dateIso = new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
+      const startIso = startDateObj.toISOString();
+      const endIso = endDateObj.toISOString();
+
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -254,7 +359,10 @@ export default function SessionsAdminPage() {
           date,
           startTime,
           endTime,
-          locationName: finalLocationName || "Ruang Caprice",
+          startIso,
+          endIso,
+          dateIso,
+          locationName: finalLocationName || "Lokasi Pertemuan",
           latitude,
           longitude,
           radiusMeter,
@@ -271,11 +379,12 @@ export default function SessionsAdminPage() {
 
       // Reset form
       setTitle("");
-      setLocationPreset("Ruang Caprice");
+      setLocationPreset("Lainnya");
       setCustomLocation("");
       setLatitude("");
       setLongitude("");
       setIsModalOpen(false);
+      setCreateStep(1);
       fetchSessions();
     } catch (err: any) {
       setActionMessage({
@@ -515,16 +624,15 @@ export default function SessionsAdminPage() {
             const sStart = new Date(session.startTime);
             const sEnd = new Date(session.endTime);
 
+            const isClosedTime = nowTime > sEnd;
+            const isOpenNow = session.isActive && !session.isCancelled && nowTime >= sStart && nowTime <= sEnd;
+            const isUpcoming = session.isActive && !session.isCancelled && nowTime < sStart;
+
             const todayZero = new Date();
             todayZero.setHours(0, 0, 0, 0);
 
-            const sessionDateZero = new Date(session.date);
+            const sessionDateZero = new Date(sStart);
             sessionDateZero.setHours(0, 0, 0, 0);
-
-            const isPastDate = sessionDateZero < todayZero;
-            const isClosedTime = isPastDate || nowTime > sEnd;
-            const isOpenNow = session.isActive && !session.isCancelled && !isPastDate && nowTime >= sStart && nowTime <= sEnd;
-            const isUpcoming = session.isActive && !session.isCancelled && !isClosedTime && nowTime < sStart;
 
             const diffDays = Math.round((sessionDateZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24));
             let relativeDateTag = "";
@@ -841,7 +949,8 @@ export default function SessionsAdminPage() {
                         }
 
                         const isSelected = date === cd.dateStr;
-                        const todayStr = new Date().toISOString().split("T")[0];
+                        const nowLocal = new Date();
+                        const todayStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
                         const isToday = todayStr === cd.dateStr;
                         const isPast = Boolean(cd.dateStr && cd.dateStr < todayStr);
 
@@ -857,14 +966,14 @@ export default function SessionsAdminPage() {
                             key={index}
                             disabled={isPast}
                             onClick={() => {
-                              if (cd.dateStr) {
+                              if (cd.dateStr && !isPast) {
                                 setDate(cd.dateStr);
                                 setSelectedDateSessions(dateSessions);
                               }
                             }}
                             className={`h-8 w-full flex items-center justify-center rounded-lg text-xs font-semibold transition-all relative ${
                               isPast
-                                ? "opacity-30 text-slate-600 cursor-not-allowed line-through bg-slate-950/40"
+                                ? "opacity-25 text-slate-600 cursor-not-allowed line-through bg-slate-950/60 pointer-events-none"
                                 : isSelected
                                 ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/40 ring-2 ring-emerald-400"
                                 : isToday
@@ -939,6 +1048,50 @@ export default function SessionsAdminPage() {
                       />
                     </div>
 
+                    {/* Quick Time Preset Buttons */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-400 block">
+                        Pilihan Jam Cepat (Klik untuk Pasang):
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => handleSetQuickTime("NOW")}
+                          className="py-1.5 px-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-bold transition-all text-center flex items-center justify-center gap-1"
+                        >
+                          <span>⚡ Mulai Sekarang (Testing)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetQuickTime("EVENING")}
+                          className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-blue-600/20 text-slate-300 hover:text-blue-300 border border-slate-700 hover:border-blue-500/40 font-medium transition-all text-center"
+                        >
+                          🌇 Sore (15:30 - 17:30)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetQuickTime("NIGHT")}
+                          className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-blue-600/20 text-slate-300 hover:text-blue-300 border border-slate-700 hover:border-blue-500/40 font-medium transition-all text-center"
+                        >
+                          🌙 Malam (19:30 - 21:30)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetQuickTime("AFTERNOON")}
+                          className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-blue-600/20 text-slate-300 hover:text-blue-300 border border-slate-700 hover:border-blue-500/40 font-medium transition-all text-center"
+                        >
+                          ☀️ Siang (13:00 - 15:00)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetQuickTime("MORNING")}
+                          className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-blue-600/20 text-slate-300 hover:text-blue-300 border border-slate-700 hover:border-blue-500/40 font-medium transition-all text-center"
+                        >
+                          🌅 Pagi (08:00 - 10:00)
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block font-medium text-slate-300 mb-1.5">
@@ -964,6 +1117,22 @@ export default function SessionsAdminPage() {
                           onChange={(e) => setEndTime(e.target.value)}
                           className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500 text-xs font-semibold"
                         />
+                      </div>
+                    </div>
+
+                    {/* Friendly Time Format Preview */}
+                    <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] space-y-1 text-slate-300">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Jam Buka:</span>
+                        <strong className="text-emerald-400 font-mono font-semibold">
+                          {formatFriendlyTime(startTime)}
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Jam Tutup:</span>
+                        <strong className="text-amber-400 font-mono font-semibold">
+                          {formatFriendlyTime(endTime)}
+                        </strong>
                       </div>
                     </div>
 
@@ -1014,24 +1183,40 @@ export default function SessionsAdminPage() {
                         </button>
                       </div>
 
-                      <select
-                        value={locationPreset}
-                        onChange={(e) => handleLocationPresetChange(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-purple-500 transition-colors text-xs font-medium"
-                      >
-                        {dbPresets.map((preset) => (
-                          <option key={preset.id} value={preset.name}>
-                            📍 {preset.name} (Preset Saved)
-                          </option>
-                        ))}
-                        <option value="Lainnya">✍️ Lainnya (Ketik Tempat & Koordinat Custom)...</option>
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={locationPreset}
+                          onChange={(e) => handleLocationPresetChange(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-purple-500 transition-colors text-xs font-medium"
+                        >
+                          <option value="Lainnya">✍️ Lainnya (Ketik Nama & Ambil GPS Sendiri)...</option>
+                          {dbPresets.map((preset) => (
+                            <option key={preset.id} value={preset.name}>
+                              📍 {preset.name} (Tersimpan)
+                            </option>
+                          ))}
+                        </select>
+
+                        {locationPreset !== "Lainnya" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const found = dbPresets.find((p) => p.name === locationPreset);
+                              if (found) handleDeletePreset(found.id, found.name);
+                            }}
+                            className="p-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 transition-colors shrink-0"
+                            title="Hapus Template Lokasi Ini"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
 
                       {locationPreset === "Lainnya" && (
                         <input
                           type="text"
                           required
-                          placeholder="Ketik nama tempat perkumpulan baru (contoh: Ruang 102 / Lab Komputer)"
+                          placeholder="Ketik nama tempat perkumpulan (contoh: Ruang Rapat / Lapangan / Lab Komputer)"
                           value={customLocation}
                           onChange={(e) => setCustomLocation(e.target.value)}
                           className="w-full mt-2 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors text-xs"
@@ -1049,10 +1234,20 @@ export default function SessionsAdminPage() {
                         <button
                           type="button"
                           onClick={handleGetCurrentLocation}
-                          className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
+                          disabled={isLocatingGps}
+                          className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
                         >
-                          <Navigation className="w-3 h-3" />
-                          Ambil Lokasi GPS Saat Ini
+                          {isLocatingGps ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />
+                              <span>Mengambil Lokasi GPS...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Navigation className="w-3.5 h-3.5" />
+                              <span>Ambil Lokasi GPS Saat Ini</span>
+                            </>
+                          )}
                         </button>
                       </div>
 
@@ -1062,7 +1257,7 @@ export default function SessionsAdminPage() {
                           <input
                             type="number"
                             step="any"
-                            placeholder="-7.9666"
+                            placeholder="Contoh: -7.9666"
                             value={latitude}
                             onChange={(e) => setLatitude(e.target.value)}
                             className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
@@ -1073,7 +1268,7 @@ export default function SessionsAdminPage() {
                           <input
                             type="number"
                             step="any"
-                            placeholder="112.6326"
+                            placeholder="Contoh: 112.6326"
                             value={longitude}
                             onChange={(e) => setLongitude(e.target.value)}
                             className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px] focus:outline-none focus:border-purple-500 font-mono"
@@ -1172,8 +1367,14 @@ export default function SessionsAdminPage() {
                         disabled={isSubmitting}
                         className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                       >
-                        {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        <span>Simpan Sesi Pertemuan</span>
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Menyimpan Sesi Pertemuan...</span>
+                          </>
+                        ) : (
+                          <span>Simpan Sesi Pertemuan</span>
+                        )}
                       </button>
                     </div>
                   </div>

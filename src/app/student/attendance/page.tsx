@@ -28,6 +28,8 @@ import {
   loadFaceApiModels,
   detectFaceWithDescriptor,
   captureFrameBase64,
+  validateFaceInGuide,
+  FaceValidationResult,
 } from "@/lib/client-face-api";
 
 interface StudentProfile {
@@ -70,10 +72,12 @@ export default function StudentAttendancePage() {
 
   // Camera & Face API State
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const guideRef = useRef<HTMLDivElement | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [modelsReady, setModelsReady] = useState(false);
   const [submittingAttendance, setSubmittingAttendance] = useState(false);
+  const [liveValidation, setLiveValidation] = useState<FaceValidationResult | null>(null);
 
   // Recognition Result Modal Popup State
   const [lastCheckInResult, setLastCheckInResult] = useState<{
@@ -221,6 +225,38 @@ export default function StudentAttendancePage() {
     };
   }, [stopCamera]);
 
+  // Real-time live face tracking & circle validation loop
+  useEffect(() => {
+    if (!cameraActive || !modelsReady || submittingAttendance) return;
+
+    let isMounted = true;
+    let isBusy = false;
+
+    const interval = setInterval(async () => {
+      if (isBusy || !videoRef.current || videoRef.current.paused || videoRef.current.videoWidth === 0) return;
+      isBusy = true;
+      try {
+        const detection = await detectFaceWithDescriptor(videoRef.current);
+        if (!isMounted) return;
+        if (!detection) {
+          setLiveValidation(null);
+        } else {
+          const validation = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
+          setLiveValidation(validation);
+        }
+      } catch (err) {
+        // ignore per-frame detection errors
+      } finally {
+        isBusy = false;
+      }
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [cameraActive, modelsReady, submittingAttendance, facingMode]);
+
   // 5. Handle Face Recognition Attendance Check-In
   const handlePerformFaceCheckIn = async () => {
     if (!videoRef.current || !cameraActive) {
@@ -246,9 +282,23 @@ export default function StudentAttendancePage() {
         return;
       }
 
+      // 2. Strict Circle / Guide & Biometric Landmark Validation
+      const validation = validateFaceInGuide(
+        videoRef.current,
+        detection,
+        guideRef.current,
+        facingMode
+      );
+
+      if (!validation.isValid) {
+        toast.warning(validation.message);
+        setSubmittingAttendance(false);
+        return;
+      }
+
       const photoBase64 = captureFrameBase64(videoRef.current, detection.box);
 
-      // 2. Send to Backend Verifier
+      // 3. Send to Backend Verifier
       const res = await fetch("/api/attendance/face-checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -320,6 +370,31 @@ export default function StudentAttendancePage() {
     );
   }
 
+  const isGuideValid = liveValidation?.isValid;
+  const guideCode = liveValidation?.code;
+
+  let guideBorderColor = "border-dashed border-slate-500/70 shadow-none";
+  let guideBadgeColor = "bg-slate-900/85 text-white border-slate-700/80";
+  let guideBadgeText = "Arahkan wajah Anda ke dalam lingkaran";
+
+  if (submittingAttendance) {
+    guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.5)]";
+    guideBadgeColor = "bg-emerald-950/90 text-emerald-300 border-emerald-500/40";
+    guideBadgeText = "Sedang memproses biometrik...";
+  } else if (isGuideValid) {
+    guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.5)] bg-emerald-500/10";
+    guideBadgeColor = "bg-emerald-950/90 text-emerald-300 border-emerald-500/50 shadow-emerald-500/20";
+    guideBadgeText = "✓ Posisi Wajah Pas (Siap Absen)";
+  } else if (guideCode === "TOO_FAR" || guideCode === "TOO_CLOSE" || guideCode === "TILTED") {
+    guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] bg-amber-500/5";
+    guideBadgeColor = "bg-amber-950/90 text-amber-300 border-amber-500/40";
+    guideBadgeText = liveValidation?.message || "Sesuaikan posisi wajah";
+  } else if (guideCode === "OUTSIDE_CIRCLE") {
+    guideBorderColor = "border-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)] bg-rose-500/5";
+    guideBadgeColor = "bg-rose-950/90 text-rose-300 border-rose-500/40";
+    guideBadgeText = "Wajah di luar lingkaran! Geser ke tengah";
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black text-white w-screen h-screen overflow-hidden select-none flex flex-col justify-between">
       {/* 1. FULL-BLEED BACKGROUND LIVE VIDEO */}
@@ -381,7 +456,10 @@ export default function StudentAttendancePage() {
       {/* 3. CENTER BIOMETRIC SCANNING VIEWFINDER */}
       <div className="relative z-20 flex flex-col items-center justify-center my-auto px-4 pointer-events-none">
         {/* Oval Face Scanning Guide Frame */}
-        <div className="relative w-60 h-76 sm:w-72 sm:h-92 rounded-[110px] border-2 border-dashed border-emerald-400/90 shadow-[0_0_50px_rgba(16,185,129,0.35)] flex items-center justify-center animate-pulse">
+        <div
+          ref={guideRef}
+          className={`relative w-60 h-76 sm:w-72 sm:h-92 rounded-[110px] border-2 transition-all duration-300 flex items-center justify-center ${guideBorderColor}`}
+        >
           {/* Inner Corner Accents */}
           <div className="absolute inset-2 border border-white/20 rounded-[102px]" />
 
@@ -397,13 +475,17 @@ export default function StudentAttendancePage() {
 
         {/* Live Guide Floating Pill */}
         <div className="mt-5 pointer-events-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/85 border border-slate-700/80 shadow-2xl backdrop-blur-md">
-            <Camera className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-xs font-bold text-white">
-              {submittingAttendance
-                ? "Sedang memproses biometrik..."
-                : "Arahkan wajah Anda ke dalam lingkaran"}
-            </span>
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 ${guideBadgeColor}`}>
+            {isGuideValid ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            ) : guideCode === "OUTSIDE_CIRCLE" ? (
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            ) : guideCode ? (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            ) : (
+              <Camera className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            )}
+            <span className="text-xs font-bold">{guideBadgeText}</span>
           </div>
         </div>
       </div>
@@ -425,7 +507,11 @@ export default function StudentAttendancePage() {
           <button
             onClick={handlePerformFaceCheckIn}
             disabled={submittingAttendance || !cameraActive}
-            className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm tracking-wide shadow-2xl shadow-emerald-600/40 border border-emerald-400/30 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+            className={`flex-1 py-4 px-6 rounded-2xl text-white font-black text-xs sm:text-sm tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
+              isGuideValid
+                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/40 border-emerald-400/40 ring-2 ring-emerald-500/30"
+                : "bg-gradient-to-r from-slate-800 to-slate-800 hover:from-emerald-700 hover:to-teal-700 border-slate-700"
+            }`}
           >
             {submittingAttendance ? (
               <>

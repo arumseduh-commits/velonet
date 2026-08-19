@@ -607,7 +607,7 @@ export default function SessionDetailPage({
               <div>
                 <h3 className="font-bold text-white text-sm">Peta Titik Koordinat GPS Perkumpulan</h3>
                 <p className="text-xs text-slate-400">
-                  Visualisasi titik kumpul lokasi absensi ({session.locationName || "Ruang Caprice"})
+                  Visualisasi titik kumpul lokasi absensi ({session.locationName || "Titik Kumpul"})
                 </p>
               </div>
             </div>

@@ -33,6 +33,8 @@ import {
   loadFaceApiModels,
   detectFaceWithDescriptor,
   captureFrameBase64,
+  validateFaceInGuide,
+  FaceValidationResult,
 } from "@/lib/client-face-api";
 
 interface EnrolledStudent {
@@ -65,6 +67,8 @@ export default function AdminFaceTerminalPage() {
 
   // Camera & Face API
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const guideRef = useRef<HTMLDivElement | null>(null);
+  const [guideValidation, setGuideValidation] = useState<FaceValidationResult | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [modelsReady, setModelsReady] = useState(false);
@@ -124,25 +128,21 @@ export default function AdminFaceTerminalPage() {
 
   useEffect(() => {
     fetchData();
-    loadFaceApiModels().then((ready) => setModelsReady(ready));
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        setKioskGps({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-      });
-    }
   }, [fetchData]);
 
-  // 2. Camera Controls
-  const startCamera = async (mode: "user" | "environment" = facingMode) => {
+  // 2. Initialize Models & Camera
+  const startCamera = async () => {
     try {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      setLoading(true);
+      await loadFaceApiModels();
+      setModelsReady(true);
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 640 }, height: { ideal: 480 } },
+        video: {
+          facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
 
@@ -150,11 +150,12 @@ export default function AdminFaceTerminalPage() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setCameraActive(true);
-        setFacingMode(mode);
       }
     } catch (err: any) {
-      toast.error(`Kamera tidak dapat diakses: ${err.message}`);
-      setCameraActive(false);
+      console.error("Camera access error:", err);
+      toast.error("Gagal mengakses kamera terminal. Pastikan izin kamera aktif.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -169,6 +170,13 @@ export default function AdminFaceTerminalPage() {
 
   useEffect(() => {
     startCamera();
+    
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setKioskGps({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      });
+    }
+
     return () => stopCamera();
   }, []);
 
@@ -197,6 +205,15 @@ export default function AdminFaceTerminalPage() {
         const detection = await detectFaceWithDescriptor(videoRef.current);
         if (!detection || !isMounted) {
           setCurrentDetection(null);
+          setGuideValidation(null);
+          return;
+        }
+
+        const valResult = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
+        setGuideValidation(valResult);
+
+        // Guard: Face must be centered inside the guide box
+        if (!valResult.isValid) {
           return;
         }
 
@@ -267,7 +284,7 @@ export default function AdminFaceTerminalPage() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [cameraActive, modelsReady, isContinuousScanning, kioskGps, audioFeedback]);
+  }, [cameraActive, modelsReady, isContinuousScanning, kioskGps, audioFeedback, facingMode]);
 
   return (
     <div className="space-y-6">
@@ -354,11 +371,38 @@ export default function AdminFaceTerminalPage() {
 
               {/* Scanning Target Box */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-52 h-64 rounded-[40px] border-2 border-blue-500/60 shadow-[0_0_30px_rgba(59,130,246,0.25)] relative flex items-center justify-center animate-pulse">
-                  <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-blue-400" />
-                  <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-blue-400" />
-                  <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-blue-400" />
-                  <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-blue-400" />
+                <div
+                  ref={guideRef}
+                  className={`w-52 h-64 rounded-[40px] border-2 transition-all duration-300 relative flex items-center justify-center ${
+                    guideValidation?.isValid
+                      ? "border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.35)]"
+                      : guideValidation?.code === "OUTSIDE_CIRCLE"
+                      ? "border-rose-500 shadow-[0_0_35px_rgba(244,63,94,0.35)]"
+                      : guideValidation?.code
+                      ? "border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.35)]"
+                      : "border-blue-500/60 shadow-[0_0_30px_rgba(59,130,246,0.25)] animate-pulse"
+                  }`}
+                >
+                  <div
+                    className={`absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 transition-colors ${
+                      guideValidation?.isValid ? "border-emerald-300" : "border-blue-400"
+                    }`}
+                  />
+                  <div
+                    className={`absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 transition-colors ${
+                      guideValidation?.isValid ? "border-emerald-300" : "border-blue-400"
+                    }`}
+                  />
+                  <div
+                    className={`absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 transition-colors ${
+                      guideValidation?.isValid ? "border-emerald-300" : "border-blue-400"
+                    }`}
+                  />
+                  <div
+                    className={`absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 transition-colors ${
+                      guideValidation?.isValid ? "border-emerald-300" : "border-blue-400"
+                    }`}
+                  />
                 </div>
               </div>
 

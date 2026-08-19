@@ -44,6 +44,9 @@ export async function POST(req: Request) {
       date,
       startTime,
       endTime,
+      startIso,
+      endIso,
+      dateIso,
       locationName,
       latitude,
       longitude,
@@ -57,10 +60,29 @@ export async function POST(req: Request) {
       );
     }
 
-    // Convert inputs to Date objects
-    const sessionDate = new Date(date);
-    const startDateTime = new Date(`${date}T${startTime}`);
-    const endDateTime = new Date(`${date}T${endTime}`);
+    // Convert inputs to exact Date objects
+    let sessionDate: Date;
+    let startDateTime: Date;
+    let endDateTime: Date;
+
+    if (startIso && endIso) {
+      sessionDate = dateIso ? new Date(dateIso) : new Date(`${date}T00:00:00.000Z`);
+      startDateTime = new Date(startIso);
+      endDateTime = new Date(endIso);
+    } else {
+      // Robust fallback: Parse in WIB (+07:00) context
+      const [year, month, day] = date.split("-").map(Number);
+      const [startH, startM] = startTime.split(":").map(Number);
+      const [endH, endM] = endTime.split(":").map(Number);
+
+      sessionDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+      startDateTime = new Date(Date.UTC(year, month - 1, day, startH - 7, startM, 0));
+
+      // Handle overnight session where end time crosses midnight (e.g. 23:00 - 01:00)
+      const isOvernight = endH < startH || (endH === startH && endM <= startM);
+      const endDay = isOvernight ? day + 1 : day;
+      endDateTime = new Date(Date.UTC(year, month - 1, endDay, endH - 7, endM, 0));
+    }
 
     const newSession = await prisma.meetingSession.create({
       data: {
@@ -71,7 +93,7 @@ export async function POST(req: Request) {
         locationName: locationName || null,
         latitude: latitude != null && latitude !== "" ? parseFloat(latitude) : null,
         longitude: longitude != null && longitude !== "" ? parseFloat(longitude) : null,
-        radiusMeter: radiusMeter != null && radiusMeter !== "" ? parseFloat(radiusMeter) : 150,
+        radiusMeter: radiusMeter != null && radiusMeter !== "" ? parseFloat(radiusMeter) : 50,
         isActive: true,
       },
     });
