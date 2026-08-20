@@ -3,6 +3,7 @@ import makeWASocket, {
   WASocket,
   fetchLatestBaileysVersion,
   isJidBroadcast,
+  Browsers,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import QRCode from "qrcode";
@@ -98,6 +99,8 @@ class WhatsAppBotEngine extends EventEmitter {
         version,
         logger,
         auth: state,
+        browser: Browsers.windows("Desktop"),
+        syncFullHistory: false,
         printQRInTerminal: false,
         keepAliveIntervalMs: 15000, // Keeps TCP pipe active on Cloud proxies (prevents 408/428 timeouts)
         connectTimeoutMs: 60000,
@@ -130,6 +133,10 @@ class WhatsAppBotEngine extends EventEmitter {
           const isRestartRequired =
             statusCode === DisconnectReason.restartRequired || statusCode === 515;
 
+          try {
+            sock.ws?.close();
+          } catch (e) {}
+
           this.socket = null;
           this.isInitializing = false;
 
@@ -142,12 +149,12 @@ class WhatsAppBotEngine extends EventEmitter {
           } else if (isRestartRequired) {
             this.emit("log", "WhatsApp server pairing handshake complete (code 515). Finalizing connection...");
             this.updateStatus("CONNECTING", null, null, "Finalizing Pairing");
-            setTimeout(() => this.startBot(), 500);
+            setTimeout(() => this.startBot(), 1500);
           } else {
             // Smooth silent background reconnect without wiping state
-            this.emit("log", `Cloud network blip (code ${statusCode}). Silently reconnecting in 1.5s...`);
+            this.emit("log", `Cloud network blip (code ${statusCode}). Silently reconnecting in 2s...`);
             this.updateStatus("CONNECTING", null, this.userInfo, `Reconnecting (Code ${statusCode})`);
-            setTimeout(() => this.startBot(), 1500);
+            setTimeout(() => this.startBot(), 2000);
           }
         } else if (connection === "open") {
           this.isInitializing = false;

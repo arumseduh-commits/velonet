@@ -123,6 +123,14 @@ export const usePrismaAuthState = async (
     } catch (e) {}
   };
 
+  let backupTimer: NodeJS.Timeout | null = null;
+  const scheduleBackup = () => {
+    if (backupTimer) clearTimeout(backupTimer);
+    backupTimer = setTimeout(async () => {
+      await backupToSystemSetting();
+    }, 2000);
+  };
+
   const creds: AuthenticationCreds = readData("creds") || initAuthCreds();
 
   return {
@@ -156,15 +164,16 @@ export const usePrismaAuthState = async (
             }
           }
           await Promise.all(tasks);
-          await backupToSystemSetting();
+          scheduleBackup();
         },
       },
     },
     saveCreds: async () => {
       await writeData("creds", creds);
-      await backupToSystemSetting();
+      scheduleBackup();
     },
     clearState: async () => {
+      if (backupTimer) clearTimeout(backupTimer);
       cache.clear();
       await prisma.baileysAuth.deleteMany({}).catch(() => {});
       await prisma.systemSetting.deleteMany({
