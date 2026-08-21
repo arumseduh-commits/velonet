@@ -327,23 +327,23 @@ function StudentLoginContent() {
   if (isGuideValid) {
     guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.6)] ring-4 ring-emerald-500/40";
     guideBadgeColor = "bg-emerald-950/90 border-emerald-500/60 text-emerald-300";
-    guideBadgeText = "Wajah Pas di Lingkaran • Siap Masuk ✅";
+    guideBadgeText = "Posisi Wajah Sesuai (Siap Masuk)";
   } else if (guideCode === "OUTSIDE_CIRCLE") {
     guideBorderColor = "border-rose-500 shadow-[0_0_45px_rgba(244,63,94,0.55)] ring-4 ring-rose-500/30";
     guideBadgeColor = "bg-rose-950/90 border-rose-500/60 text-rose-300";
-    guideBadgeText = "Wajah di luar lingkaran! Geser ke tengah ⚠️";
+    guideBadgeText = "Arahkan Wajah ke Tengah";
   } else if (guideCode === "TOO_FAR") {
     guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.45)]";
     guideBadgeColor = "bg-amber-950/90 border-amber-500/60 text-amber-300";
-    guideBadgeText = "Mendekatlah sedikit ke layar ⚠️";
+    guideBadgeText = "Dekatkan Wajah ke Kamera";
   } else if (guideCode === "TOO_CLOSE") {
     guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.45)]";
     guideBadgeColor = "bg-amber-950/90 border-amber-500/60 text-amber-300";
-    guideBadgeText = "Terlalu dekat! Mundurlah sedikit ⚠️";
+    guideBadgeText = "Mundurkan Wajah Sedikit";
   } else if (guideCode === "TILTED") {
     guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.45)]";
     guideBadgeColor = "bg-amber-950/90 border-amber-500/60 text-amber-300";
-    guideBadgeText = "Tegakkan posisi kepala Anda ⚠️";
+    guideBadgeText = "Posisikan Wajah Tegak";
   }
 
   return (
@@ -414,10 +414,10 @@ function StudentLoginContent() {
               </div>
               <div>
                 <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-                  ⚡ LOGIN INSTAN VIA WHATSAPP (1-KLIK)
+                  Login Instan via WhatsApp
                 </h2>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Tekan tombol di bawah untuk membuka WA & mengirim pesan verifikasi otomatis.
+                  Tekan tombol di bawah untuk membuka WhatsApp dan mengirim pesan verifikasi otomatis.
                 </p>
               </div>
             </div>
@@ -425,7 +425,7 @@ function StudentLoginContent() {
             {loadingWa ? (
               <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                <span>Membuat sesi login WhatsApp aman...</span>
+                <span>Membuat sesi login WhatsApp...</span>
               </div>
             ) : (
               <a
@@ -434,7 +434,7 @@ function StudentLoginContent() {
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all transform hover:scale-[1.02] cursor-pointer"
               >
-                <span>📱 MASUK SEKARANG VIA WHATSAPP</span>
+                <span>Masuk Sekarang via WhatsApp</span>
                 <ArrowRight className="w-4 h-4" />
               </a>
             )}

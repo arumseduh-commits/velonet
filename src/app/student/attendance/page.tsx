@@ -85,6 +85,7 @@ export default function StudentAttendancePage() {
     message: string;
     detectedName?: string;
     detectedClass?: string;
+    loggedInName?: string;
     similarity?: number;
     distanceMeter?: number | null;
     sessionTitle?: string;
@@ -351,9 +352,10 @@ export default function StudentAttendancePage() {
       } else if (json.code === "ACCOUNT_MISMATCH") {
         setLastCheckInResult({
           status: "ACCOUNT_MISMATCH",
-          message: json.message || "Wajah terdeteksi milik akun peserta lain. Dilarang titip absen.",
+          message: json.message || "Wajah di kamera tidak cocok dengan akun yang sedang login.",
           detectedName: json.detectedUser?.name,
           detectedClass: json.detectedUser?.studentClass,
+          loggedInName: json.loggedInName,
           similarity: json.similarity,
         });
       } else if (json.code === "LOCATION_REQUIRED") {
@@ -414,19 +416,27 @@ export default function StudentAttendancePage() {
   if (submittingAttendance) {
     guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.5)]";
     guideBadgeColor = "bg-emerald-950/90 text-emerald-300 border-emerald-500/40";
-    guideBadgeText = "Sedang memproses biometrik...";
+    guideBadgeText = "Memproses Verifikasi Wajah...";
   } else if (isGuideValid) {
     guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.5)] bg-emerald-500/10";
     guideBadgeColor = "bg-emerald-950/90 text-emerald-300 border-emerald-500/50 shadow-emerald-500/20";
-    guideBadgeText = "✓ Posisi Wajah Pas (Siap Absen)";
-  } else if (guideCode === "TOO_FAR" || guideCode === "TOO_CLOSE" || guideCode === "TILTED") {
+    guideBadgeText = "Posisi Wajah Sesuai (Siap Absen)";
+  } else if (guideCode === "TOO_FAR") {
     guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] bg-amber-500/5";
     guideBadgeColor = "bg-amber-950/90 text-amber-300 border-amber-500/40";
-    guideBadgeText = liveValidation?.message || "Sesuaikan posisi wajah";
+    guideBadgeText = "Dekatkan Wajah ke Kamera";
+  } else if (guideCode === "TOO_CLOSE") {
+    guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] bg-amber-500/5";
+    guideBadgeColor = "bg-amber-950/90 text-amber-300 border-amber-500/40";
+    guideBadgeText = "Mundurkan Wajah Sedikit";
+  } else if (guideCode === "TILTED") {
+    guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] bg-amber-500/5";
+    guideBadgeColor = "bg-amber-950/90 text-amber-300 border-amber-500/40";
+    guideBadgeText = "Posisikan Wajah Tegak";
   } else if (guideCode === "OUTSIDE_CIRCLE") {
     guideBorderColor = "border-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)] bg-rose-500/5";
     guideBadgeColor = "bg-rose-950/90 text-rose-300 border-rose-500/40";
-    guideBadgeText = "Wajah di luar lingkaran! Geser ke tengah";
+    guideBadgeText = "Arahkan Wajah ke Tengah";
   }
 
   return (
@@ -541,7 +551,7 @@ export default function StudentAttendancePage() {
           <button
             onClick={handlePerformFaceCheckIn}
             disabled={submittingAttendance || !cameraActive}
-            className={`flex-1 py-4 px-6 rounded-2xl text-white font-black text-xs sm:text-sm tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
+            className={`flex-1 py-4 px-6 rounded-2xl text-white font-bold text-xs sm:text-sm tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
               isGuideValid
                 ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/40 border-emerald-400/40 ring-2 ring-emerald-500/30"
                 : "bg-gradient-to-r from-slate-800 to-slate-800 hover:from-emerald-700 hover:to-teal-700 border-slate-700"
@@ -550,12 +560,12 @@ export default function StudentAttendancePage() {
             {submittingAttendance ? (
               <>
                 <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>MEMPROSES ABSENSI...</span>
+                <span>Memproses Verifikasi...</span>
               </>
             ) : (
               <>
                 <Camera className="w-5 h-5" />
-                <span>PINDAI WAJAH SEKARANG (ABSEN)</span>
+                <span>Verifikasi & Absen Wajah</span>
               </>
             )}
           </button>
@@ -566,106 +576,226 @@ export default function StudentAttendancePage() {
         </p>
       </div>
 
-      {/* 5. INTERACTIVE FLOATING RESULT POP-UP (Wajah Terdaftar / Orang Lain / Unknown / Out of Radius) */}
+      {/* 5. INTERACTIVE FLOATING RESULT POP-UP (Minimalist & To the Point) */}
       {lastCheckInResult && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-center">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
             {/* Status Icon */}
-            <div className="mx-auto w-16 h-16 rounded-3xl flex items-center justify-center shadow-xl">
+            <div className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg">
               {lastCheckInResult.status === "SUCCESS" ? (
-                <div className="w-full h-full rounded-3xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                  <CheckCircle2 className="w-9 h-9" />
+                <div className="w-full h-full rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "ALREADY_CHECKED_IN" ? (
-                <div className="w-full h-full rounded-3xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-                  <CheckCircle2 className="w-9 h-9" />
+                <div className="w-full h-full rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <CheckCircle2 className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "ACCOUNT_MISMATCH" ? (
-                <div className="w-full h-full rounded-3xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
-                  <ShieldAlert className="w-9 h-9" />
+                <div className="w-full h-full rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                  <ShieldAlert className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "OUT_OF_RADIUS" || lastCheckInResult.status === "LOCATION_REQUIRED" ? (
-                <div className="w-full h-full rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                  <MapPin className="w-9 h-9" />
+                <div className="w-full h-full rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <MapPin className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "UNKNOWN_FACE" ? (
-                <div className="w-full h-full rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                  <User className="w-9 h-9" />
+                <div className="w-full h-full rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <User className="w-7 h-7" />
                 </div>
               ) : (
-                <div className="w-full h-full rounded-3xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
-                  <XCircle className="w-9 h-9" />
+                <div className="w-full h-full rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                  <XCircle className="w-7 h-7" />
                 </div>
               )}
             </div>
 
             {/* Title & Message */}
-            <div className="space-y-1.5">
-              <h3 className="text-lg font-bold text-white">
+            <div className="space-y-1">
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
                 {lastCheckInResult.status === "SUCCESS"
-                  ? "Absensi Berhasil Diverifikasi! 🎉"
+                  ? "Absensi Berhasil"
                   : lastCheckInResult.status === "ALREADY_CHECKED_IN"
-                  ? "Anda Sudah Absen Sebelumnya! ℹ️"
+                  ? "Sudah Melakukan Absensi"
                   : lastCheckInResult.status === "ACCOUNT_MISMATCH"
-                  ? "Wajah Akun Tidak Cocok! ⚠️"
+                  ? "Identitas Tidak Sesuai"
                   : lastCheckInResult.status === "LOCATION_REQUIRED"
-                  ? "Lokasi GPS Wajib Aktif! 📍"
+                  ? "Akses Lokasi Diperlukan"
                   : lastCheckInResult.status === "OUT_OF_RADIUS"
-                  ? "Di Luar Area Lokasi Kumpul! 📍"
+                  ? "Di Luar Jangkauan Lokasi"
                   : lastCheckInResult.status === "UNKNOWN_FACE"
-                  ? "Wajah Belum Terdaftar! ⚠️"
+                  ? "Wajah Tidak Dikenali"
                   : "Absensi Gagal"}
               </h3>
-              <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
+              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
                 {lastCheckInResult.message}
               </p>
             </div>
 
-            {/* Biometric & GPS Details Card */}
-            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5 text-left text-xs">
-              {lastCheckInResult.detectedName && (
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                  <span className="text-slate-400">Nama Siswa:</span>
-                  <span className="font-bold text-white">
-                    {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
-                  </span>
-                </div>
+            {/* Structured Details Card */}
+            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-left text-xs">
+              {lastCheckInResult.status === "ACCOUNT_MISMATCH" && (
+                <>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <span className="text-slate-400">Akun Login:</span>
+                    <span className="font-semibold text-slate-200">
+                      {lastCheckInResult.loggedInName || student?.name || "Akun Anda"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <span className="text-slate-400">Wajah Terdeteksi:</span>
+                    <span className="font-semibold text-rose-300">
+                      {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
+                    </span>
+                  </div>
+                  {lastCheckInResult.similarity !== undefined && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Akurasi Kemiripan:</span>
+                      <span className="font-mono text-rose-300 font-semibold">
+                        {(lastCheckInResult.similarity > 1 ? lastCheckInResult.similarity : lastCheckInResult.similarity * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Status:</span>
+                    <span className="font-medium text-rose-400">Ditolak (Anti-Titip Absen)</span>
+                  </div>
+                </>
               )}
 
-              {lastCheckInResult.similarity !== undefined && (
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                  <span className="text-slate-400">Akurasi Wajah (AI Match):</span>
-                  <span className="font-mono font-extrabold text-emerald-400">
-                    {(lastCheckInResult.similarity > 1 ? lastCheckInResult.similarity : lastCheckInResult.similarity * 100).toFixed(1)}% Cocok
-                  </span>
-                </div>
+              {lastCheckInResult.status === "SUCCESS" && (
+                <>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <span className="text-slate-400">Nama Siswa:</span>
+                    <span className="font-semibold text-white">
+                      {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
+                    </span>
+                  </div>
+                  {lastCheckInResult.sessionTitle && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Sesi:</span>
+                      <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                        {lastCheckInResult.sessionTitle}
+                      </span>
+                    </div>
+                  )}
+                  {lastCheckInResult.distanceMeter !== undefined && lastCheckInResult.distanceMeter !== null && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Jarak Lokasi:</span>
+                      <span className="font-mono text-emerald-400 font-semibold">
+                        {Math.round(lastCheckInResult.distanceMeter)} meter ({lastCheckInResult.locationName || "Di Lokasi"})
+                      </span>
+                    </div>
+                  )}
+                  {lastCheckInResult.timeStr && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Waktu Tercatat:</span>
+                      <span className="font-mono text-slate-200">{lastCheckInResult.timeStr} WIB</span>
+                    </div>
+                  )}
+                </>
               )}
 
-              {lastCheckInResult.distanceMeter !== undefined && lastCheckInResult.distanceMeter !== null && (
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                  <span className="text-slate-400">Jarak ke Titik Kumpul:</span>
-                  <span className="font-mono font-bold text-blue-300">
-                    {lastCheckInResult.distanceMeter > 1000
-                      ? `${(lastCheckInResult.distanceMeter / 1000).toFixed(1)} km (${Math.round(lastCheckInResult.distanceMeter).toLocaleString("id-ID")} meter)`
-                      : `${Math.round(lastCheckInResult.distanceMeter)} meter`}{" "}
-                    ({lastCheckInResult.locationName || "Titik Kumpul"})
-                  </span>
-                </div>
+              {lastCheckInResult.status === "ALREADY_CHECKED_IN" && (
+                <>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <span className="text-slate-400">Nama Siswa:</span>
+                    <span className="font-semibold text-white">
+                      {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
+                    </span>
+                  </div>
+                  {lastCheckInResult.sessionTitle && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Sesi:</span>
+                      <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                        {lastCheckInResult.sessionTitle}
+                      </span>
+                    </div>
+                  )}
+                  {lastCheckInResult.timeStr && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Waktu Absen:</span>
+                      <span className="font-mono text-slate-200">{lastCheckInResult.timeStr} WIB</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Status Kehadiran:</span>
+                    <span className="font-medium text-blue-400">Sudah Tercatat Hadir</span>
+                  </div>
+                </>
               )}
 
-              {lastCheckInResult.timeStr && (
+              {lastCheckInResult.status === "OUT_OF_RADIUS" && (
+                <>
+                  {lastCheckInResult.detectedName && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Nama Siswa:</span>
+                      <span className="font-semibold text-white">
+                        {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
+                      </span>
+                    </div>
+                  )}
+                  {lastCheckInResult.locationName && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Titik Sesi:</span>
+                      <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                        {lastCheckInResult.locationName}
+                      </span>
+                    </div>
+                  )}
+                  {lastCheckInResult.distanceMeter !== undefined && lastCheckInResult.distanceMeter !== null && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Jarak Anda:</span>
+                      <span className="font-mono font-semibold text-amber-400">
+                        {lastCheckInResult.distanceMeter > 1000
+                          ? `${(lastCheckInResult.distanceMeter / 1000).toFixed(1)} km (${Math.round(lastCheckInResult.distanceMeter).toLocaleString("id-ID")} m)`
+                          : `${Math.round(lastCheckInResult.distanceMeter)} meter`}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Status:</span>
+                    <span className="font-medium text-amber-400">Di Luar Batas Radius</span>
+                  </div>
+                </>
+              )}
+
+              {lastCheckInResult.status === "LOCATION_REQUIRED" && (
+                <>
+                  {lastCheckInResult.sessionTitle && (
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <span className="text-slate-400">Sesi:</span>
+                      <span className="font-medium text-slate-200">
+                        {lastCheckInResult.sessionTitle}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Status Lokasi:</span>
+                    <span className="font-medium text-amber-400">GPS Tidak Terdeteksi</span>
+                  </div>
+                </>
+              )}
+
+              {lastCheckInResult.status === "UNKNOWN_FACE" && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Waktu Tercatat:</span>
-                  <span className="font-mono text-slate-200">{lastCheckInResult.timeStr}</span>
+                  <span className="text-slate-400">Status Biometrik:</span>
+                  <span className="font-medium text-amber-400">Wajah Belum Terdaftar</span>
+                </div>
+              )}
+
+              {lastCheckInResult.status === "ERROR" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Keterangan:</span>
+                  <span className="font-medium text-rose-400">Terjadi Kesalahan</span>
                 </div>
               )}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
               <button
                 onClick={() => setLastCheckInResult(null)}
-                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
               >
                 {lastCheckInResult.status === "SUCCESS" || lastCheckInResult.status === "ALREADY_CHECKED_IN" ? "Tutup" : "Coba Lagi"}
               </button>
@@ -674,7 +804,7 @@ export default function StudentAttendancePage() {
                 <Link
                   href="/student"
                   onClick={stopCamera}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20"
                 >
                   <span>Kembali ke Beranda</span>
                 </Link>

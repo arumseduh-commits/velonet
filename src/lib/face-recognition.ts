@@ -219,6 +219,7 @@ export interface ProcessFaceAttendanceResult {
     phoneNumber: string;
     facePhoto: string | null;
   };
+  loggedInName?: string;
   similarity?: number;
   distanceMeter?: number | null;
   sessionTitle?: string;
@@ -270,8 +271,7 @@ export async function processFaceAttendance({
     return {
       success: false,
       code: "UNKNOWN_FACE",
-      message:
-        "❌ Wajah Tidak Dikenali / Bukan Anggota: Wajah Anda belum terdaftar sebagai anggota Velocity. Silakan hubungi Pembina atau lakukan perekaman wajah.",
+      message: "Wajah Anda belum terdaftar di sistem. Silakan hubungi admin atau rekam wajah di menu profil.",
     };
   }
 
@@ -292,7 +292,7 @@ export async function processFaceAttendance({
     return {
       success: false,
       code: "ACCOUNT_MISMATCH",
-      message: `⚠️ Terdeteksi Wajah: ${detectedName} (${detectedClass}) [Kemiripan: ${similarity}%]\n\n⛔ ABSENSI DITOLAK: Anda sedang login sebagai "${loggedInName}", namun wajah di kamera terdeteksi sebagai "${detectedName}". Dilarang melakukan titip absen!`,
+      message: `Wajah di kamera terdeteksi sebagai "${detectedName}", sedangkan akun yang aktif adalah "${loggedInName}". Titip absen tidak diperbolehkan.`,
       detectedUser: {
         id: detectedUser.id,
         name: detectedName,
@@ -300,6 +300,7 @@ export async function processFaceAttendance({
         phoneNumber: detectedUser.phoneNumber,
         facePhoto: detectedUser.facePhoto,
       },
+      loggedInName,
       similarity,
     };
   }
@@ -315,7 +316,7 @@ export async function processFaceAttendance({
     return {
       success: false,
       code: "NO_ACTIVE_SESSION",
-      message: `⏳ Tidak ada Sesi Pertemuan Velocity yang sedang aktif saat ini. Absensi wajah hanya dapat dilakukan sesuai jadwal kumpul.`,
+      message: "Tidak ada sesi pertemuan yang sedang aktif saat ini.",
       detectedUser: {
         id: detectedUser.id,
         name: detectedName,
@@ -336,7 +337,7 @@ export async function processFaceAttendance({
     return {
       success: false,
       code: "LOCATION_REQUIRED",
-      message: `📍 LOKASI GPS TIDAK TERDETEKSI\n\nSesi "${session.title}" mewajibkan verifikasi lokasi di "${session.locationName || 'Titik Kumpul'}". Mohon aktifkan GPS perangkat Anda dan izinkan akses lokasi pada browser HP Anda.`,
+      message: `Sesi "${session.title}" mewajibkan verifikasi lokasi di ${session.locationName || 'titik kumpul'}. Pastikan GPS perangkat Anda aktif.`,
       detectedUser: {
         id: detectedUser.id,
         name: detectedName,
@@ -355,14 +356,14 @@ export async function processFaceAttendance({
     const formattedDistance =
       dist !== null
         ? dist > 1000
-          ? `${(dist / 1000).toFixed(1)} km (${dist.toLocaleString("id-ID")} meter)`
+          ? `${(dist / 1000).toFixed(1)} km (${dist.toLocaleString("id-ID")} m)`
           : `${dist} meter`
         : "tidak terjangkau";
 
     return {
       success: false,
       code: "OUT_OF_RADIUS",
-      message: `🔴 ABSENSI DITOLAK (DI LUAR AREA)\n\nWajah teridentifikasi: ${detectedName} (${similarity}%)\nLokasi Anda terdeteksi berjarak ${formattedDistance} dari "${session.locationName || session.title}" (Batas radius: ${session.radiusMeter} meter).\n\nMohon lakukan absensi saat Anda sudah berada di lokasi pertemuan.`,
+      message: `Posisi Anda terdeteksi ${formattedDistance} dari "${session.locationName || session.title}" (Batas: ${session.radiusMeter} meter).`,
       detectedUser: {
         id: detectedUser.id,
         name: detectedName,
@@ -404,7 +405,7 @@ export async function processFaceAttendance({
     return {
       success: true,
       code: "ALREADY_CHECKED_IN",
-      message: `ℹ️ ANDA SUDAH MELAKUKAN ABSENSI\n\nHalo Kak *${detectedName}*! Anda sudah tercatat *HADIR* untuk sesi "${session.title}" pada pukul *${originalTimeStr} WIB*.\n\nTidak perlu melakukan absensi ulang. Selamat mengikuti kegiatan! 🎉`,
+      message: `Anda sudah tercatat hadir untuk sesi "${session.title}" pada pukul ${originalTimeStr} WIB.`,
       detectedUser: {
         id: detectedUser.id,
         name: detectedName,
@@ -452,15 +453,10 @@ export async function processFaceAttendance({
     },
   });
 
-  const distText =
-    sessionResult.distanceMeter !== null
-      ? `${sessionResult.distanceMeter} Meter`
-      : "Lokasi Tervalidasi";
-
   return {
     success: true,
     code: "SUCCESS",
-    message: `🟢 ABSENSI BERHASIL!\n\n👤 Nama: ${detectedName}\n🏫 Kelas: ${detectedClass}\n🎯 Kemiripan Wajah: ${similarity}%\n📌 Sesi: ${session.title}\n📍 Lokasi: ${session.locationName || "Titik Kumpul"} (${distText})\n⏰ Waktu: ${timeStr} WIB`,
+    message: "Absensi kehadiran Anda berhasil diverifikasi.",
     detectedUser: {
       id: detectedUser.id,
       name: detectedName,
