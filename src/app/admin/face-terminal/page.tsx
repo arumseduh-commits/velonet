@@ -236,7 +236,7 @@ export default function AdminFaceTerminalPage() {
         const nowMs = Date.now();
         const timeStr = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-        if (json.code === "SUCCESS") {
+        if (json.code === "SUCCESS" || json.code === "ALREADY_CHECKED_IN") {
           const userId = json.detectedUser?.id || "unknown";
           const lastTime = lastProcessedTimeRef.current[userId] || 0;
 
@@ -257,7 +257,7 @@ export default function AdminFaceTerminalPage() {
                 id: Math.random().toString(),
                 name: json.detectedUser?.name || "Peserta",
                 studentClass: json.detectedUser?.studentClass || "-",
-                status: "SUCCESS",
+                status: json.code === "ALREADY_CHECKED_IN" ? "ALREADY_CHECKED" : "SUCCESS",
                 time: timeStr,
                 similarity: json.similarity || 0,
                 photo: photoBase64 || undefined,
