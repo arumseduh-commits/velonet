@@ -81,7 +81,7 @@ export default function StudentAttendancePage() {
 
   // Recognition Result Modal Popup State
   const [lastCheckInResult, setLastCheckInResult] = useState<{
-    status: "SUCCESS" | "ACCOUNT_MISMATCH" | "UNKNOWN_FACE" | "OUT_OF_RADIUS" | "NO_SESSION" | "ERROR";
+    status: "SUCCESS" | "ACCOUNT_MISMATCH" | "UNKNOWN_FACE" | "OUT_OF_RADIUS" | "LOCATION_REQUIRED" | "NO_SESSION" | "ERROR";
     message: string;
     detectedName?: string;
     detectedClass?: string;
@@ -269,6 +269,18 @@ export default function StudentAttendancePage() {
       return;
     }
 
+    // Strict GPS Enforcement: Active sessions require valid GPS coordinate
+    const requiresGps = activeSessions.length === 0 || activeSessions.some((s) => s.latitude != null && s.longitude != null);
+    if (requiresGps && !gpsLocation) {
+      if (gpsLoading) {
+        toast.warning("Sedang mengunci titik lokasi GPS Anda, mohon tunggu sebentar...");
+        return;
+      }
+      toast.error("Lokasi GPS wajib aktif untuk melakukan absensi. Silakan izinkan akses lokasi di browser HP Anda.");
+      acquireGps();
+      return;
+    }
+
     setSubmittingAttendance(true);
     setLastCheckInResult(null);
 
@@ -331,6 +343,16 @@ export default function StudentAttendancePage() {
           detectedName: json.detectedUser?.name,
           detectedClass: json.detectedUser?.studentClass,
           similarity: json.similarity,
+        });
+      } else if (json.code === "LOCATION_REQUIRED") {
+        setLastCheckInResult({
+          status: "LOCATION_REQUIRED",
+          message: json.message || "Lokasi GPS wajib diaktifkan untuk melakukan absensi pada sesi ini.",
+          detectedName: json.detectedUser?.name,
+          detectedClass: json.detectedUser?.studentClass,
+          similarity: json.similarity,
+          sessionTitle: json.sessionTitle,
+          locationName: json.locationName,
         });
       } else if (json.code === "UNKNOWN_FACE") {
         setLastCheckInResult({
@@ -546,7 +568,7 @@ export default function StudentAttendancePage() {
                 <div className="w-full h-full rounded-3xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
                   <ShieldAlert className="w-9 h-9" />
                 </div>
-              ) : lastCheckInResult.status === "OUT_OF_RADIUS" ? (
+              ) : lastCheckInResult.status === "OUT_OF_RADIUS" || lastCheckInResult.status === "LOCATION_REQUIRED" ? (
                 <div className="w-full h-full rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
                   <MapPin className="w-9 h-9" />
                 </div>
@@ -568,13 +590,15 @@ export default function StudentAttendancePage() {
                   ? "Absensi Berhasil Diverifikasi! 🎉"
                   : lastCheckInResult.status === "ACCOUNT_MISMATCH"
                   ? "Wajah Akun Tidak Cocok! ⚠️"
+                  : lastCheckInResult.status === "LOCATION_REQUIRED"
+                  ? "Lokasi GPS Wajib Aktif! 📍"
                   : lastCheckInResult.status === "OUT_OF_RADIUS"
                   ? "Di Luar Area Lokasi Kumpul! 📍"
                   : lastCheckInResult.status === "UNKNOWN_FACE"
                   ? "Wajah Belum Terdaftar! ⚠️"
                   : "Absensi Gagal"}
               </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
                 {lastCheckInResult.message}
               </p>
             </div>
@@ -594,7 +618,7 @@ export default function StudentAttendancePage() {
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                   <span className="text-slate-400">Akurasi Wajah (AI Match):</span>
                   <span className="font-mono font-extrabold text-emerald-400">
-                    {(lastCheckInResult.similarity * 100).toFixed(1)}% Cocok
+                    {(lastCheckInResult.similarity > 1 ? lastCheckInResult.similarity : lastCheckInResult.similarity * 100).toFixed(1)}% Cocok
                   </span>
                 </div>
               )}
@@ -603,7 +627,10 @@ export default function StudentAttendancePage() {
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                   <span className="text-slate-400">Jarak ke Titik Kumpul:</span>
                   <span className="font-mono font-bold text-blue-300">
-                    {Math.round(lastCheckInResult.distanceMeter)} meter ({lastCheckInResult.locationName || "Titik Kumpul"})
+                    {lastCheckInResult.distanceMeter > 1000
+                      ? `${(lastCheckInResult.distanceMeter / 1000).toFixed(1)} km (${Math.round(lastCheckInResult.distanceMeter).toLocaleString("id-ID")} meter)`
+                      : `${Math.round(lastCheckInResult.distanceMeter)} meter`}{" "}
+                    ({lastCheckInResult.locationName || "Titik Kumpul"})
                   </span>
                 </div>
               )}

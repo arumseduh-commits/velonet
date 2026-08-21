@@ -207,6 +207,7 @@ export interface ProcessFaceAttendanceResult {
     | "UNKNOWN_FACE"
     | "NO_ACTIVE_SESSION"
     | "OUT_OF_RADIUS"
+    | "LOCATION_REQUIRED"
     | "NOT_ENROLLED"
     | "ERROR";
   message: string;
@@ -328,11 +329,39 @@ export async function processFaceAttendance({
   const session = sessionResult.session;
 
   // 5. Verify GPS Geofence Distance
-  if (!sessionResult.isWithinRadius && sessionResult.distanceMeter !== null) {
+  const requiresGps = session.latitude != null && session.longitude != null;
+
+  if (requiresGps && (latitude == null || longitude == null)) {
+    return {
+      success: false,
+      code: "LOCATION_REQUIRED",
+      message: `📍 LOKASI GPS TIDAK TERDETEKSI\n\nSesi "${session.title}" mewajibkan verifikasi lokasi di "${session.locationName || 'Titik Kumpul'}". Mohon aktifkan GPS perangkat Anda dan izinkan akses lokasi pada browser HP Anda.`,
+      detectedUser: {
+        id: detectedUser.id,
+        name: detectedName,
+        studentClass: detectedClass,
+        phoneNumber: detectedUser.phoneNumber,
+        facePhoto: detectedUser.facePhoto,
+      },
+      similarity,
+      sessionTitle: session.title,
+      locationName: session.locationName || "Lokasi Pertemuan",
+    };
+  }
+
+  if (requiresGps && !sessionResult.isWithinRadius) {
+    const dist = sessionResult.distanceMeter;
+    const formattedDistance =
+      dist !== null
+        ? dist > 1000
+          ? `${(dist / 1000).toFixed(1)} km (${dist.toLocaleString("id-ID")} meter)`
+          : `${dist} meter`
+        : "tidak terjangkau";
+
     return {
       success: false,
       code: "OUT_OF_RADIUS",
-      message: `🔴 ABSENSI GAGAL (DI LUAR AREA)\n\nWajah teridentifikasi: ${detectedName} (${similarity}%)\nLokasi Anda terdeteksi berjarak ${sessionResult.distanceMeter} meter dari "${session.locationName || session.title}" (Maksimal: ${session.radiusMeter} meter).\n\nMohon lakukan absensi saat Anda sudah berada di lokasi kegiatan.`,
+      message: `🔴 ABSENSI DITOLAK (DI LUAR AREA)\n\nWajah teridentifikasi: ${detectedName} (${similarity}%)\nLokasi Anda terdeteksi berjarak ${formattedDistance} dari "${session.locationName || session.title}" (Batas radius: ${session.radiusMeter} meter).\n\nMohon lakukan absensi saat Anda sudah berada di lokasi pertemuan.`,
       detectedUser: {
         id: detectedUser.id,
         name: detectedName,
