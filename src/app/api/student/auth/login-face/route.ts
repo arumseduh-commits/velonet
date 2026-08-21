@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Perform Biometric Euclidean Matching (Strict threshold 0.45 = ~75%+ similarity)
-    const matchResult = findBestFaceMatch(faceDescriptor, candidateUsers, 0.45);
+    // 2. Perform Biometric Euclidean Matching (Balanced threshold 0.56 for cross-device support)
+    const matchResult = findBestFaceMatch(faceDescriptor, candidateUsers, 0.56);
 
     if (!matchResult.isMatch || !matchResult.matchedUser) {
       return NextResponse.json(

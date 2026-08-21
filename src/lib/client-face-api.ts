@@ -313,8 +313,8 @@ export async function detectFaceWithDescriptor(
   }
 
   const options = new api.TinyFaceDetectorOptions({
-    inputSize: 320,
-    scoreThreshold: 0.5,
+    inputSize: 416,
+    scoreThreshold: 0.4,
   });
 
   const detection = await api
@@ -352,8 +352,8 @@ export async function detectFaceLivenessAndDescriptor(
   }
 
   const options = new api.TinyFaceDetectorOptions({
-    inputSize: 320,
-    scoreThreshold: 0.45,
+    inputSize: 416,
+    scoreThreshold: 0.4,
   });
 
   try {

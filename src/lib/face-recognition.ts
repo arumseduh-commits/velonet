@@ -58,7 +58,7 @@ export interface BestFaceMatchResult {
 export function findBestFaceMatch(
   queryDescriptor: number[],
   candidates: CandidateUser[],
-  threshold = 0.50
+  threshold = 0.56
 ): BestFaceMatchResult {
   let minDistance = Infinity;
   let bestUser: CandidateUser | null = null;
