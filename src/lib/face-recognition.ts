@@ -40,6 +40,7 @@ export interface CandidateUser {
   gender: string | null;
   faceDescriptor: string | null;
   facePhoto: string | null;
+  isCompleted?: boolean;
 }
 
 export interface BestFaceMatchResult {
