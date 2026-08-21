@@ -29,6 +29,25 @@ export function startAutoCronScheduler() {
   }, 60000);
 }
 
+let cachedTargetHour = 22;
+let lastHourCheckTime = 0;
+
+async function getTargetHour(): Promise<number> {
+  const now = Date.now();
+  if (now - lastHourCheckTime > 3600000) {
+    lastHourCheckTime = now;
+    try {
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key: "cron_reminder_hour" },
+      });
+      if (setting && setting.value) {
+        cachedTargetHour = parseInt(setting.value, 10);
+      }
+    } catch (e) {}
+  }
+  return cachedTargetHour;
+}
+
 /**
  * Automated Nightly Task (Runs automatically at 22:00 / 10 PM every night)
  * Checks if there is a meeting session scheduled for TOMORROW.
@@ -37,17 +56,7 @@ export function startAutoCronScheduler() {
 export async function checkAndRunNightlyReminders() {
   const now = new Date();
   const currentHour = now.getHours();
-
-  // Default target time: 22:00 (10 PM)
-  let targetHour = 22;
-  try {
-    const setting = await prisma.systemSetting.findUnique({
-      where: { key: "cron_reminder_hour" },
-    });
-    if (setting && setting.value) {
-      targetHour = parseInt(setting.value, 10);
-    }
-  } catch (e) {}
+  const targetHour = await getTargetHour();
 
   if (currentHour !== targetHour) {
     return;

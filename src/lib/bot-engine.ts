@@ -34,6 +34,7 @@ class WhatsAppBotEngine extends EventEmitter {
   private lastError: string | null = null;
   private clearAuthState: (() => Promise<void>) | null = null;
   private isInitializing: boolean = false;
+  private lidCache: Map<string, string> = new Map();
 
   constructor() {
     super();
@@ -551,6 +552,11 @@ class WhatsAppBotEngine extends EventEmitter {
       return raw.startsWith("0") ? "62" + raw.slice(1) : raw;
     }
 
+    // 0. Fast in-memory cache check
+    if (this.lidCache.has(raw)) {
+      return this.lidCache.get(raw) || null;
+    }
+
     // 1. Check BaileysAuth table for stored LID mapping from WhatsApp handshake
     try {
       const authRecord = await prisma.baileysAuth.findUnique({
@@ -564,7 +570,9 @@ class WhatsAppBotEngine extends EventEmitter {
         if (typeof val === "string") {
           const clean = val.replace(/\D/g, "");
           if ((clean.startsWith("62") || clean.startsWith("08")) && clean.length >= 10 && clean.length <= 15) {
-            return clean.startsWith("0") ? "62" + clean.slice(1) : clean;
+            const finalNum = clean.startsWith("0") ? "62" + clean.slice(1) : clean;
+            this.lidCache.set(raw, finalNum);
+            return finalNum;
           }
         }
       }
@@ -612,13 +620,17 @@ class WhatsAppBotEngine extends EventEmitter {
               if (pPn) {
                 const cleanPn = pPn.split("@")[0].split(":")[0];
                 if (cleanPn.startsWith("62") || cleanPn.startsWith("08")) {
-                  return cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
+                  const finalNum = cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
+                  this.lidCache.set(raw, finalNum);
+                  return finalNum;
                 }
               }
               if (pId.endsWith("@s.whatsapp.net")) {
                 const cleanPn = pId.split("@")[0].split(":")[0];
                 if (cleanPn.startsWith("62") || cleanPn.startsWith("08")) {
-                  return cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
+                  const finalNum = cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
+                  this.lidCache.set(raw, finalNum);
+                  return finalNum;
                 }
               }
             }
@@ -637,7 +649,9 @@ class WhatsAppBotEngine extends EventEmitter {
           if (item && item.jid) {
             const cleanJid = item.jid.split("@")[0].split(":")[0];
             if (cleanJid.startsWith("62") || cleanJid.startsWith("08")) {
-              return cleanJid.startsWith("0") ? "62" + cleanJid.slice(1) : cleanJid;
+              const finalNum = cleanJid.startsWith("0") ? "62" + cleanJid.slice(1) : cleanJid;
+              this.lidCache.set(raw, finalNum);
+              return finalNum;
             }
           }
         }

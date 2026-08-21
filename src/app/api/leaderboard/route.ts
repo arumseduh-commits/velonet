@@ -3,10 +3,17 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const cache: Record<string, { data: any; time: number }> = {};
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get("type") || "global";
+
+    const now = Date.now();
+    if (cache[type] && now - cache[type].time < 20000) {
+      return NextResponse.json(cache[type].data);
+    }
 
     if (type === "global") {
       const topStudents = await prisma.user.findMany({
@@ -42,6 +49,7 @@ export async function GET(req: NextRequest) {
         level: s.gamification?.level || 1,
       }));
 
+      cache[type] = { data: leaderboard, time: now };
       return NextResponse.json(leaderboard);
     } else if (type === "monthly") {
       // Mock monthly logic
@@ -75,6 +83,7 @@ export async function GET(req: NextRequest) {
         }))
         .sort((a, b) => b.xp - a.xp);
 
+      cache[type] = { data: leaderboard, time: now };
       return NextResponse.json(leaderboard);
     }
 
