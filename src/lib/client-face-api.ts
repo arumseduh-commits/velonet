@@ -101,8 +101,9 @@ export function transformVideoBoxToScreen(
   box: { x: number; y: number; width: number; height: number },
   facingMode: "user" | "environment" = "user"
 ): { x: number; y: number; width: number; height: number; centerX: number; centerY: number } {
-  const cw = video.clientWidth || window.innerWidth;
-  const ch = video.clientHeight || window.innerHeight;
+  const vRect = video.getBoundingClientRect();
+  const cw = vRect.width || video.clientWidth || window.innerWidth;
+  const ch = vRect.height || video.clientHeight || window.innerHeight;
   const vw = video.videoWidth || 640;
   const vh = video.videoHeight || 480;
 
@@ -115,11 +116,11 @@ export function transformVideoBoxToScreen(
   let screenX: number;
   if (facingMode === "user") {
     // Mirrored horizontally
-    screenX = offsetX + (vw - (box.x + box.width)) * scale;
+    screenX = vRect.left + offsetX + (vw - (box.x + box.width)) * scale;
   } else {
-    screenX = offsetX + box.x * scale;
+    screenX = vRect.left + offsetX + box.x * scale;
   }
-  const screenY = offsetY + box.y * scale;
+  const screenY = vRect.top + offsetY + box.y * scale;
   const screenW = box.width * scale;
   const screenH = box.height * scale;
 
@@ -224,8 +225,8 @@ export function validateFaceInGuide(
     }
   }
 
-  // 1. Outside Oval Guide (normalizedDistance > 0.65 means center is outside the guide)
-  if (normalizedDistance > 0.65) {
+  // 1. Outside Oval Guide (normalizedDistance > 0.85 means center is clearly outside the oval guide)
+  if (normalizedDistance > 0.85) {
     return {
       isValid: false,
       code: "OUTSIDE_CIRCLE",
@@ -238,7 +239,7 @@ export function validateFaceInGuide(
   }
 
   // 2. Too far away
-  if (widthRatio < 0.35 || faceCoverage < 0.16) {
+  if (widthRatio < 0.28 || faceCoverage < 0.12) {
     return {
       isValid: false,
       code: "TOO_FAR",
@@ -251,7 +252,7 @@ export function validateFaceInGuide(
   }
 
   // 3. Too close / overflowing
-  if (widthRatio > 1.25 || faceCoverage > 1.25) {
+  if (widthRatio > 1.35 || faceCoverage > 1.35) {
     return {
       isValid: false,
       code: "TOO_CLOSE",

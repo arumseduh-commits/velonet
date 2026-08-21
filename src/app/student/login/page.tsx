@@ -12,6 +12,11 @@ import {
   Sparkles,
   SwitchCamera,
   ScanFace,
+  X,
+  Camera,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import {
@@ -26,13 +31,15 @@ function StudentLoginContent() {
   const searchParams = useSearchParams();
   const { toast } = useDialog();
 
-  // State untuk Tab: "FACE_ID" | "WA" | "PASSWORD"
-  const [loginMethod, setLoginMethod] = useState<"FACE_ID" | "WA" | "PASSWORD">("FACE_ID");
+  // State untuk Tab Login: Default adalah "WA"
+  const [loginMethod, setLoginMethod] = useState<"WA" | "FACE_ID" | "PASSWORD">("WA");
 
-  // State Face ID
+  // State Face ID Full Screen Modal
+  const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const guideRef = useRef<HTMLDivElement | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [modelsReady, setModelsReady] = useState(false);
   const [liveValidation, setLiveValidation] = useState<FaceValidationResult | null>(null);
@@ -74,9 +81,16 @@ function StudentLoginContent() {
     }
   };
 
-  // 2. Camera Controls for Face ID
+  useEffect(() => {
+    if (loginMethod === "WA") {
+      initWaPayload();
+    }
+  }, [loginMethod]);
+
+  // 2. Camera Controls for Face ID Full Screen Modal
   const startCamera = useCallback(async (mode: "user" | "environment" = facingMode) => {
     try {
+      setCameraLoading(true);
       await loadFaceApiModels();
       setModelsReady(true);
 
@@ -104,6 +118,8 @@ function StudentLoginContent() {
       console.error("Camera access error:", err);
       toast.error("Gagal mengakses kamera. Pastikan izin kamera aktif pada browser Anda.");
       setCameraActive(false);
+    } finally {
+      setCameraLoading(false);
     }
   }, [facingMode, toast]);
 
@@ -122,57 +138,62 @@ function StudentLoginContent() {
     startCamera(nextMode);
   };
 
-  // Switch tabs & lifecycle
+  // Open & Close Fullscreen Face ID Scanner
+  const handleOpenFaceModal = () => {
+    setIsFaceModalOpen(true);
+    startCamera("user");
+  };
+
+  const handleCloseFaceModal = () => {
+    stopCamera();
+    setIsFaceModalOpen(false);
+    setIsLoggingInFace(false);
+  };
+
+  // Clean up camera when unmounting or closing modal
   useEffect(() => {
-    if (loginMethod === "FACE_ID") {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-
-    if (loginMethod === "WA") {
-      initWaPayload();
-    }
-
     return () => {
       stopCamera();
     };
-  }, [loginMethod]);
+  }, [stopCamera]);
 
-  // 3. Live Face Tracking Loop for Face ID
+  // 3. Live Face Tracking Loop in Full Screen Modal
   useEffect(() => {
-    if (loginMethod !== "FACE_ID" || !cameraActive || !modelsReady) return;
+    if (!isFaceModalOpen || !cameraActive || !modelsReady) return;
 
     let isMounted = true;
-    const interval = setInterval(async () => {
-      if (isLoggingInFace || !videoRef.current || videoRef.current.paused) return;
+    let isBusy = false;
 
+    const interval = setInterval(async () => {
+      if (isBusy || isLoggingInFace || !videoRef.current || videoRef.current.paused || videoRef.current.videoWidth === 0) return;
+      isBusy = true;
       try {
         const detection = await detectFaceWithDescriptor(videoRef.current);
-        if (!detection || !isMounted) {
-          setLiveValidation(null);
-          return;
-        }
+        if (!isMounted) return;
 
-        const valResult = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
-        if (isMounted) {
+        if (!detection) {
+          setLiveValidation(null);
+        } else {
+          const valResult = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
           setLiveValidation(valResult);
         }
       } catch (err) {
         // continue loop
+      } finally {
+        isBusy = false;
       }
-    }, 400);
+    }, 300);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [loginMethod, cameraActive, modelsReady, isLoggingInFace, facingMode]);
+  }, [isFaceModalOpen, cameraActive, modelsReady, isLoggingInFace, facingMode]);
 
   // 4. Perform Face ID Login
   const handleFaceLogin = async () => {
     if (!videoRef.current || videoRef.current.paused) {
-      toast.warning("Kamera belum aktif. Silakan aktifkan kamera terlebih dahulu.");
+      toast.warning("Kamera belum aktif. Silakan tunggu sebentar.");
       return;
     }
 
@@ -209,6 +230,7 @@ function StudentLoginContent() {
 
       if (json.success) {
         stopCamera();
+        setIsFaceModalOpen(false);
         toast.success(`Selamat datang, ${json.student?.name || "Siswa"}! Mengalihkan ke dashboard... 🎉`);
         setTimeout(() => {
           router.replace(json.redirectUrl || "/student");
@@ -298,29 +320,29 @@ function StudentLoginContent() {
   const isGuideValid = liveValidation?.isValid || false;
   const guideCode = liveValidation?.code;
 
-  let guideBorderColor = "border-blue-500/60 shadow-[0_0_30px_rgba(59,130,246,0.25)]";
-  let guideBadgeColor = "bg-slate-900/80 border-slate-700 text-slate-300";
+  let guideBorderColor = "border-blue-400/80 shadow-[0_0_35px_rgba(59,130,246,0.35)]";
+  let guideBadgeColor = "bg-slate-900/90 border-slate-700 text-slate-300";
   let guideBadgeText = "Arahkan wajah ke dalam lingkaran";
 
   if (isGuideValid) {
-    guideBorderColor = "border-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.45)] ring-4 ring-emerald-500/30";
-    guideBadgeColor = "bg-emerald-950/80 border-emerald-500/50 text-emerald-300";
+    guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.6)] ring-4 ring-emerald-500/40";
+    guideBadgeColor = "bg-emerald-950/90 border-emerald-500/60 text-emerald-300";
     guideBadgeText = "Wajah Pas di Lingkaran • Siap Masuk ✅";
   } else if (guideCode === "OUTSIDE_CIRCLE") {
-    guideBorderColor = "border-rose-500 shadow-[0_0_40px_rgba(244,63,94,0.45)] ring-4 ring-rose-500/30";
-    guideBadgeColor = "bg-rose-950/80 border-rose-500/50 text-rose-300";
+    guideBorderColor = "border-rose-500 shadow-[0_0_45px_rgba(244,63,94,0.55)] ring-4 ring-rose-500/30";
+    guideBadgeColor = "bg-rose-950/90 border-rose-500/60 text-rose-300";
     guideBadgeText = "Wajah di luar lingkaran! Geser ke tengah ⚠️";
   } else if (guideCode === "TOO_FAR") {
-    guideBorderColor = "border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.35)]";
-    guideBadgeColor = "bg-amber-950/80 border-amber-500/50 text-amber-300";
-    guideBadgeText = "Mendekatlah sedikit ke kamera ⚠️";
+    guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.45)]";
+    guideBadgeColor = "bg-amber-950/90 border-amber-500/60 text-amber-300";
+    guideBadgeText = "Mendekatlah sedikit ke layar ⚠️";
   } else if (guideCode === "TOO_CLOSE") {
-    guideBorderColor = "border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.35)]";
-    guideBadgeColor = "bg-amber-950/80 border-amber-500/50 text-amber-300";
+    guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.45)]";
+    guideBadgeColor = "bg-amber-950/90 border-amber-500/60 text-amber-300";
     guideBadgeText = "Terlalu dekat! Mundurlah sedikit ⚠️";
   } else if (guideCode === "TILTED") {
-    guideBorderColor = "border-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.35)]";
-    guideBadgeColor = "bg-amber-950/80 border-amber-500/50 text-amber-300";
+    guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.45)]";
+    guideBadgeColor = "bg-amber-950/90 border-amber-500/60 text-amber-300";
     guideBadgeText = "Tegakkan posisi kepala Anda ⚠️";
   }
 
@@ -341,21 +363,8 @@ function StudentLoginContent() {
           <p className="text-xs text-slate-400">Pilih metode masuk ke akun VeloNet Anda</p>
         </div>
 
-        {/* 3-Tab Toggle: FACE_ID | WA | PASSWORD */}
+        {/* 3-Tab Toggle: WA (Default) | FACE_ID | PASSWORD */}
         <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950/80 rounded-2xl border border-slate-800 shadow-inner">
-          <button
-            type="button"
-            onClick={() => setLoginMethod("FACE_ID")}
-            className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              loginMethod === "FACE_ID"
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20 border border-emerald-400/30"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <ScanFace className="w-4 h-4" />
-            <span>Face ID</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setLoginMethod("WA")}
@@ -367,6 +376,19 @@ function StudentLoginContent() {
           >
             <MessageSquareCode className="w-4 h-4" />
             <span>WhatsApp</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setLoginMethod("FACE_ID")}
+            className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              loginMethod === "FACE_ID"
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20 border border-emerald-400/30"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <ScanFace className="w-4 h-4" />
+            <span>Face ID</span>
           </button>
 
           <button
@@ -383,88 +405,7 @@ function StudentLoginContent() {
           </button>
         </div>
 
-        {/* 1. TAB: FACE ID LOGIN */}
-        {loginMethod === "FACE_ID" && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            {/* Camera Viewport Container */}
-            <div className="relative aspect-4/3 w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner">
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                className={`w-full h-full object-cover transform ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
-              />
-
-              {/* Oval Face Scanning Guide Frame */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div
-                  ref={guideRef}
-                  className={`w-44 h-56 rounded-[80px] border-2 transition-all duration-300 flex items-center justify-center relative ${guideBorderColor}`}
-                >
-                  <div className="absolute inset-1.5 border border-white/20 rounded-[74px]" />
-
-                  {isLoggingInFace && (
-                    <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs rounded-[78px] flex flex-col items-center justify-center gap-2">
-                      <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
-                      <span className="text-[11px] font-bold text-white bg-slate-900/90 px-3 py-1 rounded-full border border-emerald-500/40">
-                        Memverifikasi AI...
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Top Camera Controls */}
-              <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={toggleCameraFacing}
-                  className="p-2 rounded-xl bg-slate-900/85 hover:bg-slate-800 text-white border border-slate-700/70 shadow-lg backdrop-blur-md transition-all cursor-pointer"
-                  title="Ganti Kamera"
-                >
-                  <SwitchCamera className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Bottom Live Hint Overlay */}
-              <div className="absolute bottom-2 inset-x-2 z-20 pointer-events-none flex justify-center">
-                <div className={`px-3 py-1 rounded-xl border text-[11px] font-bold shadow-lg backdrop-blur-md transition-all ${guideBadgeColor}`}>
-                  <span>{guideBadgeText}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Scan Action Button */}
-            <button
-              type="button"
-              onClick={handleFaceLogin}
-              disabled={isLoggingInFace || !cameraActive}
-              className={`w-full py-3.5 px-5 rounded-2xl text-white font-bold text-xs sm:text-sm tracking-wide shadow-xl border transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
-                isGuideValid
-                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30 border-emerald-400/40 ring-2 ring-emerald-500/30"
-                  : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"
-              }`}
-            >
-              {isLoggingInFace ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>MEMVERIFIKASI WAJAH AI...</span>
-                </>
-              ) : (
-                <>
-                  <ScanFace className="w-4 h-4" />
-                  <span>PINDAI WAJAH & MASUK SEKARANG</span>
-                </>
-              )}
-            </button>
-
-            <p className="text-[11px] text-slate-400 text-center">
-              Pastikan pencahayaan cukup dan wajah Anda sudah terdaftar di profil VeloNet.
-            </p>
-          </div>
-        )}
-
-        {/* 2. TAB: WHATSAPP LOGIN */}
+        {/* 1. TAB: WHATSAPP LOGIN (DEFAULT) */}
         {loginMethod === "WA" && (
           <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-4 shadow-lg animate-in fade-in duration-200">
             <div className="flex items-center gap-3">
@@ -516,6 +457,37 @@ function StudentLoginContent() {
           </div>
         )}
 
+        {/* 2. TAB: FACE ID LOGIN (LAUNCHER CARD) */}
+        {loginMethod === "FACE_ID" && (
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 space-y-4 shadow-lg animate-in fade-in duration-200 text-center">
+            <div className="mx-auto w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/10">
+              <ScanFace className="w-9 h-9" />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-sm font-bold text-white tracking-wide">
+                Masuk Instan dengan Face ID AI
+              </h2>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+                Pindai biometrik wajah Anda dalam mode Full Screen tanpa perlu password atau kode OTP.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenFaceModal}
+              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-xl shadow-emerald-600/30 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+              <span>BUKA KAMERA PINDAI WAJAH (FULL SCREEN)</span>
+            </button>
+
+            <p className="text-[11px] text-slate-500">
+              💡 Pastikan wajah Anda sudah pernah direkam di profil VeloNet.
+            </p>
+          </div>
+        )}
+
         {/* 3. TAB: PASSWORD LOGIN */}
         {loginMethod === "PASSWORD" && (
           <form onSubmit={handlePasswordLogin} className="space-y-4 animate-in fade-in duration-200">
@@ -558,7 +530,7 @@ function StudentLoginContent() {
               )}
             </button>
             <p className="text-center text-[11px] text-slate-500 pt-1">
-              Lupa password? Silakan gunakan opsi Face ID atau WhatsApp.
+              Lupa password? Silakan gunakan opsi WhatsApp atau Face ID.
             </p>
           </form>
         )}
@@ -591,6 +563,115 @@ function StudentLoginContent() {
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* FULL SCREEN IMMERSIVE FACE ID SCANNER MODAL                                */}
+      {/* ========================================================================= */}
+      {isFaceModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between overflow-hidden animate-in fade-in duration-200 select-none">
+          {/* Fullscreen Video Stream */}
+          <div className="absolute inset-0 z-0 bg-black flex items-center justify-center overflow-hidden">
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              className={`w-full h-full object-cover transform ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
+            />
+
+            {/* Dark Mask Vignette Outside Oval Guide */}
+            <div className="absolute inset-0 bg-radial from-transparent via-black/40 to-black/80 pointer-events-none" />
+
+            {/* Large Oval Biometric Guide Frame */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div
+                ref={guideRef}
+                className={`w-60 h-80 sm:w-72 sm:h-96 rounded-[110px] border-3 transition-all duration-300 flex items-center justify-center relative ${guideBorderColor}`}
+              >
+                {/* Inner Decorative Guides */}
+                <div className="absolute inset-2 border border-white/20 rounded-[102px]" />
+
+                {/* Animated Scanning Beam when Valid */}
+                {isGuideValid && !isLoggingInFace && (
+                  <div className="absolute inset-x-4 h-0.5 bg-gradient-to-r from-transparent via-emerald-300 to-transparent animate-pulse shadow-[0_0_15px_#10b981]" />
+                )}
+
+                {/* Loading Overlay when Submitting */}
+                {isLoggingInFace && (
+                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm rounded-[107px] flex flex-col items-center justify-center gap-3">
+                    <RefreshCw className="w-10 h-10 text-emerald-400 animate-spin" />
+                    <span className="text-xs font-bold text-white bg-slate-900/90 px-4 py-1.5 rounded-full border border-emerald-500/50 shadow-lg">
+                      Memverifikasi Biometrik AI...
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Top Floating Navigation Bar */}
+          <div className="relative z-20 flex items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+            <button
+              type="button"
+              onClick={handleCloseFaceModal}
+              className="px-3.5 py-2 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-white border border-slate-700/80 text-xs font-bold shadow-xl backdrop-blur-md transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <X className="w-4 h-4 text-rose-400" />
+              <span>Batal</span>
+            </button>
+
+            <div className="px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-emerald-500/40 text-emerald-400 text-[11px] font-bold tracking-wider uppercase flex items-center gap-1.5 backdrop-blur-md shadow-lg">
+              <ScanFace className="w-3.5 h-3.5" />
+              <span>VeloNet Face ID</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleCameraFacing}
+              className="p-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-white border border-slate-700/80 shadow-xl backdrop-blur-md transition-all cursor-pointer"
+              title="Ganti Kamera Depan / Belakang"
+            >
+              <SwitchCamera className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Bottom Floating Action Dock */}
+          <div className="relative z-20 p-4 sm:p-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent flex flex-col items-center gap-3">
+            {/* Live Guide Status Badge */}
+            <div className={`px-4 py-2 rounded-2xl border text-xs font-bold shadow-2xl backdrop-blur-md transition-all flex items-center gap-2 ${guideBadgeColor}`}>
+              {isGuideValid ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              )}
+              <span>{guideBadgeText}</span>
+            </div>
+
+            {/* Big Action Button */}
+            <button
+              type="button"
+              onClick={handleFaceLogin}
+              disabled={isLoggingInFace || !cameraActive}
+              className={`w-full max-w-sm py-4 px-6 rounded-2xl text-white font-extrabold text-sm sm:text-base tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
+                isGuideValid
+                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/40 border-emerald-400/50 ring-4 ring-emerald-500/30 scale-[1.02]"
+                  : "bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 backdrop-blur-md"
+              }`}
+            >
+              {isLoggingInFace ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <span>MEMVERIFIKASI WAJAH...</span>
+                </>
+              ) : (
+                <>
+                  <ScanFace className="w-5 h-5" />
+                  <span>PINDAI WAJAH & MASUK SEKARANG</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
