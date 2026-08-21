@@ -168,12 +168,36 @@ export async function processLocationCheckIn({
     }
   }
 
+  // 5.5 Check if already checked in
+  const existingAttendance = await prisma.attendance.findUnique({
+    where: {
+      sessionId_userId: {
+        sessionId: session.id,
+        userId: user.id,
+      },
+    },
+  });
+
   // 6. Save Attendance to Database
   const now = new Date();
   const timeStr = now.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  if (existingAttendance && existingAttendance.status === "HADIR") {
+    const originalTimeStr = existingAttendance.checkInTime
+      ? new Date(existingAttendance.checkInTime).toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : timeStr;
+
+    return {
+      success: true,
+      replyMessage: `ℹ️ *ANDA SUDAH ABSEN*\n\nHalo Kak *${user.name || "Peserta"}*!\n\nAnda sudah tercatat *HADIR* untuk sesi *"${session.title}"* pada pukul *${originalTimeStr} WIB*.\n\nTidak perlu melakukan absensi ulang. Selamat mengikuti kegiatan! 🎉`,
+    };
+  }
 
   await prisma.attendance.upsert({
     where: {

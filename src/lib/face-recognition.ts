@@ -203,6 +203,7 @@ export interface ProcessFaceAttendanceResult {
   success: boolean;
   code:
     | "SUCCESS"
+    | "ALREADY_CHECKED_IN"
     | "ACCOUNT_MISMATCH"
     | "UNKNOWN_FACE"
     | "NO_ACTIVE_SESSION"
@@ -376,13 +377,50 @@ export async function processFaceAttendance({
     };
   }
 
-  // 6. Record Attendance in Database
+  // 6. Check if participant has already checked in for this session
+  const existingAttendance = await prisma.attendance.findUnique({
+    where: {
+      sessionId_userId: {
+        sessionId: session.id,
+        userId: detectedUser.id,
+      },
+    },
+  });
+
   const now = new Date();
   const timeStr = now.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
+  if (existingAttendance && existingAttendance.status === "HADIR") {
+    const originalTimeStr = existingAttendance.checkInTime
+      ? new Date(existingAttendance.checkInTime).toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : timeStr;
+
+    return {
+      success: true,
+      code: "ALREADY_CHECKED_IN",
+      message: `ℹ️ ANDA SUDAH MELAKUKAN ABSENSI\n\nHalo Kak *${detectedName}*! Anda sudah tercatat *HADIR* untuk sesi "${session.title}" pada pukul *${originalTimeStr} WIB*.\n\nTidak perlu melakukan absensi ulang. Selamat mengikuti kegiatan! 🎉`,
+      detectedUser: {
+        id: detectedUser.id,
+        name: detectedName,
+        studentClass: detectedClass,
+        phoneNumber: detectedUser.phoneNumber,
+        facePhoto: detectedUser.facePhoto,
+      },
+      similarity,
+      distanceMeter: existingAttendance.distanceMeter ?? sessionResult.distanceMeter,
+      sessionTitle: session.title,
+      locationName: session.locationName || "Titik Kumpul",
+      checkInTime: originalTimeStr,
+    };
+  }
+
+  // 7. Record First-time Attendance in Database
   await prisma.attendance.upsert({
     where: {
       sessionId_userId: {

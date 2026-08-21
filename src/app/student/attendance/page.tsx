@@ -81,7 +81,7 @@ export default function StudentAttendancePage() {
 
   // Recognition Result Modal Popup State
   const [lastCheckInResult, setLastCheckInResult] = useState<{
-    status: "SUCCESS" | "ACCOUNT_MISMATCH" | "UNKNOWN_FACE" | "OUT_OF_RADIUS" | "LOCATION_REQUIRED" | "NO_SESSION" | "ERROR";
+    status: "SUCCESS" | "ALREADY_CHECKED_IN" | "ACCOUNT_MISMATCH" | "UNKNOWN_FACE" | "OUT_OF_RADIUS" | "LOCATION_REQUIRED" | "NO_SESSION" | "ERROR";
     message: string;
     detectedName?: string;
     detectedClass?: string;
@@ -336,6 +336,18 @@ export default function StudentAttendancePage() {
           locationName: json.locationName,
           timeStr: json.checkInTime,
         });
+      } else if (json.code === "ALREADY_CHECKED_IN") {
+        setLastCheckInResult({
+          status: "ALREADY_CHECKED_IN",
+          message: json.message || "Anda sudah melakukan absensi untuk pertemuan kali ini.",
+          detectedName: json.detectedUser?.name,
+          detectedClass: json.detectedUser?.studentClass,
+          similarity: json.similarity,
+          distanceMeter: json.distanceMeter,
+          sessionTitle: json.sessionTitle,
+          locationName: json.locationName,
+          timeStr: json.checkInTime,
+        });
       } else if (json.code === "ACCOUNT_MISMATCH") {
         setLastCheckInResult({
           status: "ACCOUNT_MISMATCH",
@@ -564,6 +576,10 @@ export default function StudentAttendancePage() {
                 <div className="w-full h-full rounded-3xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
                   <CheckCircle2 className="w-9 h-9" />
                 </div>
+              ) : lastCheckInResult.status === "ALREADY_CHECKED_IN" ? (
+                <div className="w-full h-full rounded-3xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
               ) : lastCheckInResult.status === "ACCOUNT_MISMATCH" ? (
                 <div className="w-full h-full rounded-3xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
                   <ShieldAlert className="w-9 h-9" />
@@ -588,6 +604,8 @@ export default function StudentAttendancePage() {
               <h3 className="text-lg font-bold text-white">
                 {lastCheckInResult.status === "SUCCESS"
                   ? "Absensi Berhasil Diverifikasi! 🎉"
+                  : lastCheckInResult.status === "ALREADY_CHECKED_IN"
+                  ? "Anda Sudah Absen Sebelumnya! ℹ️"
                   : lastCheckInResult.status === "ACCOUNT_MISMATCH"
                   ? "Wajah Akun Tidak Cocok! ⚠️"
                   : lastCheckInResult.status === "LOCATION_REQUIRED"
@@ -649,10 +667,10 @@ export default function StudentAttendancePage() {
                 onClick={() => setLastCheckInResult(null)}
                 className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer"
               >
-                {lastCheckInResult.status === "SUCCESS" ? "Tutup" : "Coba Lagi"}
+                {lastCheckInResult.status === "SUCCESS" || lastCheckInResult.status === "ALREADY_CHECKED_IN" ? "Tutup" : "Coba Lagi"}
               </button>
 
-              {lastCheckInResult.status === "SUCCESS" && (
+              {(lastCheckInResult.status === "SUCCESS" || lastCheckInResult.status === "ALREADY_CHECKED_IN") && (
                 <Link
                   href="/student"
                   onClick={stopCamera}
