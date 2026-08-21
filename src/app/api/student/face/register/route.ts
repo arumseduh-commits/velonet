@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLoggedInStudent } from "@/lib/student-auth";
 import { prisma } from "@/lib/prisma";
+import { findBestFaceMatch } from "@/lib/face-recognition";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,40 @@ export async function POST(req: Request) {
       );
     }
 
+    // 1. Biometric Uniqueness Check: Ensure this face is NOT already registered by another account
+    const existingUsersWithFace = await prisma.user.findMany({
+      where: {
+        id: { not: student.id },
+        faceDescriptor: { not: null },
+        isExcluded: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        phoneNumber: true,
+        studentClass: true,
+        gender: true,
+        faceDescriptor: true,
+        facePhoto: true,
+      },
+    });
+
+    if (existingUsersWithFace.length > 0) {
+      const matchResult = findBestFaceMatch(faceDescriptor, existingUsersWithFace, 0.45);
+      if (matchResult.isMatch && matchResult.matchedUser) {
+        const ownerName = matchResult.matchedUser.name || "Peserta Lain";
+        const ownerClass = matchResult.matchedUser.studentClass || "-";
+        return NextResponse.json(
+          {
+            success: false,
+            error: `❌ Perekaman Wajah Ditolak: Wajah ini sudah terdaftar pada akun "${ownerName}" (${ownerClass}) dengan tingkat kecocokan biometrik ${matchResult.similarity}%. Satu wajah hanya dapat digunakan untuk 1 akun resmi Velocity.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // 2. Save face descriptor to current student account
     const updatedUser = await prisma.user.update({
       where: { id: student.id },
       data: {
