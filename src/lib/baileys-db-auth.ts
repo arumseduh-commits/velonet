@@ -106,31 +106,6 @@ export const usePrismaAuthState = async (
     }
   };
 
-  const backupToSystemSetting = async () => {
-    try {
-      const allRecords = await prisma.baileysAuth.findMany();
-      if (allRecords.length > 0) {
-        const backupMap: Record<string, string> = {};
-        for (const r of allRecords) {
-          backupMap[r.key] = r.value;
-        }
-        await prisma.systemSetting.upsert({
-          where: { key: "baileys_auth_backup" },
-          create: { key: "baileys_auth_backup", value: JSON.stringify(backupMap) },
-          update: { value: JSON.stringify(backupMap) },
-        }).catch(() => {});
-      }
-    } catch (e) {}
-  };
-
-  let backupTimer: NodeJS.Timeout | null = null;
-  const scheduleBackup = () => {
-    if (backupTimer) clearTimeout(backupTimer);
-    backupTimer = setTimeout(async () => {
-      await backupToSystemSetting();
-    }, 2000);
-  };
-
   const creds: AuthenticationCreds = readData("creds") || initAuthCreds();
 
   return {
@@ -164,16 +139,13 @@ export const usePrismaAuthState = async (
             }
           }
           await Promise.all(tasks);
-          scheduleBackup();
         },
       },
     },
     saveCreds: async () => {
       await writeData("creds", creds);
-      scheduleBackup();
     },
     clearState: async () => {
-      if (backupTimer) clearTimeout(backupTimer);
       cache.clear();
       await prisma.baileysAuth.deleteMany({}).catch(() => {});
       await prisma.systemSetting.deleteMany({
