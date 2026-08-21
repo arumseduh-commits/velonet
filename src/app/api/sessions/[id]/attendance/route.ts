@@ -8,11 +8,12 @@ export async function POST(
   try {
     const { id: sessionId } = await params;
     const body = await req.json();
-    const { participantId, status, notes } = body;
+    const { participantId, userId: incomingUserId, status, notes } = body;
+    const targetUserId = incomingUserId || participantId;
 
-    if (!participantId || !status) {
+    if (!targetUserId || !status) {
       return NextResponse.json(
-        { error: "participantId dan status wajib diisi" },
+        { error: "participantId/userId dan status wajib diisi" },
         { status: 400 }
       );
     }
@@ -21,7 +22,7 @@ export async function POST(
       await prisma.attendance.deleteMany({
         where: {
           sessionId,
-          participantId,
+          userId: targetUserId,
         },
       });
       return NextResponse.json({ success: true });
@@ -29,14 +30,14 @@ export async function POST(
 
     const attendance = await prisma.attendance.upsert({
       where: {
-        sessionId_participantId: {
+        sessionId_userId: {
           sessionId,
-          participantId,
+          userId: targetUserId,
         },
       },
       create: {
         sessionId,
-        participantId,
+        userId: targetUserId,
         status,
         method: "MANUAL_ADMIN",
         notes: notes || "Diubah manual oleh Admin Dashboard",
