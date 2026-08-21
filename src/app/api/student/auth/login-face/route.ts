@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         gender: true,
         faceDescriptor: true,
         facePhoto: true,
-        isCompleted: true,
+        status: true,
       },
     });
 
@@ -73,7 +73,10 @@ export async function POST(req: NextRequest) {
     await createStudentSession(matchedUser.id, userAgent, ipAddress);
 
     // Determine redirect destination
-    const redirectUrl = matchedUser.isCompleted ? "/student" : "/student/complete-profile";
+    const isCompleted =
+      matchedUser.status === "COMPLETED" ||
+      Boolean(matchedUser.name && matchedUser.name !== "Siswa Baru" && matchedUser.studentClass);
+    const redirectUrl = isCompleted ? "/student" : "/student/complete-profile";
 
     return NextResponse.json({
       success: true,
