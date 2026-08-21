@@ -35,6 +35,9 @@ class WhatsAppBotEngine extends EventEmitter {
   private clearAuthState: (() => Promise<void>) | null = null;
   private isInitializing: boolean = false;
   private lidCache: Map<string, string> = new Map();
+  private processedMsgIds: Set<string> = new Set();
+  private groupMembersCache: Map<string, { members: Set<string>; expiresAt: number }> = new Map();
+  private lastReplyTimestamps: Map<string, number> = new Map();
 
   constructor() {
     super();
@@ -182,8 +185,19 @@ class WhatsAppBotEngine extends EventEmitter {
         for (const msg of m.messages) {
           if (!msg.message) continue;
 
+          // 1. Message Deduplication: ignore if message ID already processed
+          const msgId = msg.key?.id;
+          if (msgId) {
+            if (this.processedMsgIds.has(msgId)) continue;
+            this.processedMsgIds.add(msgId);
+            if (this.processedMsgIds.size > 2000) {
+              const first = this.processedMsgIds.values().next().value;
+              if (first) this.processedMsgIds.delete(first);
+            }
+          }
+
           const remoteJid = msg.key.remoteJid;
-          if (!remoteJid) continue;
+          if (!remoteJid || remoteJid === "status@broadcast" || msg.key.fromMe) continue;
 
           const locMsg = msg.message.locationMessage || msg.message.liveLocationMessage;
           const conversationText =
@@ -219,9 +233,6 @@ class WhatsAppBotEngine extends EventEmitter {
               continue;
             }
 
-            // Skip messages sent by bot itself in group
-            if (msg.key.fromMe) continue;
-
             const groupSenderJid = (msg as any).participant || (msg.key as any).participant;
             const pushName = msg.pushName || undefined;
 
@@ -234,21 +245,7 @@ class WhatsAppBotEngine extends EventEmitter {
               if (groupSenderJid.endsWith("@s.whatsapp.net")) {
                 realPhoneNum = groupSenderJid.split("@")[0].split(":")[0];
               } else if (groupSenderJid.endsWith("@lid")) {
-                // Try resolving @lid to real phone number
-                try {
-                  const res = await sock.onWhatsApp(groupSenderJid);
-                  if (res && Array.isArray(res)) {
-                    for (const item of res) {
-                      if (item && item.jid) {
-                        const raw = item.jid.split("@")[0].split(":")[0];
-                        if (raw.startsWith("62")) {
-                          realPhoneNum = raw;
-                          break;
-                        }
-                      }
-                    }
-                  }
-                } catch (e) {}
+                realPhoneNum = (await this.resolveLidToRealPhone(groupSenderJid)) || undefined;
               }
 
               const result = await processIncomingMessage(
@@ -262,13 +259,9 @@ class WhatsAppBotEngine extends EventEmitter {
                   try {
                     const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
                     if (!setting || !setting.value) return true;
-                    
-                    const groupData = await this.fetchGroupMembersWithStatus(setting.value);
-                    const cleanPhone = phone.startsWith("0") ? "62" + phone.slice(1) : phone;
-                    return groupData.members.some(m => m.phoneNumber === cleanPhone || m.jid?.startsWith(cleanPhone));
+                    return await this.isPhoneInGroup(setting.value, phone);
                   } catch (e) {
-                    console.error("[CheckGroup] Failed to fetch group metadata:", e);
-                    return false;
+                    return true;
                   }
                 }
               );
@@ -282,23 +275,18 @@ class WhatsAppBotEngine extends EventEmitter {
                   mentions: [groupSenderJid],
                 });
 
-                // 2. Send data collection prompts (Nama, Kelas, Motivasi, Hobi) PRIVATELY via 1-on-1 DM
+                // 2. Send data collection prompts PRIVATELY via 1-on-1 DM
                 const privateTarget = realPhoneNum 
                   ? `${realPhoneNum}@s.whatsapp.net` 
                   : (groupSenderJid.endsWith('@s.whatsapp.net') ? groupSenderJid : null);
 
                 if (privateTarget) {
                   await this.sendToJid(privateTarget, result.replyMessage);
-                } else {
-                  this.emit('log', `⚠️ Cannot send private DM to group member [${groupSenderJid}] - no phone number resolved.`);
                 }
               }
             }
             continue;
           }
-
-          // Skip self-sent 1-on-1 DMs
-          if (msg.key.fromMe) continue;
 
           // Process DM message for registered participants
           const pushName = msg.pushName || undefined;
@@ -323,49 +311,18 @@ class WhatsAppBotEngine extends EventEmitter {
             }
           }
 
-          // 3. Jika belum ketemu dan LID, selesaikan via resolveLidToRealPhone
+          // 3. Jika belum ketemu dan LID, selesaikan via resolveLidToRealPhone (Fast 0ms cache)
           if (!realPhoneNum) {
             realPhoneNum = (await this.resolveLidToRealPhone(remoteJid)) || undefined;
           }
 
-          // 3. Auto-healing user database secara realtime jika nomor sebelumnya tersimpan sebagai LID
-          if (realPhoneNum && remoteJid.endsWith("@lid")) {
-            try {
-              const cleanLid = remoteJid.split("@")[0].split(":")[0];
-              const lidUser = await prisma.user.findFirst({
-                where: { phoneNumber: cleanLid },
-              });
-
-              if (lidUser && lidUser.phoneNumber !== realPhoneNum) {
-                const existingReal = await prisma.user.findUnique({
-                  where: { phoneNumber: realPhoneNum },
-                });
-
-                if (existingReal && existingReal.id !== lidUser.id) {
-                  await prisma.user.update({
-                    where: { id: existingReal.id },
-                    data: {
-                      name: lidUser.name || existingReal.name,
-                      studentClass: lidUser.studentClass || existingReal.studentClass,
-                      motivation: lidUser.motivation || existingReal.motivation,
-                      hobby: lidUser.hobby || existingReal.hobby,
-                      status: lidUser.status !== "NOT_STARTED" ? lidUser.status : existingReal.status,
-                      faceDescriptor: lidUser.faceDescriptor || existingReal.faceDescriptor,
-                      facePhoto: lidUser.facePhoto || existingReal.facePhoto,
-                    },
-                  });
-                  await prisma.user.delete({ where: { id: lidUser.id } }).catch(() => {});
-                } else {
-                  await prisma.user.update({
-                    where: { id: lidUser.id },
-                    data: { phoneNumber: realPhoneNum },
-                  }).catch(() => {});
-                }
-              }
-            } catch (e) {
-              console.error("[BotEngine] Error auto-healing LID user in DB:", e);
-            }
+          // Anti-Burst & Debounce: Prevent rapid duplicate triggers from same user within 800ms
+          const now = Date.now();
+          const lastProcessed = this.lastReplyTimestamps.get(remoteJid) || 0;
+          if (now - lastProcessed < 800) {
+            continue;
           }
+          this.lastReplyTimestamps.set(remoteJid, now);
 
           let locationData: import("./bot-state-machine").LocationPayload | undefined = undefined;
           if (
@@ -405,14 +362,10 @@ class WhatsAppBotEngine extends EventEmitter {
               async (phone: string) => {
                 try {
                   const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
-                  if (!setting || !setting.value) return true; // If no group set, assume true
-                  
-                  const groupData = await this.fetchGroupMembersWithStatus(setting.value);
-                  const cleanPhone = phone.startsWith("0") ? "62" + phone.slice(1) : phone;
-                  return groupData.members.some(m => m.phoneNumber === cleanPhone || m.jid?.startsWith(cleanPhone));
+                  if (!setting || !setting.value) return true;
+                  return await this.isPhoneInGroup(setting.value, phone);
                 } catch (e) {
-                  console.error("[CheckGroup] Failed to fetch group metadata:", e);
-                  return false;
+                  return true;
                 }
               }
             );
@@ -541,6 +494,55 @@ class WhatsAppBotEngine extends EventEmitter {
   }
 
   /**
+   * Fast in-memory cached group member lookup (0ms)
+   */
+  public async isPhoneInGroup(groupIdInput: string, phoneNumber: string): Promise<boolean> {
+    if (!this.socket || this.connectionState !== "CONNECTED") return true;
+
+    let cleanGroupId = groupIdInput.trim();
+    if (!cleanGroupId.includes("@g.us")) {
+      cleanGroupId = `${cleanGroupId.replace(/\D/g, "")}@g.us`;
+    }
+
+    const cleanTargetPhone = phoneNumber.replace(/\D/g, "");
+    const formattedNum = cleanTargetPhone.startsWith("0") ? "62" + cleanTargetPhone.slice(1) : cleanTargetPhone;
+
+    // Check cache first (3-minute TTL)
+    const now = Date.now();
+    const cached = this.groupMembersCache.get(cleanGroupId);
+    if (cached && cached.expiresAt > now) {
+      return cached.members.has(formattedNum) || cached.members.has(cleanTargetPhone);
+    }
+
+    // Populate cache
+    try {
+      const metadata = await this.socket.groupMetadata(cleanGroupId).catch(() => null);
+      if (metadata && metadata.participants) {
+        const memberSet = new Set<string>();
+        for (const p of metadata.participants) {
+          const pDigits = p.id.split("@")[0].split(":")[0];
+          memberSet.add(pDigits);
+          if (pDigits.startsWith("0")) memberSet.add("62" + pDigits.slice(1));
+          if ((p as any).pn) {
+            const pnDigits = (p as any).pn.split("@")[0].split(":")[0];
+            memberSet.add(pnDigits);
+            if (pDigits) this.lidCache.set(pDigits, pnDigits);
+          }
+        }
+        this.groupMembersCache.set(cleanGroupId, {
+          members: memberSet,
+          expiresAt: now + 3 * 60 * 1000,
+        });
+        return memberSet.has(formattedNum) || memberSet.has(cleanTargetPhone);
+      }
+    } catch (e) {
+      console.warn("[BotEngine] Could not fetch group metadata for isPhoneInGroup:", e);
+    }
+
+    return true; // Fallback to allow message if group check encounters an error
+  }
+
+  /**
    * Resolves an LID or unknown JID to a real Indonesian mobile number (628xxx)
    */
   public async resolveLidToRealPhone(jidOrLid: string): Promise<string | null> {
@@ -552,7 +554,7 @@ class WhatsAppBotEngine extends EventEmitter {
       return raw.startsWith("0") ? "62" + raw.slice(1) : raw;
     }
 
-    // 0. Fast in-memory cache check
+    // 0. Fast in-memory cache check (0ms)
     if (this.lidCache.has(raw)) {
       return this.lidCache.get(raw) || null;
     }
@@ -588,7 +590,9 @@ class WhatsAppBotEngine extends EventEmitter {
         if (typeof val === "string") {
           const clean = val.replace(/\D/g, "");
           if ((clean.startsWith("62") || clean.startsWith("08")) && clean.length >= 10 && clean.length <= 15) {
-            return clean.startsWith("0") ? "62" + clean.slice(1) : clean;
+            const finalNum = clean.startsWith("0") ? "62" + clean.slice(1) : clean;
+            this.lidCache.set(raw, finalNum);
+            return finalNum;
           }
         }
       }
@@ -596,68 +600,12 @@ class WhatsAppBotEngine extends EventEmitter {
       console.error("[BotEngine] Error checking BaileysAuth for LID mapping:", e);
     }
 
-    if (!this.socket || this.connectionState !== "CONNECTED") {
-      return null;
-    }
-
-    try {
-      // 2. Try resolving via Primary Group Metadata participants
-      const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
-      if (setting && setting.value) {
-        let cleanGroupId = setting.value.trim();
-        if (!cleanGroupId.includes("@g.us")) {
-          cleanGroupId = `${cleanGroupId.replace(/\D/g, "")}@g.us`;
-        }
-
-        const metadata = await this.socket.groupMetadata(cleanGroupId).catch(() => null);
-        if (metadata && metadata.participants) {
-          for (const p of metadata.participants) {
-            const pId = p.id || "";
-            const pLid = (p as any).lid || "";
-            const pPn = (p as any).pn || (p as any).phoneNumber || "";
-
-            if (pId.includes(raw) || pLid.includes(raw) || pPn.includes(raw)) {
-              if (pPn) {
-                const cleanPn = pPn.split("@")[0].split(":")[0];
-                if (cleanPn.startsWith("62") || cleanPn.startsWith("08")) {
-                  const finalNum = cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
-                  this.lidCache.set(raw, finalNum);
-                  return finalNum;
-                }
-              }
-              if (pId.endsWith("@s.whatsapp.net")) {
-                const cleanPn = pId.split("@")[0].split(":")[0];
-                if (cleanPn.startsWith("62") || cleanPn.startsWith("08")) {
-                  const finalNum = cleanPn.startsWith("0") ? "62" + cleanPn.slice(1) : cleanPn;
-                  this.lidCache.set(raw, finalNum);
-                  return finalNum;
-                }
-              }
-            }
-          }
-        }
+    // 2. Check cached group members
+    for (const cached of this.groupMembersCache.values()) {
+      if (cached.members.has(raw)) {
+        this.lidCache.set(raw, raw);
+        return raw;
       }
-
-      // 2. Try onWhatsApp direct lookup
-      const onWaJid = jidOrLid.includes("@") ? jidOrLid : `${raw}@lid`;
-      const onWaPromise = this.socket.onWhatsApp(onWaJid);
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
-      const res = await Promise.race([onWaPromise, timeoutPromise]);
-
-      if (res && Array.isArray(res)) {
-        for (const item of res) {
-          if (item && item.jid) {
-            const cleanJid = item.jid.split("@")[0].split(":")[0];
-            if (cleanJid.startsWith("62") || cleanJid.startsWith("08")) {
-              const finalNum = cleanJid.startsWith("0") ? "62" + cleanJid.slice(1) : cleanJid;
-              this.lidCache.set(raw, finalNum);
-              return finalNum;
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error("[BotEngine] resolveLidToRealPhone error:", err);
     }
 
     return null;
