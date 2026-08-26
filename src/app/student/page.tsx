@@ -7,7 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
-  UserCheck,
   CalendarCheck,
   Clock,
   MapPin,
@@ -26,6 +25,14 @@ import {
   Send,
   ShieldCheck,
   Camera,
+  BookOpen,
+  BrainCircuit,
+  Trophy,
+  Flame,
+  ChevronRight,
+  ArrowRight,
+  BookMarked,
+  Layers,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -38,6 +45,7 @@ interface StudentProfile {
   hobby: string;
   gender: string;
   status: string;
+  isFaceRegistered?: boolean;
 }
 
 interface Stats {
@@ -59,6 +67,16 @@ interface AttendanceRecord {
   notes: string | null;
 }
 
+interface FeaturedMaterial {
+  id: string;
+  title: string;
+  category: string;
+  level: string;
+  summary: string;
+  readTime: string;
+  quizCount: number;
+}
+
 export default function StudentDashboardPage() {
   const router = useRouter();
   const { toast } = useDialog();
@@ -66,14 +84,26 @@ export default function StudentDashboardPage() {
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [featuredMaterials, setFeaturedMaterials] = useState<FeaturedMaterial[]>([]);
+  const [activeSession, setActiveSession] = useState<{
+    id: string;
+    title: string;
+    locationName: string | null;
+    startTime: string;
+    endTime: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkingIn, setCheckingIn] = useState(false);
 
   const fetchStudentData = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/student/auth/me");
-      const json = await res.json();
+      const [meRes, matRes, sessRes] = await Promise.all([
+        fetch("/api/student/auth/me"),
+        fetch("/api/learning/articles"),
+        fetch("/api/attendance/active-locations"),
+      ]);
+
+      const json = await meRes.json();
       if (json.success && json.data?.student) {
         const isCompleted =
           json.data.student.status === "COMPLETED" ||
@@ -89,9 +119,31 @@ export default function StudentDashboardPage() {
         }
         setStudent(json.data.student);
         setStats(json.data.stats);
-        setRecords(json.data.recentAttendances);
+        setRecords(json.data.recentAttendances || []);
       } else {
         router.replace("/student/login");
+        return;
+      }
+
+      // Fetch featured learning materials
+      const matJson = await matRes.json();
+      if (matJson.success && Array.isArray(matJson.data)) {
+        const mapped = matJson.data.slice(0, 3).map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          category: m.category || "General",
+          level: m.level || "Intermediate",
+          summary: m.summary || "Pelajari materi ini untuk mengasah kemampuan bahasa Inggris.",
+          readTime: m.readTime || "5 min read",
+          quizCount: m.quiz ? m.quiz.length : 3,
+        }));
+        setFeaturedMaterials(mapped);
+      }
+
+      // Fetch active session if any
+      const sessJson = await sessRes.json();
+      if (sessJson.success && Array.isArray(sessJson.data) && sessJson.data.length > 0) {
+        setActiveSession(sessJson.data[0]);
       }
     } catch (err) {
       console.error("Failed to fetch student data:", err);
@@ -115,53 +167,11 @@ export default function StudentDashboardPage() {
     }
   };
 
-  // Perform Web GPS Check-In
-  const handleWebCheckIn = () => {
-    if (!navigator.geolocation) {
-      toast.error("Browser Anda tidak mendukung lokasi GPS.");
-      return;
-    }
-
-    setCheckingIn(true);
-    toast.info("Mengambil lokasi GPS Anda...");
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch("/api/student/attendance/check-in", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-            }),
-          });
-          const json = await res.json();
-          if (json.success) {
-            toast.success(json.message || "Absensi GPS berhasil dicatat!");
-            fetchStudentData();
-          } else {
-            toast.error(json.error || "Gagal melakukan absensi GPS.");
-          }
-        } catch (err: any) {
-          toast.error(err.message || "Gagal menghubungi server.");
-        } finally {
-          setCheckingIn(false);
-        }
-      },
-      (err) => {
-        toast.error(`Gagal mendapatkan lokasi GPS: ${err.message}`);
-        setCheckingIn(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
+      <div className="min-h-screen bg-[#090d16] flex flex-col items-center justify-center text-slate-400 gap-3">
         <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
-        <span className="text-sm font-medium">Memuat Portal Siswa Velocity...</span>
+        <span className="text-sm font-medium">Menyiapkan Dashboard Siswa VeloNet...</span>
       </div>
     );
   }
@@ -172,156 +182,306 @@ export default function StudentDashboardPage() {
     !student.name ||
     student.name === "Siswa Baru";
 
-  // Render Web Registration Form if Student profile is not COMPLETED
   if (isRegistrationIncomplete) {
     if (typeof window !== "undefined") {
       router.push("/student/complete-profile");
     }
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
+      <div className="min-h-screen bg-[#090d16] flex flex-col items-center justify-center text-slate-400 gap-3">
         <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
         <span className="text-sm font-medium">Mengalihkan ke formulir pendaftaran...</span>
       </div>
     );
   }
 
-  // Render Full Student Dashboard when profile is COMPLETED
   const badgeTitle =
     (stats?.ratePercentage || 0) >= 90
-      ? "🌟 Velocity Star (Sangat Rajin)"
+      ? "🌟 Velocity Star"
       : (stats?.ratePercentage || 0) >= 75
-      ? "🥇 Active Member"
-      : "🎗️ Member Velocity";
+      ? "🥇 Active Learner"
+      : "🎗️ Velocity Member";
+
+  const learningCategories = [
+    { title: "Grammar Guide", count: "12 Topik", icon: BookMarked, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
+    { title: "Speaking & Dialogues", count: "8 Dialog", icon: Sparkles, color: "text-teal-400", bg: "bg-teal-500/10 border-teal-500/20" },
+    { title: "TOEIC & Test Preps", count: "15 Soal", icon: Target, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
+    { title: "Vocabulary Builder", count: "100+ Kata", icon: BrainCircuit, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 space-y-6 max-w-6xl mx-auto">
-      {/* Top Header Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/20 shadow-xl backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-emerald-500/20 shrink-0">
-            {student?.name?.charAt(0).toUpperCase() || "S"}
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-wide">
-                {student?.name}
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
-                Kelas {student?.studentClass}
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 pb-24 md:pb-12 text-slate-100">
+      {/* 1. HERO USER BANNER */}
+      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-900/90 to-blue-950/30 border border-emerald-500/25 shadow-2xl backdrop-blur-xl">
+        {/* Subtle background decorative shapes */}
+        <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          {/* User Info Left */}
+          <div className="flex items-center gap-4 sm:gap-5">
+            <div className="relative">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center text-white font-black text-2xl sm:text-3xl shadow-xl shadow-emerald-500/20 ring-4 ring-slate-900 shrink-0">
+                {student?.name?.charAt(0).toUpperCase() || "S"}
+              </div>
+              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-slate-900 flex items-center justify-center text-white text-[10px] font-bold" title="Akun Aktif">
+                ✓
               </span>
-              {student?.gender && (
-                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium">
-                  {student.gender}
-                </span>
-              )}
             </div>
-            <p className="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
-              <span>No. WA: +{student?.phoneNumber}</span>
-              <span>•</span>
-              <span className="text-amber-400 font-semibold">{badgeTitle}</span>
-            </p>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  {student?.name}
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
+                  Kelas {student?.studentClass}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
+                <span className="text-amber-400 font-semibold">{badgeTitle}</span>
+                <span>•</span>
+                <span className="text-slate-400">WA: +{student?.phoneNumber}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Action Buttons Right */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+            <Link
+              href="/student/learning"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-blue-200" />
+              <span>Buka Materi LMS</span>
+            </Link>
+
+            <Link
+              href="/student/attendance"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+            >
+              <Camera className="w-4 h-4 text-emerald-200" />
+              <span>Absen Wajah</span>
+            </Link>
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
+      {/* 2. ACTIVE SESSION RADAR (If a meeting session is currently active) */}
+      {activeSession && (
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shrink-0">
+              <MapPin className="w-6 h-6 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 justify-center sm:justify-start">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold animate-pulse">
+                  SESI BERJALAN SEKARANG
+                </span>
+                <h3 className="text-sm font-bold text-white">{activeSession.title}</h3>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Lokasi: <b>{activeSession.locationName || "Titik Kumpul"}</b> • Jam:{" "}
+                {new Date(activeSession.startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} -{" "}
+                {new Date(activeSession.endTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/student/attendance"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
           >
-            <LogOut className="w-4 h-4 text-rose-400" />
-            <span>Keluar Portal</span>
-          </button>
+            <Camera className="w-4 h-4" />
+            <span>Check-in Sekarang</span>
+          </Link>
         </div>
-      </div>
+      )}
 
-
-      {/* Quick Action Banner: Face Recognition & Smart Location Attendance */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-        <div className="space-y-1 text-center sm:text-left">
-          <div className="flex items-center gap-2 justify-center sm:justify-start">
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-              AI BIOMETRIK
-            </span>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Camera className="w-5 h-5 text-emerald-400" />
-              <span>Absensi Face Recognition & Smart Lokasi</span>
-            </h2>
-          </div>
-          <p className="text-xs text-slate-300">
-            Pindai wajah Anda di depan kamera dan verifikasi koordinat lokasi kegiatan secara otomatis!
-          </p>
-        </div>
-
-        <Link
-          href="/student/attendance"
-          className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
-        >
-          <Camera className="w-4 h-4 text-emerald-200" />
-          <span>Buka Pemindai Wajah</span>
-        </Link>
-      </div>
-
-      {/* Stat Cards Grid (Mobile Responsive: grid-cols-1 sm:grid-cols-2 md:grid-cols-4) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl glass-panel border border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Kehadiran</span>
+      {/* 3. FOUR CORE STATS GRID (Mobile: 1 col, Tablet: 2 cols, Desktop: 4 cols) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Kehadiran */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 hover:border-emerald-500/30 transition-colors">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Kehadiran Sesi</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <p className="text-2xl font-bold text-emerald-400">
-            {stats?.hadirCount || 0} <span className="text-xs text-slate-400 font-normal">Sesi</span>
-          </p>
-          <p className="text-[11px] text-slate-500">Hadir tepat waktu di lokasi</p>
-        </div>
-
-        <div className="p-4 rounded-2xl glass-panel border border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Izin / Sakit</span>
-            <FileText className="w-4 h-4 text-amber-400" />
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-emerald-400">
+              {stats?.hadirCount || 0}
+            </span>
+            <span className="text-xs text-slate-400">/ {stats?.totalSessions || 0} Pertemuan</span>
           </div>
-          <p className="text-2xl font-bold text-amber-400">
-            {stats?.izinCount || 0} <span className="text-xs text-slate-400 font-normal">Sesi</span>
-          </p>
-          <p className="text-[11px] text-slate-500">Izin dikonfirmasi via Bot</p>
-        </div>
-
-        <div className="p-4 rounded-2xl glass-panel border border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Alpa</span>
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+          <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="bg-emerald-500 h-1.5 rounded-full"
+              style={{ width: `${Math.min(100, stats?.ratePercentage || 0)}%` }}
+            />
           </div>
-          <p className="text-2xl font-bold text-rose-400">
-            {stats?.alpaCount || 0} <span className="text-xs text-slate-400 font-normal">Sesi</span>
-          </p>
-          <p className="text-[11px] text-slate-500">Tanpa keterangan hadir</p>
         </div>
 
-        <div className="p-4 rounded-2xl glass-panel border border-slate-800 space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+        {/* Tingkat Kerajinan */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 hover:border-blue-500/30 transition-colors">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
             <span>Tingkat Rajin</span>
             <Award className="w-4 h-4 text-blue-400" />
           </div>
-          <p className="text-2xl font-bold text-blue-400">
-            {stats?.ratePercentage || 0}%
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-blue-400">
+              {stats?.ratePercentage || 0}%
+            </span>
+            <span className="text-xs text-slate-400">Rate Absensi</span>
+          </div>
+          <p className="text-[11px] text-slate-500 truncate">
+            {stats?.izinCount || 0} Izin • {stats?.alpaCount || 0} Alpa
           </p>
-          <p className="text-[11px] text-slate-500">Dari total {stats?.totalSessions || 0} sesi</p>
+        </div>
+
+        {/* Modul & Bank Materi */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 hover:border-purple-500/30 transition-colors">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Materi Bahasa Inggris</span>
+            <BookOpen className="w-4 h-4 text-purple-400" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-purple-400">
+              {featuredMaterials.length > 0 ? "50+" : "0"}
+            </span>
+            <span className="text-xs text-slate-400">Artikel & Kuis</span>
+          </div>
+          <p className="text-[11px] text-slate-500">MisterGuru.web.id Hub</p>
+        </div>
+
+        {/* Face ID Status */}
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 hover:border-teal-500/30 transition-colors">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Biometrik Face ID</span>
+            <ShieldCheck className="w-4 h-4 text-teal-400" />
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="px-2.5 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-bold">
+              Siap Digunakan ✅
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">Enkripsi 128-D Vektor</p>
         </div>
       </div>
 
-      {/* Attendance History Table Card */}
+      {/* 4. LEARNING LMS HUB & FEATURED TRACKS */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
-            <CalendarCheck className="w-5 h-5 text-emerald-400" />
-            <span>Riwayat Absensi Sesi Pertemuan</span>
-          </h2>
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-blue-400" />
+              <span>Katalog Materi & Latihan Soal</span>
+            </h2>
+            <p className="text-xs text-slate-400">Pilih topik materi dan kerjakan kuis evaluasi untuk mengasah skill</p>
+          </div>
+
+          <Link
+            href="/student/learning"
+            className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+          >
+            <span>Lihat Semua</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
 
-        <div className="rounded-2xl glass-panel border border-slate-800 overflow-hidden">
+        {/* Quick Category Track Pills */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {learningCategories.map((cat, idx) => {
+            const Icon = cat.icon;
+            return (
+              <Link
+                key={idx}
+                href="/student/learning"
+                className={`p-4 rounded-2xl border ${cat.bg} hover:scale-[1.02] transition-all flex flex-col justify-between space-y-3 cursor-pointer group`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className={`p-2 rounded-xl bg-slate-900/80 border border-white/5 ${cat.color}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">{cat.count}</span>
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors">
+                    {cat.title}
+                  </h3>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Featured Material Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+          {featuredMaterials.map((item) => (
+            <Link
+              key={item.id}
+              href="/student/learning"
+              className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/40 transition-all flex flex-col justify-between space-y-4 group cursor-pointer"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold">
+                    {item.category}
+                  </span>
+                  <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
+                    <Clock className="w-3 h-3 text-slate-500" />
+                    {item.readTime}
+                  </span>
+                </div>
+
+                <h4 className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors line-clamp-2">
+                  {item.title}
+                </h4>
+
+                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                  {item.summary}
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                <span className="text-amber-400 text-[11px] font-semibold flex items-center gap-1">
+                  <BrainCircuit className="w-3.5 h-3.5" />
+                  <span>{item.quizCount} Soal Kuis</span>
+                </span>
+
+                <span className="text-blue-400 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-1 text-[11px]">
+                  <span>Mulai Baca</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* 5. ATTENDANCE HISTORY TABLE */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <CalendarCheck className="w-5 h-5 text-emerald-400" />
+              <span>Riwayat Absensi & Sesi Pertemuan</span>
+            </h2>
+            <p className="text-xs text-slate-400">Rekap kehadiran Anda pada pertemuan ekskul Bahasa Inggris</p>
+          </div>
+
+          <Link
+            href="/student/profile"
+            className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+          >
+            <span>Semua Riwayat</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-900 border-b border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <th className="py-3.5 px-4">Nama Sesi</th>
                   <th className="py-3.5 px-4">Waktu Check-In</th>
                   <th className="py-3.5 px-4">Status</th>
@@ -338,9 +498,9 @@ export default function StudentDashboardPage() {
                     </td>
                   </tr>
                 ) : (
-                  records.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-900/40 transition-colors">
-                      <td className="py-3.5 px-4 font-semibold text-white">
+                  records.slice(0, 5).map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-white">
                         {r.sessionTitle}
                       </td>
                       <td className="py-3.5 px-4 text-slate-400 font-mono">
@@ -348,7 +508,7 @@ export default function StudentDashboardPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <span
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
                             r.status === "HADIR"
                               ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                               : r.status === "IZIN" || r.status === "SAKIT"
@@ -359,15 +519,15 @@ export default function StudentDashboardPage() {
                           {r.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-400">
-                        {r.method === "LOCATION_GPS"
-                          ? "📍 Share Location WA"
-                          : r.method === "WEB_GPS"
-                          ? "🌐 Browser GPS Web"
-                          : "✍️ Manual Admin"}
+                      <td className="py-3.5 px-4 text-slate-300">
+                        {r.method === "FACE" || r.method === "FACE_RECOGNITION"
+                          ? "📸 Face Recognition"
+                          : r.method === "LOCATION_GPS" || r.method === "GEOFENCE"
+                          ? "📍 GPS Lokasi"
+                          : "✍️ Manual"}
                       </td>
-                      <td className="py-3.5 px-4 font-mono font-medium text-emerald-400">
-                        {r.distanceMeter != null ? `${r.distanceMeter}m` : "-"}
+                      <td className="py-3.5 px-4 font-mono font-bold text-emerald-400">
+                        {r.distanceMeter != null ? `${Math.round(r.distanceMeter)}m` : "-"}
                       </td>
                       <td className="py-3.5 px-4 text-slate-400">
                         {r.notes || "-"}

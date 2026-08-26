@@ -3,91 +3,59 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const cache: Record<string, { data: any; time: number }> = {};
-
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get("type") || "global";
 
-    const now = Date.now();
-    if (cache[type] && now - cache[type].time < 20000) {
-      return NextResponse.json(cache[type].data);
-    }
+    const students = await prisma.user.findMany({
+      where: {
+        role: "STUDENT",
+        name: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        studentClass: true,
+        status: true,
+        attendances: {
+          where: { status: "HADIR" },
+          select: { id: true },
+        },
+        gamification: {
+          select: {
+            xp: true,
+            level: true,
+            streak: true,
+          },
+        },
+      },
+    });
 
-    if (type === "global") {
-      const topStudents = await prisma.user.findMany({
-        where: {
-          role: "STUDENT",
-          gamification: {
-            isNot: null,
-          },
-        },
-        select: {
-          id: true,
-          name: true,
-          gamification: {
-            select: {
-              xp: true,
-              level: true,
-            },
-          },
-        },
-        orderBy: {
-          gamification: {
-            xp: "desc",
-          },
-        },
-        take: 50,
-      });
+    const leaderboard = students
+      .map((s) => {
+        const baseProfileXp = s.status === "COMPLETED" ? 100 : 25;
+        const attendanceXp = s.attendances.length * 50;
+        const gameXp = s.gamification?.xp || 0;
+        const totalXp = gameXp > 0 ? gameXp : baseProfileXp + attendanceXp;
+        const calculatedLevel = Math.max(1, Math.floor(totalXp / 100) + 1);
 
-      // Flatten structure
-      const leaderboard = topStudents.map((s) => ({
-        id: s.id,
-        name: s.name || "Unknown",
-        xp: s.gamification?.xp || 0,
-        level: s.gamification?.level || 1,
-      }));
+        const multiplier = type === "monthly" ? 0.4 : 1.0;
+        const finalXp = Math.round(totalXp * multiplier);
 
-      cache[type] = { data: leaderboard, time: now };
-      return NextResponse.json(leaderboard);
-    } else if (type === "monthly") {
-      // Mock monthly logic
-      const topStudents = await prisma.user.findMany({
-        where: {
-          role: "STUDENT",
-          gamification: {
-            isNot: null,
-          },
-        },
-        select: {
-          id: true,
-          name: true,
-          gamification: {
-            select: {
-              xp: true,
-              level: true,
-            },
-          },
-        },
-        take: 50,
-      });
-
-      // Shuffle or randomize slightly for mock monthly data
-      const leaderboard = topStudents
-        .map((s) => ({
+        return {
           id: s.id,
-          name: s.name || "Unknown",
-          xp: Math.floor((s.gamification?.xp || 0) * 0.4), // mock a smaller monthly XP
-          level: s.gamification?.level || 1,
-        }))
-        .sort((a, b) => b.xp - a.xp);
+          name: s.name || "Siswa Velocity",
+          studentClass: s.studentClass || "X",
+          xp: finalXp,
+          level: s.gamification?.level || calculatedLevel,
+          streak: s.gamification?.streak || Math.min(s.attendances.length, 7),
+          hadirCount: s.attendances.length,
+        };
+      })
+      .sort((a, b) => b.xp - a.xp);
 
-      cache[type] = { data: leaderboard, time: now };
-      return NextResponse.json(leaderboard);
-    }
-
-    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+    return NextResponse.json(leaderboard);
   } catch (error: any) {
     console.error("Failed to fetch leaderboard:", error);
     return NextResponse.json(

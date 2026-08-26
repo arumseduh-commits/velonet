@@ -17,12 +17,33 @@ export async function GET() {
       });
     }
 
-    const users = await prisma.user.findMany({
-      select: {
-        status: true,
-        isExcluded: true,
-      },
-    });
+    const [
+      users,
+      articlesCount,
+      coursesCount,
+      sessionsCount,
+      activeSessionsCount,
+      attendancesCount,
+      faceRegisteredCount,
+    ] = await Promise.all([
+      prisma.user.findMany({
+        select: {
+          status: true,
+          isExcluded: true,
+          faceDescriptor: true,
+        },
+      }),
+      prisma.scrapedArticle.count(),
+      prisma.course.count(),
+      prisma.meetingSession.count(),
+      prisma.meetingSession.count({
+        where: { isActive: true, isCancelled: false },
+      }),
+      prisma.attendance.count(),
+      prisma.user.count({
+        where: { faceDescriptor: { not: null } },
+      }),
+    ]);
 
     let completed = 0;
     let optedOut = 0;
@@ -58,6 +79,12 @@ export async function GET() {
       waitingConfirmation,
       inProgress,
       excluded,
+      articlesCount,
+      coursesCount,
+      sessionsCount,
+      activeSessionsCount,
+      attendancesCount,
+      faceRegisteredCount,
     };
 
     cachedStats = result;
