@@ -22,6 +22,7 @@ import {
   User,
   X,
   Zap,
+  ScanFace,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import {
@@ -30,6 +31,7 @@ import {
   captureFrameBase64,
   validateFaceInGuide,
   FaceValidationResult,
+  DetectedFaceData,
 } from "@/lib/client-face-api";
 
 interface StudentProfile {
@@ -226,47 +228,81 @@ export default function StudentAttendancePage() {
     };
   }, [stopCamera]);
 
-  // Real-time live face tracking & circle validation loop
+  // Hands-free Auto-Scan Refs
+  const isAutoScanningRef = useRef(false);
+  const autoScanCooldownUntilRef = useRef(0);
+
+  // 4. Real-time live face tracking & Hands-Free Auto Check-in loop
   useEffect(() => {
-    if (!cameraActive || !modelsReady || submittingAttendance) return;
+    if (!cameraActive || !modelsReady) return;
 
     let isMounted = true;
     let isBusy = false;
 
     const interval = setInterval(async () => {
-      if (isBusy || !videoRef.current || videoRef.current.paused || videoRef.current.videoWidth === 0) return;
+      if (
+        isBusy ||
+        submittingAttendance ||
+        lastCheckInResult ||
+        isAutoScanningRef.current ||
+        Date.now() < autoScanCooldownUntilRef.current ||
+        !videoRef.current ||
+        videoRef.current.paused ||
+        videoRef.current.videoWidth === 0
+      )
+        return;
+
       isBusy = true;
       try {
         const detection = await detectFaceWithDescriptor(videoRef.current);
         if (!isMounted) return;
+
         if (!detection) {
           setLiveValidation(null);
         } else {
           const validation = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
           setLiveValidation(validation);
+
+          // Hands-free instant auto check-in when face is properly centered in circle
+          if (
+            validation.isValid &&
+            !submittingAttendance &&
+            !lastCheckInResult &&
+            !isAutoScanningRef.current
+          ) {
+            const requiresGps =
+              activeSessions.length === 0 ||
+              activeSessions.some((s) => s.latitude != null && s.longitude != null);
+
+            // Auto-trigger if GPS is locked or not required
+            if (!requiresGps || gpsLocation) {
+              isAutoScanningRef.current = true;
+              executeFaceCheckIn(detection);
+            }
+          }
         }
       } catch (err) {
         // ignore per-frame detection errors
       } finally {
         isBusy = false;
       }
-    }, 350);
+    }, 280);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [cameraActive, modelsReady, submittingAttendance, facingMode]);
+  }, [cameraActive, modelsReady, submittingAttendance, lastCheckInResult, facingMode, activeSessions, gpsLocation]);
 
-  // 5. Handle Face Recognition Attendance Check-In
-  const handlePerformFaceCheckIn = async () => {
+  // 5. Handle Face Recognition Attendance Check-In (Auto-Scan & Manual Click)
+  const executeFaceCheckIn = async (detectionParam?: DetectedFaceData) => {
     if (!videoRef.current || !cameraActive) {
-      toast.warning("Silakan aktifkan kamera terlebih dahulu.");
+      isAutoScanningRef.current = false;
       return;
     }
 
     if (!modelsReady) {
-      toast.warning("Model AI Face Recognition sedang dimuat, mohon tunggu sebentar...");
+      isAutoScanningRef.current = false;
       return;
     }
 
@@ -275,43 +311,43 @@ export default function StudentAttendancePage() {
     if (requiresGps && !gpsLocation) {
       if (gpsLoading) {
         toast.warning("Sedang mengunci titik lokasi GPS Anda, mohon tunggu sebentar...");
+        isAutoScanningRef.current = false;
         return;
       }
       toast.error("Lokasi GPS wajib aktif untuk melakukan absensi. Silakan izinkan akses lokasi di browser HP Anda.");
       acquireGps();
+      isAutoScanningRef.current = false;
       return;
     }
 
     setSubmittingAttendance(true);
-    setLastCheckInResult(null);
 
     try {
-      // 1. Detect Face and Extract Biometric Vector
-      const detection = await detectFaceWithDescriptor(videoRef.current);
-
+      let detection = detectionParam;
       if (!detection) {
-        toast.warning("Wajah tidak terdeteksi di kamera! Posisikan wajah Anda tepat di dalam lingkaran.");
-        setSubmittingAttendance(false);
-        return;
-      }
+        const detected = await detectFaceWithDescriptor(videoRef.current);
+        if (!detected) {
+          toast.warning("Wajah tidak terdeteksi di kamera! Posisikan wajah Anda tepat di dalam lingkaran.");
+          setSubmittingAttendance(false);
+          isAutoScanningRef.current = false;
+          autoScanCooldownUntilRef.current = Date.now() + 1500;
+          return;
+        }
 
-      // 2. Strict Circle / Guide & Biometric Landmark Validation
-      const validation = validateFaceInGuide(
-        videoRef.current,
-        detection,
-        guideRef.current,
-        facingMode
-      );
-
-      if (!validation.isValid) {
-        toast.warning(validation.message);
-        setSubmittingAttendance(false);
-        return;
+        const validation = validateFaceInGuide(videoRef.current, detected, guideRef.current, facingMode);
+        if (!validation.isValid) {
+          toast.warning(validation.message);
+          setSubmittingAttendance(false);
+          isAutoScanningRef.current = false;
+          autoScanCooldownUntilRef.current = Date.now() + 1500;
+          return;
+        }
+        detection = detected;
       }
 
       const photoBase64 = captureFrameBase64(videoRef.current, detection.box);
 
-      // 3. Send to Backend Verifier
+      // Send to Backend Verifier
       const res = await fetch("/api/attendance/face-checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -394,6 +430,8 @@ export default function StudentAttendancePage() {
       toast.error(err.message || "Gagal memproses absensi wajah.");
     } finally {
       setSubmittingAttendance(false);
+      isAutoScanningRef.current = false;
+      autoScanCooldownUntilRef.current = Date.now() + 2000;
     }
   };
 
@@ -547,25 +585,32 @@ export default function StudentAttendancePage() {
             <SwitchCamera className="w-5 h-5" />
           </button>
 
-          {/* Main Scan Button */}
+          {/* Hands-free Auto-Scan Status / Manual Check-In Button */}
           <button
-            onClick={handlePerformFaceCheckIn}
+            onClick={() => executeFaceCheckIn()}
             disabled={submittingAttendance || !cameraActive}
             className={`flex-1 py-4 px-6 rounded-2xl text-white font-bold text-xs sm:text-sm tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
-              isGuideValid
-                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/40 border-emerald-400/40 ring-2 ring-emerald-500/30"
-                : "bg-gradient-to-r from-slate-800 to-slate-800 hover:from-emerald-700 hover:to-teal-700 border-slate-700"
+              submittingAttendance
+                ? "bg-emerald-950/80 border-emerald-500/50 shadow-emerald-600/30"
+                : isGuideValid
+                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 shadow-emerald-600/40 border-emerald-400/40 ring-2 ring-emerald-500/30"
+                : "bg-slate-900/90 border-slate-700/80 text-slate-300 backdrop-blur-md"
             }`}
           >
             {submittingAttendance ? (
               <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>Memproses Verifikasi...</span>
+                <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                <span className="text-emerald-300 font-bold">Memverifikasi Kehadiran...</span>
+              </>
+            ) : isGuideValid ? (
+              <>
+                <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
+                <span className="text-emerald-200 font-semibold">Wajah Terkunci • Otomatis Absen</span>
               </>
             ) : (
               <>
-                <Camera className="w-5 h-5" />
-                <span>Verifikasi & Absen Wajah</span>
+                <ScanFace className="w-4 h-4 text-slate-400" />
+                <span>Posisikan Wajah untuk Absen Otomatis</span>
               </>
             )}
           </button>
@@ -794,7 +839,10 @@ export default function StudentAttendancePage() {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
               <button
-                onClick={() => setLastCheckInResult(null)}
+                onClick={() => {
+                  setLastCheckInResult(null);
+                  autoScanCooldownUntilRef.current = Date.now() + 1500;
+                }}
                 className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
               >
                 {lastCheckInResult.status === "SUCCESS" || lastCheckInResult.status === "ALREADY_CHECKED_IN" ? "Tutup" : "Coba Lagi"}

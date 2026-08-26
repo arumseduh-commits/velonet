@@ -157,7 +157,11 @@ function StudentLoginContent() {
     };
   }, [stopCamera]);
 
-  // 3. Live Face Tracking Loop in Full Screen Modal
+  // Hands-free Auto-Scan Refs
+  const isAutoScanningRef = useRef(false);
+  const autoScanCooldownUntilRef = useRef(0);
+
+  // 3. Live Face Tracking Loop in Full Screen Modal with Hands-Free Auto-Login
   useEffect(() => {
     if (!isFaceModalOpen || !cameraActive || !modelsReady) return;
 
@@ -165,7 +169,17 @@ function StudentLoginContent() {
     let isBusy = false;
 
     const interval = setInterval(async () => {
-      if (isBusy || isLoggingInFace || !videoRef.current || videoRef.current.paused || videoRef.current.videoWidth === 0) return;
+      if (
+        isBusy ||
+        isLoggingInFace ||
+        isAutoScanningRef.current ||
+        Date.now() < autoScanCooldownUntilRef.current ||
+        !videoRef.current ||
+        videoRef.current.paused ||
+        videoRef.current.videoWidth === 0
+      )
+        return;
+
       isBusy = true;
       try {
         const detection = await detectFaceWithDescriptor(videoRef.current);
@@ -176,13 +190,19 @@ function StudentLoginContent() {
         } else {
           const valResult = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
           setLiveValidation(valResult);
+
+          // Hands-free instant auto login when face is properly centered in guide
+          if (valResult.isValid && !isLoggingInFace && !isAutoScanningRef.current) {
+            isAutoScanningRef.current = true;
+            await executeFaceLogin(detection.descriptor);
+          }
         }
       } catch (err) {
         // continue loop
       } finally {
         isBusy = false;
       }
-    }, 300);
+    }, 250);
 
     return () => {
       isMounted = false;
@@ -190,39 +210,45 @@ function StudentLoginContent() {
     };
   }, [isFaceModalOpen, cameraActive, modelsReady, isLoggingInFace, facingMode]);
 
-  // 4. Perform Face ID Login
-  const handleFaceLogin = async () => {
+  // 4. Perform Face ID Login (Supports Auto-Scan & Manual Click)
+  const executeFaceLogin = async (descriptorParam?: number[]) => {
     if (!videoRef.current || videoRef.current.paused) {
-      toast.warning("Kamera belum aktif. Silakan tunggu sebentar.");
+      isAutoScanningRef.current = false;
       return;
     }
 
     setIsLoggingInFace(true);
 
     try {
-      // 1. Detect Face descriptor
-      const detection = await detectFaceWithDescriptor(videoRef.current);
+      let finalDescriptor = descriptorParam;
 
-      if (!detection) {
-        toast.warning("Wajah tidak terdeteksi. Posisikan wajah Anda tepat di dalam lingkaran.");
-        setIsLoggingInFace(false);
-        return;
+      if (!finalDescriptor) {
+        const detection = await detectFaceWithDescriptor(videoRef.current);
+        if (!detection) {
+          toast.warning("Wajah tidak terdeteksi. Posisikan wajah Anda tepat di dalam lingkaran.");
+          setIsLoggingInFace(false);
+          isAutoScanningRef.current = false;
+          autoScanCooldownUntilRef.current = Date.now() + 1500;
+          return;
+        }
+
+        const validation = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
+        if (!validation.isValid) {
+          toast.warning(validation.message);
+          setIsLoggingInFace(false);
+          isAutoScanningRef.current = false;
+          autoScanCooldownUntilRef.current = Date.now() + 1500;
+          return;
+        }
+        finalDescriptor = detection.descriptor;
       }
 
-      // 2. Guide Validation
-      const validation = validateFaceInGuide(videoRef.current, detection, guideRef.current, facingMode);
-      if (!validation.isValid) {
-        toast.warning(validation.message);
-        setIsLoggingInFace(false);
-        return;
-      }
-
-      // 3. Send Biometric Vector to Login API
+      // Send Biometric Vector to Login API
       const res = await fetch("/api/student/auth/login-face", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          faceDescriptor: detection.descriptor,
+          faceDescriptor: finalDescriptor,
         }),
       });
 
@@ -231,17 +257,21 @@ function StudentLoginContent() {
       if (json.success) {
         stopCamera();
         setIsFaceModalOpen(false);
-        toast.success(`Selamat datang, ${json.student?.name || "Siswa"}! Mengalihkan ke dashboard... 🎉`);
+        toast.success(`Selamat datang, ${json.student?.name || "Siswa"}! Mengalihkan ke dashboard...`);
         setTimeout(() => {
           router.replace(json.redirectUrl || "/student");
-        }, 800);
+        }, 500);
       } else {
-        toast.error(json.error || "Wajah tidak dikenali. Silakan coba lagi atau gunakan WhatsApp.");
+        toast.error(json.error || "Wajah tidak dikenali. Silakan coba lagi.");
         setIsLoggingInFace(false);
+        isAutoScanningRef.current = false;
+        autoScanCooldownUntilRef.current = Date.now() + 2500;
       }
     } catch (err: any) {
       toast.error(err.message || "Gagal memproses login Face ID.");
       setIsLoggingInFace(false);
+      isAutoScanningRef.current = false;
+      autoScanCooldownUntilRef.current = Date.now() + 2500;
     }
   };
 
@@ -646,26 +676,33 @@ function StudentLoginContent() {
               <span>{guideBadgeText}</span>
             </div>
 
-            {/* Big Action Button */}
+            {/* Hands-Free Auto-Scan Feedback Button */}
             <button
               type="button"
-              onClick={handleFaceLogin}
+              onClick={() => executeFaceLogin()}
               disabled={isLoggingInFace || !cameraActive}
-              className={`w-full max-w-sm py-4 px-6 rounded-2xl text-white font-extrabold text-sm sm:text-base tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
-                isGuideValid
-                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/40 border-emerald-400/50 ring-4 ring-emerald-500/30 scale-[1.02]"
-                  : "bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300 backdrop-blur-md"
+              className={`w-full max-w-sm py-4 px-6 rounded-2xl text-white font-bold text-xs sm:text-sm tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
+                isLoggingInFace
+                  ? "bg-emerald-950/80 border-emerald-500/50 shadow-emerald-600/30"
+                  : isGuideValid
+                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 shadow-emerald-600/40 border-emerald-400/50 ring-2 ring-emerald-500/30"
+                  : "bg-slate-900/90 border-slate-700/80 text-slate-300 backdrop-blur-md"
               }`}
             >
               {isLoggingInFace ? (
                 <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  <span>MEMVERIFIKASI WAJAH...</span>
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                  <span className="text-emerald-300 font-bold">Memverifikasi Wajah...</span>
+                </>
+              ) : isGuideValid ? (
+                <>
+                  <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
+                  <span className="text-emerald-200 font-semibold">Wajah Terkunci • Masuk Otomatis</span>
                 </>
               ) : (
                 <>
-                  <ScanFace className="w-5 h-5" />
-                  <span>PINDAI WAJAH & MASUK SEKARANG</span>
+                  <ScanFace className="w-4 h-4 text-slate-400" />
+                  <span>Posisikan Wajah untuk Masuk Otomatis</span>
                 </>
               )}
             </button>
