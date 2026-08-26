@@ -27,6 +27,12 @@ import {
   UserCheck,
   FileText,
   Upload,
+  Star,
+  Link as LinkIcon,
+  ExternalLink,
+  Lock,
+  Unlock,
+  ShieldCheck,
 } from "lucide-react";
 
 interface LogItem {
@@ -68,6 +74,12 @@ interface ExclusionItem {
   createdAt: string;
 }
 
+interface PrimaryGroupInfo {
+  id: string | null;
+  name: string | null;
+  inviteLink: string | null;
+}
+
 export default function BotControlPage() {
   const { confirm, toast } = useDialog();
   const [status, setStatus] = useState<BotStatus>({
@@ -79,6 +91,16 @@ export default function BotControlPage() {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  // Primary Official Group & Registration Strict Mode State
+  const [primaryGroup, setPrimaryGroup] = useState<PrimaryGroupInfo>({
+    id: null,
+    name: null,
+    inviteLink: null,
+  });
+  const [primaryInviteInput, setPrimaryInviteInput] = useState("");
+  const [savingPrimaryGroup, setSavingPrimaryGroup] = useState(false);
+  const [fetchingInviteLink, setFetchingInviteLink] = useState(false);
 
   // Group Inspector & Dropdown State
   const [savedGroups, setSavedGroups] = useState<SavedGroup[]>([]);
@@ -379,19 +401,29 @@ export default function BotControlPage() {
     } catch (e) {}
   };
 
-  // Fetch list of saved groups for dropdown
+  // Fetch list of saved groups for dropdown & primary group setting
   const fetchSavedGroupsList = async () => {
     try {
       const res = await fetch("/api/bot/groups");
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        setSavedGroups(json.data);
+      if (json.success) {
+        if (Array.isArray(json.data)) {
+          setSavedGroups(json.data);
+        }
+        if (json.primaryGroup) {
+          setPrimaryGroup(json.primaryGroup);
+          if (json.primaryGroup.inviteLink) {
+            setPrimaryInviteInput(json.primaryGroup.inviteLink);
+          }
+        }
 
         const savedJid = typeof window !== "undefined" ? localStorage.getItem("velo_selected_group_jid") : null;
         const targetJid =
-          savedJid && json.data.some((g: any) => g.id === savedJid)
+          savedJid && json.data?.some((g: any) => g.id === savedJid)
             ? savedJid
-            : json.data.length > 0
+            : json.primaryGroup?.id
+            ? json.primaryGroup.id
+            : json.data?.length > 0
             ? json.data[0].id
             : "";
 
@@ -415,6 +447,12 @@ export default function BotControlPage() {
       const json = await res.json();
       if (json.success) {
         setGroupData(json.data);
+        if (json.primaryGroup) {
+          setPrimaryGroup(json.primaryGroup);
+          if (json.primaryGroup.inviteLink && !primaryInviteInput) {
+            setPrimaryInviteInput(json.primaryGroup.inviteLink);
+          }
+        }
       } else {
         setInspectorMsg(`Gagal: ${json.error}`);
       }
@@ -422,6 +460,144 @@ export default function BotControlPage() {
       setInspectorMsg(`Error: ${err.message}`);
     } finally {
       setLoadingGroupMembers(false);
+    }
+  };
+
+  // Primary Group Management Handlers
+  const handleSetPrimaryGroup = async (groupJid: string, groupSubject?: string) => {
+    const confirmed = await confirm({
+      title: "Tetapkan Sebagai Grup Utama Resmi",
+      message: `Jadikan "${groupSubject || groupJid}" sebagai Grup Utama Resmi Velocity?\n\nNomor baru yang belum bergabung ke grup ini TIDAK AKAN dapat mendaftar sebelum bergabung ke grup WhatsApp ini.`,
+      confirmText: "Ya, Tetapkan Grup Utama",
+      cancelText: "Batal",
+      variant: "info",
+      icon: "info",
+    });
+
+    if (!confirmed) return;
+
+    setSavingPrimaryGroup(true);
+    try {
+      const res = await fetch("/api/bot/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_primary_group",
+          groupId: groupJid,
+          groupSubject: groupSubject || "Grup Komunitas Velocity",
+          inviteLink: primaryInviteInput.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message || "Grup Utama resmi berhasil ditetapkan!");
+        if (json.primaryGroup) {
+          setPrimaryGroup(json.primaryGroup);
+          if (json.primaryGroup.inviteLink) {
+            setPrimaryInviteInput(json.primaryGroup.inviteLink);
+          }
+        }
+      } else {
+        toast.error(json.error || "Gagal menetapkan grup utama.");
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setSavingPrimaryGroup(false);
+    }
+  };
+
+  const handleSaveInviteLink = async () => {
+    if (!primaryInviteInput.trim()) {
+      toast.warning("Masukkan link undangan grup WhatsApp terlebih dahulu.");
+      return;
+    }
+    setSavingPrimaryGroup(true);
+    try {
+      const res = await fetch("/api/bot/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_invite_link",
+          inviteLink: primaryInviteInput.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Link undangan grup WhatsApp berhasil disimpan!");
+        setPrimaryGroup((prev) => ({ ...prev, inviteLink: primaryInviteInput.trim() }));
+      } else {
+        toast.error(json.error || "Gagal menyimpan link undangan.");
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setSavingPrimaryGroup(false);
+    }
+  };
+
+  const handleAutoFetchInviteLink = async () => {
+    if (status.state !== "CONNECTED") {
+      toast.error("Bot belum terhubung! Silakan aktifkan bot terlebih dahulu.");
+      return;
+    }
+    setFetchingInviteLink(true);
+    try {
+      const targetGid = primaryGroup.id || inputGroupJid;
+      const res = await fetch("/api/bot/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "fetch_group_invite_link",
+          groupId: targetGid || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.inviteLink) {
+        setPrimaryInviteInput(json.inviteLink);
+        setPrimaryGroup((prev) => ({ ...prev, inviteLink: json.inviteLink }));
+        toast.success("Link undangan grup berhasil ditarik otomatis dari WhatsApp!");
+      } else {
+        toast.error(json.error || "Gagal menarik link undangan grup.");
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setFetchingInviteLink(false);
+    }
+  };
+
+  const handleUnsetPrimaryGroup = async () => {
+    const confirmed = await confirm({
+      title: "Nonaktifkan Mode Validasi Grup",
+      message: "Apakah Anda yakin ingin menonaktifkan validasi grup? Nomor baru akan diizinkan mendaftar secara bebas tanpa wajib bergabung ke grup WhatsApp terlebih dahulu.",
+      confirmText: "Ya, Buka Pendaftaran Bebas",
+      cancelText: "Batal",
+      variant: "warning",
+      icon: "warning",
+    });
+
+    if (!confirmed) return;
+
+    setSavingPrimaryGroup(true);
+    try {
+      const res = await fetch("/api/bot/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unset_primary_group" }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Pengaturan Grup Utama dinonaktifkan (Mode Pendaftaran Terbuka).");
+        setPrimaryGroup({ id: null, name: null, inviteLink: null });
+        setPrimaryInviteInput("");
+      } else {
+        toast.error(json.error || "Gagal menonaktifkan grup utama.");
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setSavingPrimaryGroup(false);
     }
   };
 
@@ -646,6 +822,116 @@ export default function BotControlPage() {
             {status.lastError && (
               <div className="p-3 rounded-xl bg-rose-900/30 border border-rose-500/30 text-rose-300 text-xs">
                 Log Terakhir: {status.lastError}
+              </div>
+            )}
+          </div>
+
+          {/* Primary Official Group & Registration Strict Mode Card */}
+          <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4" /> Grup Utama & Validasi Pendaftaran
+              </h3>
+              {primaryGroup.id ? (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <Lock className="w-3 h-3" /> Strict Mode
+                </span>
+              ) : (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+                  <Unlock className="w-3 h-3" /> Open Mode
+                </span>
+              )}
+            </div>
+
+            {primaryGroup.id ? (
+              <div className="space-y-3.5">
+                <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                        <span>{primaryGroup.name || "Grup Komunitas Velocity"}</span>
+                      </p>
+                      <p className="text-[11px] font-mono text-emerald-400/90 mt-0.5 break-all">
+                        {primaryGroup.id}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleUnsetPrimaryGroup}
+                      disabled={savingPrimaryGroup}
+                      className="px-2 py-1 text-[10px] font-semibold rounded-lg text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 transition-all cursor-pointer shrink-0 disabled:opacity-40"
+                      title="Kembalikan ke pendaftaran terbuka tanpa validasi grup"
+                    >
+                      Buka Bebas
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    🔒 <b>Aturan Aktif:</b> Nomor baru yang belum ada di grup ini akan <b>ditolak saat mendaftar</b> dan otomatis dikirimi link undangan grup WhatsApp di bawah.
+                  </p>
+                </div>
+
+                {/* Invite Link Form */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Link Undangan Grup WhatsApp (Invite Link):
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <div className="relative">
+                      <LinkIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="https://chat.whatsapp.com/..."
+                        value={primaryInviteInput}
+                        onChange={(e) => setPrimaryInviteInput(e.target.value)}
+                        className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAutoFetchInviteLink}
+                        disabled={fetchingInviteLink || status.state !== "CONNECTED"}
+                        className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                        title="Tarik link invite resmi secara otomatis via koneksi WhatsApp Bot"
+                      >
+                        {fetchingInviteLink ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
+                        <span>Tarik dari WA</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveInviteLink}
+                        disabled={savingPrimaryGroup || !primaryInviteInput.trim()}
+                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                      >
+                        {savingPrimaryGroup ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        <span>Simpan Link</span>
+                      </button>
+                    </div>
+                  </div>
+                  {primaryGroup.inviteLink && (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <span className="text-[11px] text-slate-400 shrink-0">Link Aktif:</span>
+                      <a
+                        href={primaryGroup.inviteLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-emerald-400 hover:underline inline-flex items-center gap-1 font-mono truncate"
+                      >
+                        {primaryGroup.inviteLink} <ExternalLink className="w-3 h-3 shrink-0" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2 text-left">
+                <p className="text-xs text-amber-300/90 font-semibold flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> Mode Pendaftaran Terbuka (Open)
+                </p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Belum ada Grup Utama yang ditetapkan. Nomor baru dari luar grup saat ini tetap bisa mendaftar. Untuk mewajibkan calon siswa masuk grup WhatsApp terlebih dahulu, pilih grup pada menu inspeksi lalu klik <b>"Jadikan Grup Utama Resmi"</b>.
+                </p>
               </div>
             )}
           </div>
@@ -905,15 +1191,28 @@ export default function BotControlPage() {
                   <h3 className="font-extrabold text-white text-base flex items-center gap-2">
                     {groupData.groupSubject} <Sparkles className="w-4 h-4 text-amber-400" />
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Daftar {groupData.totalMembers} Anggota terdeteksi di grup
+                  <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                    {groupData.groupId} • {groupData.totalMembers} Anggota
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 font-medium">
-                    Kirim konfirmasi per anggota melalui tombol aksi di bawah
-                  </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {primaryGroup.id === groupData.groupId ? (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shadow-sm">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>Grup Utama Resmi Aktif ✅</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimaryGroup(groupData.groupId, groupData.groupSubject)}
+                      disabled={savingPrimaryGroup}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-lg shadow-amber-600/20 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {savingPrimaryGroup ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Star className="w-3.5 h-3.5" />}
+                      <span>Jadikan Grup Utama Resmi</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

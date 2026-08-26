@@ -319,7 +319,9 @@ export async function processIncomingMessage(
       participant.status === RegistrationStatus.COMPLETED ||
       Boolean(participant.name && participant.name !== "Siswa Baru" && participant.studentClass);
 
-    // Cek keberadaan di Grup Utama
+    const greetingName = participant.name && participant.name !== "Siswa Baru" ? `Kak *${participant.name}*` : "Kak";
+
+    // Cek keberadaan di Grup Utama secara ketat
     if (!isAlreadyCompleted) {
       let isInGroup = true;
       if (checkGroup) {
@@ -327,20 +329,21 @@ export async function processIncomingMessage(
       }
 
       if (!isInGroup) {
-        let inviteLink = "Hubungi admin untuk mendapatkan link grup.";
+        let inviteLink = "Hubungi admin untuk mendapatkan link grup WhatsApp resmi.";
         try {
           const linkSetting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_invite_link" } });
           if (linkSetting && linkSetting.value) inviteLink = linkSetting.value;
         } catch (e) {}
 
+        // TIDAK set payload menjadi VERIFIED agar tidak bisa masuk web sebelum join grup
         return {
           newStatus: participant.status as RegistrationStatusType,
-          replyMessage: `Maaf, kamu belum bergabung di grup komunitas kami. Silakan join grup melalui link berikut terlebih dahulu:\n\n${inviteLink}`,
+          replyMessage: `🚫 *PENDAFTARAN DITOLAK: BELUM GABUNG GRUP*\n\nHalo ${greetingName}!\n\nMohon maaf, pendaftaran anggota ekskul Velocity hanya diperuntukkan bagi peserta yang *sudah bergabung* di Grup WhatsApp Resmi Komunitas kami.\n\nSilakan klik link undangan di bawah ini untuk bergabung ke grup terlebih dahulu:\n👉 ${inviteLink}\n\n_Setelah berhasil bergabung di grup WhatsApp, silakan ulangi pendaftaran Anda di website atau kirim ulang pesan ini._ 🙏`,
         };
       }
     }
 
-    // Set verified di payload
+    // Set verified di payload jika nomor sudah ada di grup
     try {
       const payloadSetting = await prisma.systemSetting.findUnique({
         where: { key: `login_payload:${payloadId}` },
@@ -380,8 +383,6 @@ export async function processIncomingMessage(
       };
     }
 
-    const greetingName = participant.name && participant.name !== "Siswa Baru" ? `Kak *${participant.name}*` : "Kak";
-
     return {
       newStatus: participant.status as RegistrationStatusType,
       replyMessage: `📝 *LINK PENDAFTARAN SISWA VELOCITY*\n\nHalo ${greetingName}!\n\nSilakan klik link di bawah ini untuk melengkapi formulir pendaftaran anggota ekskul Velocity:\n\n🔗 ${baseUrl}/api/student/auth/verify-registration?token=${payloadId}\n\n_⚠️ Link ini berlaku 10 menit. Silakan lengkapi biodata Anda._`,
@@ -408,7 +409,7 @@ export async function processIncomingMessage(
       participant.status === RegistrationStatus.COMPLETED ||
       Boolean(participant.name && participant.name !== "Siswa Baru" && participant.studentClass);
 
-    // Jika belum registrasi sama sekali, cek grup dulu
+    // Jika belum registrasi sama sekali, cek grup dulu secara ketat
     if (!isProfileCompleted) {
       let isInGroup = true;
       if (checkGroup) {
@@ -416,7 +417,7 @@ export async function processIncomingMessage(
       }
 
       if (!isInGroup) {
-        let inviteLink = "Hubungi admin untuk mendapatkan link grup.";
+        let inviteLink = "Hubungi admin untuk mendapatkan link grup WhatsApp resmi.";
         try {
           const linkSetting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_invite_link" } });
           if (linkSetting && linkSetting.value) inviteLink = linkSetting.value;
@@ -424,7 +425,7 @@ export async function processIncomingMessage(
 
         return {
           newStatus: participant.status as RegistrationStatusType,
-          replyMessage: `Maaf, kamu belum bergabung di grup komunitas kami. Silakan join grup melalui link berikut terlebih dahulu:\n\n${inviteLink}`,
+          replyMessage: `🚫 *AKSES DITOLAK: BELUM GABUNG GRUP*\n\nMohon maaf, Anda belum terdaftar di Grup WhatsApp Resmi Komunitas Velocity.\n\nSilakan bergabung ke grup terlebih dahulu melalui link berikut:\n👉 ${inviteLink}\n\n_Setelah bergabung di grup WhatsApp, silakan ulangi login/pendaftaran._ 🙏`,
         };
       }
     }
@@ -579,6 +580,27 @@ export async function processIncomingMessage(
     upperText === 'BERSEDIA';
 
   if (isAccepting && participant.status !== RegistrationStatus.COMPLETED) {
+    const greeting = participant.name && participant.name !== "Siswa Baru" ? `Halo Kak *${participant.name}*!` : "Halo Kak!";
+
+    // Cek keberadaan di Grup Utama sebelum memberikan link pendaftaran
+    let isInGroup = true;
+    if (checkGroup) {
+      isInGroup = await checkGroup(participant.phoneNumber);
+    }
+
+    if (!isInGroup) {
+      let inviteLink = "Hubungi admin untuk mendapatkan link grup WhatsApp resmi.";
+      try {
+        const linkSetting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_invite_link" } });
+        if (linkSetting && linkSetting.value) inviteLink = linkSetting.value;
+      } catch (e) {}
+
+      return {
+        newStatus: RegistrationStatus.WAITING_CONFIRMATION,
+        replyMessage: `🚫 *PENDAFTARAN DITOLAK: BELUM GABUNG GRUP*\n\n${greeting}\nMohon maaf, pendaftaran anggota ekskul Velocity hanya diperuntukkan bagi peserta yang *sudah bergabung* di Grup WhatsApp Resmi Komunitas kami.\n\nSilakan klik link undangan di bawah ini untuk bergabung ke grup terlebih dahulu:\n👉 ${inviteLink}\n\n_Setelah berhasil bergabung di grup WhatsApp, silakan balas *DAFTAR* atau *YA* untuk menerima link formulir pendaftaran._ 🙏`,
+      };
+    }
+
     const magicToken = crypto.randomBytes(32).toString("hex");
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
@@ -616,7 +638,6 @@ export async function processIncomingMessage(
     baseUrl = baseUrl.replace(/\/$/, "");
 
     const directRegUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}`;
-    const greeting = participant.name && participant.name !== "Siswa Baru" ? `Halo Kak *${participant.name}*!` : "Halo Kak!";
 
     return {
       newStatus: RegistrationStatus.WAITING_CONFIRMATION,

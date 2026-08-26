@@ -362,10 +362,11 @@ class WhatsAppBotEngine extends EventEmitter {
               async (phone: string) => {
                 try {
                   const setting = await prisma.systemSetting.findUnique({ where: { key: "primary_group_id" } });
-                  if (!setting || !setting.value) return true;
+                  if (!setting || !setting.value) return true; // Open mode if not set
                   return await this.isPhoneInGroup(setting.value, phone);
                 } catch (e) {
-                  return true;
+                  console.error("[BotEngine] Error in checkGroup:", e);
+                  return false;
                 }
               }
             );
@@ -497,7 +498,7 @@ class WhatsAppBotEngine extends EventEmitter {
    * Fast in-memory cached group member lookup (0ms)
    */
   public async isPhoneInGroup(groupIdInput: string, phoneNumber: string): Promise<boolean> {
-    if (!this.socket || this.connectionState !== "CONNECTED") return true;
+    if (!this.socket || this.connectionState !== "CONNECTED") return false;
 
     let cleanGroupId = groupIdInput.trim();
     if (!cleanGroupId.includes("@g.us")) {
@@ -507,39 +508,80 @@ class WhatsAppBotEngine extends EventEmitter {
     const cleanTargetPhone = phoneNumber.replace(/\D/g, "");
     const formattedNum = cleanTargetPhone.startsWith("0") ? "62" + cleanTargetPhone.slice(1) : cleanTargetPhone;
 
-    // Check cache first (3-minute TTL)
+    // Check cache first (2-minute TTL)
     const now = Date.now();
+    let memberSet: Set<string> | null = null;
     const cached = this.groupMembersCache.get(cleanGroupId);
     if (cached && cached.expiresAt > now) {
-      return cached.members.has(formattedNum) || cached.members.has(cleanTargetPhone);
-    }
+      memberSet = cached.members;
+    } else {
+      // Populate cache from groupMetadata
+      try {
+        const metadata = await this.socket.groupMetadata(cleanGroupId).catch(() => null);
+        if (metadata && metadata.participants) {
+          memberSet = new Set<string>();
+          for (const p of metadata.participants) {
+            const pDigits = p.id.split("@")[0].split(":")[0];
+            memberSet.add(pDigits);
+            if (pDigits.startsWith("0")) memberSet.add("62" + pDigits.slice(1));
+            if (pDigits.startsWith("62")) memberSet.add("0" + pDigits.slice(2));
 
-    // Populate cache
-    try {
-      const metadata = await this.socket.groupMetadata(cleanGroupId).catch(() => null);
-      if (metadata && metadata.participants) {
-        const memberSet = new Set<string>();
-        for (const p of metadata.participants) {
-          const pDigits = p.id.split("@")[0].split(":")[0];
-          memberSet.add(pDigits);
-          if (pDigits.startsWith("0")) memberSet.add("62" + pDigits.slice(1));
-          if ((p as any).pn) {
-            const pnDigits = (p as any).pn.split("@")[0].split(":")[0];
-            memberSet.add(pnDigits);
-            if (pDigits) this.lidCache.set(pDigits, pnDigits);
+            if ((p as any).pn) {
+              const pnDigits = (p as any).pn.split("@")[0].split(":")[0];
+              memberSet.add(pnDigits);
+              if (pnDigits.startsWith("0")) memberSet.add("62" + pnDigits.slice(1));
+              if (pnDigits.startsWith("62")) memberSet.add("0" + pnDigits.slice(2));
+              if (pDigits) this.lidCache.set(pDigits, pnDigits);
+            }
           }
+          this.groupMembersCache.set(cleanGroupId, {
+            members: memberSet,
+            expiresAt: now + 2 * 60 * 1000,
+          });
         }
-        this.groupMembersCache.set(cleanGroupId, {
-          members: memberSet,
-          expiresAt: now + 3 * 60 * 1000,
-        });
-        return memberSet.has(formattedNum) || memberSet.has(cleanTargetPhone);
+      } catch (e) {
+        console.warn("[BotEngine] Could not fetch group metadata for isPhoneInGroup:", e);
       }
-    } catch (e) {
-      console.warn("[BotEngine] Could not fetch group metadata for isPhoneInGroup:", e);
     }
 
-    return true; // Fallback to allow message if group check encounters an error
+    if (!memberSet) {
+      return false;
+    }
+
+    // Direct check by formatted number & raw digits
+    if (memberSet.has(formattedNum) || memberSet.has(cleanTargetPhone)) {
+      return true;
+    }
+
+    // Check if phone number maps to an LID or reverse phone
+    const resolved = await this.resolveLidToRealPhone(phoneNumber).catch(() => null);
+    if (resolved && (memberSet.has(resolved) || memberSet.has(resolved.replace(/^0/, "62")))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Fetches the official WhatsApp Group Invite Link (https://chat.whatsapp.com/...)
+   */
+  public async getGroupInviteLink(groupIdInput: string): Promise<string | null> {
+    if (!this.socket || this.connectionState !== "CONNECTED") return null;
+
+    let cleanGroupId = groupIdInput.trim();
+    if (!cleanGroupId.includes("@g.us")) {
+      cleanGroupId = `${cleanGroupId.replace(/\D/g, "")}@g.us`;
+    }
+
+    try {
+      const code = await this.socket.groupInviteCode(cleanGroupId);
+      if (code) {
+        return `https://chat.whatsapp.com/${code}`;
+      }
+    } catch (e: any) {
+      console.warn(`[BotEngine] Could not fetch group invite code for ${cleanGroupId}:`, e?.message || e);
+    }
+    return null;
   }
 
   /**
