@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p ${PORT:-10000}",
+    "db:push": "prisma db push --accept-data-loss",
+    "start": "prisma db push --accept-data-loss && next start -H 0.0.0.0 -p ${PORT:-10000}",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
