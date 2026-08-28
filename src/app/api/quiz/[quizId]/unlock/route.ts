@@ -31,13 +31,12 @@ export async function POST(
       );
     }
 
-    const attempt = await prisma.quizAttempt.findUnique({
+    const attempt = await prisma.quizAttempt.findFirst({
       where: {
-        quizId_userId: {
-          quizId,
-          userId: student.id,
-        },
+        quizId,
+        userId: student.id,
       },
+      orderBy: { createdAt: "desc" },
     });
 
     if (!attempt) {

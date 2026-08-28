@@ -132,34 +132,43 @@ export async function POST(req: Request) {
       });
     }
 
-    // Upsert QuizAttempt
-    const quizAttempt = await prisma.quizAttempt.upsert({
+    // Find existing attempt or create new
+    let existingAttempt = await prisma.quizAttempt.findFirst({
       where: {
-        quizId_userId: {
-          quizId,
-          userId: student.id,
-        },
-      },
-      update: {
-        score: earnedScore,
-        totalScore,
-        status: hasPendingEssays ? "SUBMITTED" : "GRADED",
-        isFullyGraded: !hasPendingEssays,
-        submittedAt: new Date(),
-        answers: JSON.stringify(answers),
-      },
-      create: {
         quizId,
         userId: student.id,
-        score: earnedScore,
-        totalScore,
-        status: hasPendingEssays ? "SUBMITTED" : "GRADED",
-        isFullyGraded: !hasPendingEssays,
-        startedAt: new Date(),
-        submittedAt: new Date(),
-        answers: JSON.stringify(answers),
       },
+      orderBy: { createdAt: "desc" },
     });
+
+    let quizAttempt;
+    if (existingAttempt) {
+      quizAttempt = await prisma.quizAttempt.update({
+        where: { id: existingAttempt.id },
+        data: {
+          score: earnedScore,
+          totalScore,
+          status: hasPendingEssays ? "SUBMITTED" : "GRADED",
+          isFullyGraded: !hasPendingEssays,
+          submittedAt: new Date(),
+          answers: JSON.stringify(answers),
+        },
+      });
+    } else {
+      quizAttempt = await prisma.quizAttempt.create({
+        data: {
+          quizId,
+          userId: student.id,
+          score: earnedScore,
+          totalScore,
+          status: hasPendingEssays ? "SUBMITTED" : "GRADED",
+          isFullyGraded: !hasPendingEssays,
+          startedAt: new Date(),
+          submittedAt: new Date(),
+          answers: JSON.stringify(answers),
+        },
+      });
+    }
 
     // Save individual QuizStudentAnswer records
     for (const detail of gradedDetails) {

@@ -25,13 +25,12 @@ export async function POST(
     }
 
     // Find attempt
-    let attempt = await prisma.quizAttempt.findUnique({
+    let attempt = await prisma.quizAttempt.findFirst({
       where: {
-        quizId_userId: {
-          quizId,
-          userId: student.id,
-        },
+        quizId,
+        userId: student.id,
       },
+      orderBy: { createdAt: "desc" },
     });
 
     if (!attempt) {
