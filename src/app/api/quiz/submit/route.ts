@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     if (!student) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     if (!quizId || !Array.isArray(answers)) {
       return NextResponse.json(
         { success: false, error: "Invalid payload" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     if (!quiz) {
       return NextResponse.json(
         { success: false, error: "Quiz not found" },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       if (question) {
         totalScore += question.points;
         const selectedOption = question.options.find(
-          (opt) => opt.id === ans.optionId,
+          (opt) => opt.id === ans.optionId
         );
         if (selectedOption && selectedOption.isCorrect) {
           score += question.points;
@@ -61,13 +61,29 @@ export async function POST(req: Request) {
       };
     });
 
-    const quizAttempt = await prisma.quizAttempt.create({
-      data: {
+    const quizAttempt = await prisma.quizAttempt.upsert({
+      where: {
+        quizId_userId: {
+          quizId,
+          userId: student.id,
+        },
+      },
+      update: {
+        score,
+        totalScore,
+        answers: JSON.stringify(formattedAnswers),
+        status: "SUBMITTED",
+        submittedAt: new Date(),
+      },
+      create: {
         quizId,
         userId: student.id,
         score,
         totalScore,
         answers: JSON.stringify(formattedAnswers),
+        status: "SUBMITTED",
+        startedAt: new Date(),
+        submittedAt: new Date(),
       },
     });
 
@@ -83,7 +99,7 @@ export async function POST(req: Request) {
     console.error("[Quiz API POST]", err);
     return NextResponse.json(
       { success: false, error: "Internal Server Error" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

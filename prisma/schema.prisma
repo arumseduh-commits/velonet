@@ -292,6 +292,16 @@ model Quiz {
   title       String
   description String?
   
+  // Konfigurasi Keamanan & CBT
+  durationMinutes        Int      @default(30)
+  enableFullscreenLock   Boolean  @default(true)
+  enableTabSwitchDetect  Boolean  @default(true)
+  maxStrikes             Int      @default(3)
+  enableCameraProctor    Boolean  @default(true)
+  supervisorPin          String   @default("123456")
+  shuffleQuestions       Boolean  @default(true)
+  shuffleOptions         Boolean  @default(true)
+
   questions   Question[]
   attempts    QuizAttempt[]
 
@@ -326,10 +336,34 @@ model QuizAttempt {
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  score       Int
-  totalScore  Int
   
-  answers     String?  // JSON stringified user answers
+  status      String   @default("IN_PROGRESS") // IN_PROGRESS, LOCKED, SUBMITTED, DISQUALIFIED
+  strikeCount Int      @default(0)
+  score       Int      @default(0)
+  totalScore  Int      @default(0)
+  
+  answers     String?  // JSON stringified user answers { [questionId]: optionId }
+  
+  startedAt   DateTime @default(now())
+  submittedAt DateTime?
+
+  violations  ExamViolationLog[]
 
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([quizId, userId])
 }
+
+model ExamViolationLog {
+  id          String      @id @default(uuid())
+  attemptId   String
+  attempt     QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  type        String      // TAB_SWITCH, FULLSCREEN_EXIT, DEVTOOLS, MULTIPLE_FACES, NO_FACE, UNAUTHORIZED_KEY
+  description String?
+  snapshotUrl String?
+  timestamp   DateTime    @default(now())
+
+  @@index([attemptId])
+}
+

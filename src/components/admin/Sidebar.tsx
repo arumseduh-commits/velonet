@@ -20,6 +20,7 @@ import {
   BookOpen,
   FolderKanban,
   Shield,
+  ShieldAlert,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -152,6 +153,18 @@ export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
             >
               <FolderKanban className={`w-4 h-4 ${pathname.startsWith("/admin/courses") ? "text-blue-600" : "text-slate-400"}`} />
               <span>Katalog Kursus & Modul</span>
+            </Link>
+
+            <Link
+              href="/admin/exams"
+              className={`flex items-center gap-3 px-3 py-2 rounded-xl font-semibold text-xs transition-all ${
+                pathname.startsWith("/admin/exams")
+                  ? "bg-blue-50 text-blue-700 font-bold border border-blue-200/80 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              <ShieldAlert className={`w-4 h-4 ${pathname.startsWith("/admin/exams") ? "text-rose-600" : "text-slate-400"}`} />
+              <span>VeloExambro CBT</span>
             </Link>
           </div>
 
