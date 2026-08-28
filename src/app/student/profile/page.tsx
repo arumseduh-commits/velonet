@@ -107,59 +107,59 @@ export default function StudentProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
-        <RefreshCw className="w-8 h-8 animate-spin text-blue-400" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-500 gap-3">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
         <span className="text-sm font-medium">Memuat Profil Siswa...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 space-y-6 max-w-4xl mx-auto pb-24 md:pb-8">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 space-y-6 max-w-4xl mx-auto pb-24 md:pb-8">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/20 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50/50 to-white border border-blue-200/80 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-extrabold text-white text-3xl shadow-lg shadow-blue-500/20 shrink-0">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-extrabold text-white text-3xl shadow-md shadow-blue-500/20 shrink-0">
             {student?.name?.charAt(0).toUpperCase() || "S"}
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-wide flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-wide flex items-center gap-2">
               <span>{student?.name}</span>
-              <ShieldCheck className="w-5 h-5 text-blue-400" />
+              <ShieldCheck className="w-5 h-5 text-blue-600" />
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Anggota Resmi Komunitas Ekskul Velocity • Kelas {student?.studentClass}
             </p>
           </div>
         </div>
 
         {stats && (
-          <div className="flex items-center gap-2 bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-800 self-start sm:self-auto">
-            <Award className="w-4 h-4 text-amber-400" />
-            <span className="text-xs text-slate-300 font-medium">Kehadiran:</span>
-            <span className="text-xs font-bold text-emerald-400 font-mono">{stats.ratePercentage}%</span>
+          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-xs self-start sm:self-auto">
+            <Award className="w-4 h-4 text-amber-500" />
+            <span className="text-xs text-slate-600 font-medium">Kehadiran:</span>
+            <span className="text-xs font-bold text-emerald-700 font-mono">{stats.ratePercentage}%</span>
           </div>
         )}
       </div>
 
       {/* Face Biometrics Status Banner */}
-      <div className="p-5 rounded-3xl glass-panel border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+      <div className="p-5 rounded-3xl bg-white border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shrink-0">
+          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 shrink-0">
             <Camera className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-bold text-white">Biometrik Wajah AI (Face ID)</h3>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+              <h3 className="text-sm font-bold text-slate-900">Biometrik Wajah AI (Face ID)</h3>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 student?.isFaceRegistered
-                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                  : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}>
                 {student?.isFaceRegistered ? "Terdaftar & Aktif ✅" : "Belum Direkam ⚠️"}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               {student?.isFaceRegistered
                 ? "Data biometrik Anda aktif untuk verifikasi absensi kamera di lokasi kumpul."
                 : "Anda belum merekam sampel wajah. Buka menu absensi untuk merekam."}
@@ -169,7 +169,7 @@ export default function StudentProfilePage() {
 
         <Link
           href="/student/attendance"
-          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
           <Camera className="w-4 h-4" />
           <span>Buka Kamera Absen</span>
@@ -178,49 +178,49 @@ export default function StudentProfilePage() {
 
       {/* Profile Form Card */}
       <form onSubmit={handleUpdateProfile} className="space-y-6">
-        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-5 shadow-xl">
-          <h2 className="text-base font-bold text-white tracking-wide flex items-center gap-2 pb-3 border-b border-slate-800">
-            <User className="w-5 h-5 text-blue-400" />
+        <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 shadow-sm">
+          <h2 className="text-base font-bold text-slate-900 tracking-wide flex items-center gap-2 pb-3 border-b border-slate-200">
+            <User className="w-5 h-5 text-blue-600" />
             <span>Informasi Profil & Data Diri</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Nama Lengkap</label>
+              <label className="text-xs font-semibold text-slate-700">Nama Lengkap</label>
               <input
                 type="text"
                 value={student?.name || ""}
                 disabled
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed font-medium"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-500 cursor-not-allowed font-medium"
               />
-              <p className="text-[10px] text-slate-500">Hubungi Pembina jika ada kesalahan penulisan nama.</p>
+              <p className="text-[10px] text-slate-400">Hubungi Pembina jika ada kesalahan penulisan nama.</p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Kelas / Tingkat</label>
+              <label className="text-xs font-semibold text-slate-700">Kelas / Tingkat</label>
               <input
                 type="text"
                 value={student?.studentClass || ""}
                 disabled
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed font-medium"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-500 cursor-not-allowed font-medium"
               />
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-300">Nomor WhatsApp Terhubung</label>
+              <label className="text-xs font-semibold text-slate-700">Nomor WhatsApp Terhubung</label>
               <div className="relative">
                 <input
                   type="text"
                   value={`+${student?.phoneNumber || ""}`}
                   disabled
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-mono text-emerald-400 cursor-not-allowed font-medium"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-emerald-700 cursor-not-allowed font-bold"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Heart className="w-3.5 h-3.5 text-rose-400" />
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Heart className="w-3.5 h-3.5 text-rose-500" />
                 <span>Hobi & Minat</span>
               </label>
               <input
@@ -228,13 +228,13 @@ export default function StudentProfilePage() {
                 placeholder="Contoh: Reading, Gaming, Listening to Music"
                 value={hobby}
                 onChange={(e) => setHobby(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
               />
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                 <span>Motivasi Mengikuti Ekskul Velocity</span>
               </label>
               <textarea
@@ -242,7 +242,7 @@ export default function StudentProfilePage() {
                 placeholder="Tuliskan alasan & impian kamu bergabung di Velocity..."
                 value={motivation}
                 onChange={(e) => setMotivation(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors resize-none"
               />
             </div>
           </div>
@@ -251,7 +251,7 @@ export default function StudentProfilePage() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -270,33 +270,33 @@ export default function StudentProfilePage() {
       </form>
 
       {/* RIWAYAT ABSENSI PERTEMUAN SISWA */}
-      <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-4 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+            <div className="p-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-600">
               <History className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Riwayat Kehadiran & Sesi</h2>
-              <p className="text-[11px] text-slate-400">Catatan kehadiran Anda pada setiap pertemuan ekskul</p>
+              <h2 className="text-sm font-bold text-slate-900">Riwayat Kehadiran & Sesi</h2>
+              <p className="text-[11px] text-slate-500">Catatan kehadiran Anda pada setiap pertemuan ekskul</p>
             </div>
           </div>
 
-          <span className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1 rounded-xl border border-slate-800">
+          <span className="text-xs font-mono text-slate-600 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
             Total: {records.length} Pertemuan
           </span>
         </div>
 
         {records.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 space-y-2">
-            <CalendarCheck className="w-8 h-8 mx-auto opacity-40 text-blue-400" />
+          <div className="py-8 text-center text-slate-400 space-y-2">
+            <CalendarCheck className="w-8 h-8 mx-auto opacity-40 text-blue-600" />
             <p className="text-xs">Belum ada riwayat absensi yang tercatat.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400 font-semibold bg-slate-900/50">
+                <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-50">
                   <th className="py-3 px-3">Sesi Pertemuan</th>
                   <th className="py-3 px-3">Tanggal</th>
                   <th className="py-3 px-3">Status</th>
@@ -305,37 +305,37 @@ export default function StudentProfilePage() {
                   <th className="py-3 px-3">Jarak</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-slate-100 text-slate-800">
                 {records.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="py-3 px-3 font-semibold text-white">
+                  <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-3 font-semibold text-slate-900">
                       {rec.sessionTitle}
                     </td>
-                    <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">
+                    <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
                       {rec.sessionDate}
                     </td>
                     <td className="py-3 px-3">
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                           rec.status === "HADIR"
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : rec.status === "IZIN"
-                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                            : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-rose-50 text-rose-700 border border-rose-200"
                         }`}
                       >
                         {rec.status}
                       </span>
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-medium text-slate-600">
                         {rec.method === "FACE" ? "📸 Wajah AI" : rec.method === "GEOFENCE" ? "📍 GPS" : "✍️ Manual"}
                       </span>
                     </td>
-                    <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
+                    <td className="py-3 px-3 font-mono text-slate-500 text-[11px]">
                       {rec.checkInTime || "-"}
                     </td>
-                    <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
+                    <td className="py-3 px-3 font-mono text-slate-500 text-[11px]">
                       {rec.distanceMeter !== null ? `${Math.round(rec.distanceMeter)}m` : "-"}
                     </td>
                   </tr>

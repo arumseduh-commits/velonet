@@ -58,7 +58,7 @@ export function StudentBottomBar() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#090d16]/95 backdrop-blur-2xl border-t border-slate-800/90 px-2 py-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/90 backdrop-blur-xl border-t border-slate-200/90 px-2 py-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
       <div className="grid grid-cols-5 gap-1 max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = item.isActive;
@@ -70,11 +70,11 @@ export function StudentBottomBar() {
               href={item.href}
               className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl transition-all duration-200 ${
                 isActive
-                  ? "bg-emerald-500/15 border border-emerald-500/30 font-bold text-emerald-300 shadow-md shadow-emerald-500/10"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-emerald-50 border border-emerald-200 font-bold text-emerald-700 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              <Icon className={`w-4 h-4 transition-transform ${isActive ? "scale-110 text-emerald-400" : ""}`} />
+              <Icon className={`w-4 h-4 transition-transform ${isActive ? "scale-110 text-emerald-600" : "text-slate-400"}`} />
               <span className="text-[10px] mt-1 tracking-tight truncate font-medium">{item.label}</span>
             </Link>
           );

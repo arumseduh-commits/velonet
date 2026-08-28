@@ -10,7 +10,7 @@ export default function StudentLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 antialiased selection:bg-emerald-500 selection:text-white flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white flex flex-col justify-between">
       <StudentHeader />
       <main className="flex-1 w-full">{children}</main>
       <StudentBottomBar />

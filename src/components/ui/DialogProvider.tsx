@@ -121,46 +121,46 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   }), [confirm, customConfirm, toastHelpers]);
 
   const getModalIcon = (iconName?: string, variant: ModalVariant = "warning") => {
-    if (iconName === "trash") return <Trash2 className="w-6 h-6 text-rose-400" />;
-    if (iconName === "shield") return <ShieldAlert className="w-6 h-6 text-amber-400" />;
-    if (iconName === "send") return <Send className="w-6 h-6 text-blue-400" />;
-    if (iconName === "help") return <HelpCircle className="w-6 h-6 text-emerald-400" />;
+    if (iconName === "trash") return <Trash2 className="w-6 h-6 text-rose-600" />;
+    if (iconName === "shield") return <ShieldAlert className="w-6 h-6 text-amber-600" />;
+    if (iconName === "send") return <Send className="w-6 h-6 text-blue-600" />;
+    if (iconName === "help") return <HelpCircle className="w-6 h-6 text-emerald-600" />;
 
     switch (variant) {
       case "danger":
-        return <AlertTriangle className="w-6 h-6 text-rose-400" />;
+        return <AlertTriangle className="w-6 h-6 text-rose-600" />;
       case "warning":
-        return <AlertTriangle className="w-6 h-6 text-amber-400" />;
+        return <AlertTriangle className="w-6 h-6 text-amber-600" />;
       case "info":
-        return <Info className="w-6 h-6 text-blue-400" />;
+        return <Info className="w-6 h-6 text-blue-600" />;
       case "success":
-        return <CheckCircle2 className="w-6 h-6 text-emerald-400" />;
+        return <CheckCircle2 className="w-6 h-6 text-emerald-600" />;
     }
   };
 
   const getHeaderBg = (variant: ModalVariant = "warning") => {
     switch (variant) {
       case "danger":
-        return "bg-rose-500/10 border-rose-500/20 text-rose-400";
+        return "bg-rose-50 border-rose-200 text-rose-600";
       case "warning":
-        return "bg-amber-500/10 border-amber-500/20 text-amber-400";
+        return "bg-amber-50 border-amber-200 text-amber-600";
       case "info":
-        return "bg-blue-500/10 border-blue-500/20 text-blue-400";
+        return "bg-blue-50 border-blue-200 text-blue-600";
       case "success":
-        return "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
+        return "bg-emerald-50 border-emerald-200 text-emerald-600";
     }
   };
 
   const getConfirmBtnStyle = (variant: ModalVariant = "warning") => {
     switch (variant) {
       case "danger":
-        return "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20";
+        return "bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-500/20";
       case "warning":
-        return "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20";
+        return "bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-500/20";
       case "info":
-        return "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20";
+        return "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20";
       case "success":
-        return "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20";
+        return "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20";
     }
   };
 
@@ -170,9 +170,9 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
 
       {/* --- CONFIRMATION MODAL --- */}
       {confirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-200 scale-100"
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-200 scale-100"
             role="dialog"
             aria-modal="true"
           >
@@ -186,27 +186,27 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                   {getModalIcon(confirmModal.icon, confirmModal.variant)}
                 </div>
                 <div className="space-y-1 pt-0.5">
-                  <h3 className="text-lg font-bold text-white tracking-tight">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                     {confirmModal.title}
                   </h3>
-                  <p className="text-sm text-slate-300 leading-relaxed">
+                  <p className="text-sm text-slate-600 leading-relaxed">
                     {confirmModal.message}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => confirmModal.resolve(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-xs font-semibold transition-all cursor-pointer shadow-xs"
                 >
                   {confirmModal.cancelText || "Batal"}
                 </button>
                 <button
                   type="button"
                   onClick={() => confirmModal.resolve(true)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg transition-all cursor-pointer ${getConfirmBtnStyle(
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-all cursor-pointer ${getConfirmBtnStyle(
                     confirmModal.variant
                   )}`}
                 >
@@ -220,9 +220,9 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
 
       {/* --- CUSTOM MULTI-ACTION MODAL --- */}
       {customModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
             role="dialog"
             aria-modal="true"
           >
@@ -236,27 +236,27 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                   {getModalIcon(undefined, customModal.variant)}
                 </div>
                 <div className="space-y-1 pt-0.5">
-                  <h3 className="text-lg font-bold text-white tracking-tight">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                     {customModal.title}
                   </h3>
-                  <p className="text-sm text-slate-300 leading-relaxed">
+                  <p className="text-sm text-slate-600 leading-relaxed">
                     {customModal.message}
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row flex-wrap items-center justify-end gap-2.5 pt-4 border-t border-slate-800/80">
+              <div className="flex flex-col sm:flex-row flex-wrap items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
                 {customModal.actions.map((act) => {
                   let btnStyle =
                     "px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer w-full sm:w-auto text-center ";
                   if (act.variant === "primary") {
-                    btnStyle += "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20";
+                    btnStyle += "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20";
                   } else if (act.variant === "danger") {
-                    btnStyle += "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20";
+                    btnStyle += "bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20";
                   } else if (act.variant === "secondary") {
-                    btnStyle += "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700";
+                    btnStyle += "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300";
                   } else {
-                    btnStyle += "bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-200";
+                    btnStyle += "bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900";
                   }
 
                   return (
@@ -281,12 +281,12 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="pointer-events-auto flex items-start gap-3 p-4 rounded-xl bg-slate-900/95 border border-slate-800 text-slate-100 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300"
+            className="pointer-events-auto flex items-start gap-3 p-4 rounded-xl bg-white border border-slate-200 text-slate-800 shadow-xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300"
           >
-            {t.type === "success" && <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />}
-            {t.type === "error" && <XCircle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />}
-            {t.type === "warning" && <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />}
-            {t.type === "info" && <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />}
+            {t.type === "success" && <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />}
+            {t.type === "error" && <XCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />}
+            {t.type === "warning" && <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />}
+            {t.type === "info" && <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />}
 
             <div className="flex-1 text-xs leading-relaxed font-medium">
               {t.message}
@@ -294,7 +294,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
 
             <button
               onClick={() => removeToast(t.id)}
-              className="text-slate-400 hover:text-white p-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+              className="text-slate-400 hover:text-slate-700 p-0.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>

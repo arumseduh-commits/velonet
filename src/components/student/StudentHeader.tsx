@@ -102,25 +102,25 @@ export function StudentHeader() {
   ];
 
   return (
-    <header className="h-16 bg-[#090d16]/90 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-16 bg-white/85 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
       {/* Left: Brand / Profile Info */}
       <div className="flex items-center gap-3">
         <Link href="/student" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-extrabold text-white text-base shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-extrabold text-white text-base shadow-sm shadow-emerald-500/20 group-hover:scale-105 transition-transform">
             {student?.name?.charAt(0).toUpperCase() || "S"}
           </div>
           <div>
-            <span className="font-extrabold text-sm text-white tracking-tight flex items-center gap-1.5">
-              <span>{student?.name || "Portal Siswa"}</span>
+            <span className="font-extrabold text-sm text-slate-900 tracking-tight flex items-center gap-1.5">
+              <span className="truncate max-w-[150px] sm:max-w-[200px]">{student?.name || "Portal Siswa"}</span>
               {student?.studentClass && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {student.studentClass}
                 </span>
               )}
             </span>
-            <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+            <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
               <span>Velocity English Hub</span>
-              <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
             </p>
           </div>
         </Link>
@@ -134,13 +134,13 @@ export function StudentHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 item.isActive
-                  ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+                  ? "bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent"
               }`}
             >
-              <Icon className={`w-4 h-4 ${item.isActive ? "text-emerald-400" : "text-slate-400"}`} />
+              <Icon className={`w-4 h-4 ${item.isActive ? "text-emerald-600" : "text-slate-500"}`} />
               <span>{item.label}</span>
             </Link>
           );
@@ -151,10 +151,10 @@ export function StudentHeader() {
       <div className="flex items-center gap-2">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-950/30 hover:border-rose-500/30 hover:text-rose-300 text-slate-300 border border-slate-700/80 text-xs font-medium transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 border border-slate-200 text-xs font-medium transition-all cursor-pointer"
           title="Keluar dari Portal Siswa"
         >
-          <LogOut className="w-4 h-4 text-rose-400" />
+          <LogOut className="w-4 h-4 text-rose-500" />
           <span className="hidden sm:inline">Keluar</span>
         </button>
       </div>

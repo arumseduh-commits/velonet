@@ -437,9 +437,9 @@ export default function StudentAttendancePage() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
-        <RefreshCw className="w-9 h-9 animate-spin text-emerald-400" />
-        <span className="text-sm font-semibold text-slate-200">Membuka Kamera Absensi Wajah...</span>
+      <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col items-center justify-center text-slate-500 gap-3">
+        <RefreshCw className="w-9 h-9 animate-spin text-emerald-500" />
+        <span className="text-sm font-semibold text-slate-700">Membuka Kamera Absensi Wajah...</span>
       </div>
     );
   }
@@ -447,33 +447,33 @@ export default function StudentAttendancePage() {
   const isGuideValid = liveValidation?.isValid;
   const guideCode = liveValidation?.code;
 
-  let guideBorderColor = "border-dashed border-slate-500/70 shadow-none";
-  let guideBadgeColor = "bg-slate-900/85 text-white border-slate-700/80";
+  let guideBorderColor = "border-dashed border-white/60 shadow-none";
+  let guideBadgeColor = "bg-white/95 text-slate-800 border-slate-200 shadow-lg";
   let guideBadgeText = "Arahkan wajah Anda ke dalam lingkaran";
 
   if (submittingAttendance) {
     guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.5)]";
-    guideBadgeColor = "bg-emerald-950/90 text-emerald-300 border-emerald-500/40";
+    guideBadgeColor = "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-lg";
     guideBadgeText = "Memproses Verifikasi Wajah...";
   } else if (isGuideValid) {
     guideBorderColor = "border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.5)] bg-emerald-500/10";
-    guideBadgeColor = "bg-emerald-950/90 text-emerald-300 border-emerald-500/50 shadow-emerald-500/20";
+    guideBadgeColor = "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-lg";
     guideBadgeText = "Posisi Wajah Sesuai (Siap Absen)";
   } else if (guideCode === "TOO_FAR") {
     guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] bg-amber-500/5";
-    guideBadgeColor = "bg-amber-950/90 text-amber-300 border-amber-500/40";
+    guideBadgeColor = "bg-amber-50 text-amber-800 border-amber-300 shadow-lg";
     guideBadgeText = "Dekatkan Wajah ke Kamera";
   } else if (guideCode === "TOO_CLOSE") {
     guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] bg-amber-500/5";
-    guideBadgeColor = "bg-amber-950/90 text-amber-300 border-amber-500/40";
+    guideBadgeColor = "bg-amber-50 text-amber-800 border-amber-300 shadow-lg";
     guideBadgeText = "Mundurkan Wajah Sedikit";
   } else if (guideCode === "TILTED") {
     guideBorderColor = "border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.4)] bg-amber-500/5";
-    guideBadgeColor = "bg-amber-950/90 text-amber-300 border-amber-500/40";
+    guideBadgeColor = "bg-amber-50 text-amber-800 border-amber-300 shadow-lg";
     guideBadgeText = "Posisikan Wajah Tegak";
   } else if (guideCode === "OUTSIDE_CIRCLE") {
     guideBorderColor = "border-rose-400 shadow-[0_0_40px_rgba(244,63,94,0.4)] bg-rose-500/5";
-    guideBadgeColor = "bg-rose-950/90 text-rose-300 border-rose-500/40";
+    guideBadgeColor = "bg-rose-50 text-rose-800 border-rose-300 shadow-lg";
     guideBadgeText = "Arahkan Wajah ke Tengah";
   }
 
@@ -490,7 +490,7 @@ export default function StudentAttendancePage() {
       />
 
       {/* Dark Gradient Overlays for Readability */}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/70 via-transparent to-black/80" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-black/70" />
 
       {/* 2. TOP FLOATING NAVIGATION & RADAR BAR */}
       <div className="relative z-30 flex items-center justify-between p-4 sm:p-6">
@@ -498,7 +498,7 @@ export default function StudentAttendancePage() {
         <Link
           href="/student"
           onClick={stopCamera}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-slate-900/85 hover:bg-slate-800/90 text-white text-xs font-bold border border-slate-700/70 shadow-2xl backdrop-blur-md transition-all cursor-pointer group"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/95 hover:bg-white text-slate-800 text-xs font-bold border border-slate-200 shadow-lg backdrop-blur-md transition-all cursor-pointer group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
           <span>Kembali</span>
@@ -509,17 +509,17 @@ export default function StudentAttendancePage() {
           <button
             onClick={acquireGps}
             disabled={gpsLoading}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/70 text-white text-xs font-semibold shadow-2xl backdrop-blur-md transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 hover:bg-white border border-slate-200 text-slate-800 text-xs font-semibold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="Klik untuk segarkan GPS"
           >
             <div className="relative flex items-center justify-center">
-              <Navigation className={`w-3.5 h-3.5 ${gpsLoading ? "animate-spin text-blue-400" : "text-emerald-400"}`} />
-              <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${gpsLocation ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`} />
+              <Navigation className={`w-3.5 h-3.5 ${gpsLoading ? "animate-spin text-blue-600" : "text-emerald-600"}`} />
+              <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${gpsLocation ? "bg-emerald-500 animate-ping" : "bg-amber-500"}`} />
             </div>
 
             <div className="flex flex-col text-left">
-              <span className="text-[10px] text-slate-400 font-normal leading-tight">Radar Lokasi GPS</span>
-              <span className="font-mono text-[11px] text-emerald-300 font-bold leading-tight truncate max-w-[130px] sm:max-w-[180px]">
+              <span className="text-[10px] text-slate-500 font-normal leading-tight">Radar Lokasi GPS</span>
+              <span className="font-mono text-[11px] text-emerald-700 font-bold leading-tight truncate max-w-[130px] sm:max-w-[180px]">
                 {gpsLocation ? (
                   `${gpsLocation.latitude.toFixed(4)}, ${gpsLocation.longitude.toFixed(4)}`
                 ) : gpsLoading ? (
@@ -543,12 +543,12 @@ export default function StudentAttendancePage() {
           className={`relative w-60 h-76 sm:w-72 sm:h-92 rounded-[110px] border-2 transition-all duration-300 flex items-center justify-center ${guideBorderColor}`}
         >
           {/* Inner Corner Accents */}
-          <div className="absolute inset-2 border border-white/20 rounded-[102px]" />
+          <div className="absolute inset-2 border border-white/30 rounded-[102px]" />
 
           {submittingAttendance && (
             <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs rounded-[108px] flex flex-col items-center justify-center gap-3">
               <RefreshCw className="w-10 h-10 text-emerald-400 animate-spin" />
-              <span className="text-xs font-bold text-white bg-slate-900/90 px-4 py-1.5 rounded-full border border-emerald-500/40 shadow-lg">
+              <span className="text-xs font-bold text-slate-900 bg-white/95 px-4 py-1.5 rounded-full border border-emerald-300 shadow-lg">
                 Mencocokkan Wajah AI...
               </span>
             </div>
@@ -557,15 +557,15 @@ export default function StudentAttendancePage() {
 
         {/* Live Guide Floating Pill */}
         <div className="mt-5 pointer-events-auto">
-          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 ${guideBadgeColor}`}>
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl border shadow-lg backdrop-blur-md transition-all duration-300 ${guideBadgeColor}`}>
             {isGuideValid ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             ) : guideCode === "OUTSIDE_CIRCLE" ? (
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
             ) : guideCode ? (
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             ) : (
-              <Camera className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <Camera className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             )}
             <span className="text-xs font-bold">{guideBadgeText}</span>
           </div>
@@ -579,7 +579,7 @@ export default function StudentAttendancePage() {
           <button
             onClick={toggleCameraFacing}
             type="button"
-            className="p-3.5 rounded-2xl bg-slate-900/85 hover:bg-slate-800 text-white border border-slate-700/70 shadow-2xl backdrop-blur-md transition-all cursor-pointer shrink-0"
+            className="p-3.5 rounded-2xl bg-white/95 hover:bg-white text-slate-700 border border-slate-200 shadow-lg backdrop-blur-md transition-all cursor-pointer shrink-0"
             title="Ganti Kamera Depan/Belakang"
           >
             <SwitchCamera className="w-5 h-5" />
@@ -589,66 +589,66 @@ export default function StudentAttendancePage() {
           <button
             onClick={() => executeFaceCheckIn()}
             disabled={submittingAttendance || !cameraActive}
-            className={`flex-1 py-4 px-6 rounded-2xl text-white font-bold text-xs sm:text-sm tracking-wide shadow-2xl border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
+            className={`flex-1 py-4 px-6 rounded-2xl font-bold text-xs sm:text-sm tracking-wide shadow-lg border transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
               submittingAttendance
-                ? "bg-emerald-950/80 border-emerald-500/50 shadow-emerald-600/30"
+                ? "bg-emerald-700 text-white border-emerald-500 shadow-emerald-600/30"
                 : isGuideValid
-                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 shadow-emerald-600/40 border-emerald-400/40 ring-2 ring-emerald-500/30"
-                : "bg-slate-900/90 border-slate-700/80 text-slate-300 backdrop-blur-md"
+                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white shadow-emerald-600/40 border-emerald-400 ring-2 ring-emerald-500/30"
+                : "bg-white/95 border-slate-200 text-slate-800 backdrop-blur-md hover:bg-white"
             }`}
           >
             {submittingAttendance ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                <span className="text-emerald-300 font-bold">Memverifikasi Kehadiran...</span>
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                <span className="text-white font-bold">Memverifikasi Kehadiran...</span>
               </>
             ) : isGuideValid ? (
               <>
-                <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
-                <span className="text-emerald-200 font-semibold">Wajah Terkunci • Otomatis Absen</span>
+                <Sparkles className="w-4 h-4 text-emerald-100 animate-pulse" />
+                <span className="text-white font-bold">Wajah Terkunci • Otomatis Absen</span>
               </>
             ) : (
               <>
-                <ScanFace className="w-4 h-4 text-slate-400" />
+                <ScanFace className="w-4 h-4 text-slate-500" />
                 <span>Posisikan Wajah untuk Absen Otomatis</span>
               </>
             )}
           </button>
         </div>
 
-        <p className="text-[11px] text-slate-400 text-center font-medium drop-shadow-md">
+        <p className="text-[11px] text-white/90 text-center font-medium drop-shadow-md">
           Pastikan pencahayaan cukup dan wajah terlihat jelas di kamera.
         </p>
       </div>
 
       {/* 5. INTERACTIVE FLOATING RESULT POP-UP (Minimalist & To the Point) */}
       {lastCheckInResult && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl space-y-4 text-center text-slate-900">
             {/* Status Icon */}
-            <div className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm">
               {lastCheckInResult.status === "SUCCESS" ? (
-                <div className="w-full h-full rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <div className="w-full h-full rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "ALREADY_CHECKED_IN" ? (
-                <div className="w-full h-full rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                <div className="w-full h-full rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "ACCOUNT_MISMATCH" ? (
-                <div className="w-full h-full rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <div className="w-full h-full rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
                   <ShieldAlert className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "OUT_OF_RADIUS" || lastCheckInResult.status === "LOCATION_REQUIRED" ? (
-                <div className="w-full h-full rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <div className="w-full h-full rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
                   <MapPin className="w-7 h-7" />
                 </div>
               ) : lastCheckInResult.status === "UNKNOWN_FACE" ? (
-                <div className="w-full h-full rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <div className="w-full h-full rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
                   <User className="w-7 h-7" />
                 </div>
               ) : (
-                <div className="w-full h-full rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <div className="w-full h-full rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
                   <XCircle className="w-7 h-7" />
                 </div>
               )}
@@ -656,7 +656,7 @@ export default function StudentAttendancePage() {
 
             {/* Title & Message */}
             <div className="space-y-1">
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                 {lastCheckInResult.status === "SUCCESS"
                   ? "Absensi Berhasil"
                   : lastCheckInResult.status === "ALREADY_CHECKED_IN"
@@ -671,70 +671,70 @@ export default function StudentAttendancePage() {
                   ? "Wajah Tidak Dikenali"
                   : "Absensi Gagal"}
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+              <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
                 {lastCheckInResult.message}
               </p>
             </div>
 
             {/* Structured Details Card */}
-            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-left text-xs">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-left text-xs text-slate-800">
               {lastCheckInResult.status === "ACCOUNT_MISMATCH" && (
                 <>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span className="text-slate-400">Akun Login:</span>
-                    <span className="font-semibold text-slate-200">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <span className="text-slate-500">Akun Login:</span>
+                    <span className="font-semibold text-slate-800">
                       {lastCheckInResult.loggedInName || student?.name || "Akun Anda"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span className="text-slate-400">Wajah Terdeteksi:</span>
-                    <span className="font-semibold text-rose-300">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <span className="text-slate-500">Wajah Terdeteksi:</span>
+                    <span className="font-semibold text-rose-600">
                       {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
                     </span>
                   </div>
                   {lastCheckInResult.similarity !== undefined && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Akurasi Kemiripan:</span>
-                      <span className="font-mono text-rose-300 font-semibold">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Akurasi Kemiripan:</span>
+                      <span className="font-mono text-rose-600 font-semibold">
                         {(lastCheckInResult.similarity > 1 ? lastCheckInResult.similarity : lastCheckInResult.similarity * 100).toFixed(1)}%
                       </span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Status:</span>
-                    <span className="font-medium text-rose-400">Ditolak (Anti-Titip Absen)</span>
+                    <span className="text-slate-500">Status:</span>
+                    <span className="font-medium text-rose-600">Ditolak (Anti-Titip Absen)</span>
                   </div>
                 </>
               )}
 
               {lastCheckInResult.status === "SUCCESS" && (
                 <>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span className="text-slate-400">Nama Siswa:</span>
-                    <span className="font-semibold text-white">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <span className="text-slate-500">Nama Siswa:</span>
+                    <span className="font-semibold text-slate-900">
                       {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
                     </span>
                   </div>
                   {lastCheckInResult.sessionTitle && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Sesi:</span>
-                      <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Sesi:</span>
+                      <span className="font-medium text-slate-800 truncate max-w-[180px]">
                         {lastCheckInResult.sessionTitle}
                       </span>
                     </div>
                   )}
                   {lastCheckInResult.distanceMeter !== undefined && lastCheckInResult.distanceMeter !== null && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Jarak Lokasi:</span>
-                      <span className="font-mono text-emerald-400 font-semibold">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Jarak Lokasi:</span>
+                      <span className="font-mono text-emerald-600 font-semibold">
                         {Math.round(lastCheckInResult.distanceMeter)} meter ({lastCheckInResult.locationName || "Di Lokasi"})
                       </span>
                     </div>
                   )}
                   {lastCheckInResult.timeStr && (
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Waktu Tercatat:</span>
-                      <span className="font-mono text-slate-200">{lastCheckInResult.timeStr} WIB</span>
+                      <span className="text-slate-500">Waktu Tercatat:</span>
+                      <span className="font-mono text-slate-800">{lastCheckInResult.timeStr} WIB</span>
                     </div>
                   )}
                 </>
@@ -742,29 +742,29 @@ export default function StudentAttendancePage() {
 
               {lastCheckInResult.status === "ALREADY_CHECKED_IN" && (
                 <>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span className="text-slate-400">Nama Siswa:</span>
-                    <span className="font-semibold text-white">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <span className="text-slate-500">Nama Siswa:</span>
+                    <span className="font-semibold text-slate-900">
                       {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
                     </span>
                   </div>
                   {lastCheckInResult.sessionTitle && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Sesi:</span>
-                      <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Sesi:</span>
+                      <span className="font-medium text-slate-800 truncate max-w-[180px]">
                         {lastCheckInResult.sessionTitle}
                       </span>
                     </div>
                   )}
                   {lastCheckInResult.timeStr && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Waktu Absen:</span>
-                      <span className="font-mono text-slate-200">{lastCheckInResult.timeStr} WIB</span>
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Waktu Absen:</span>
+                      <span className="font-mono text-slate-800">{lastCheckInResult.timeStr} WIB</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Status Kehadiran:</span>
-                    <span className="font-medium text-blue-400">Sudah Tercatat Hadir</span>
+                    <span className="text-slate-500">Status Kehadiran:</span>
+                    <span className="font-medium text-blue-600">Sudah Tercatat Hadir</span>
                   </div>
                 </>
               )}
@@ -772,25 +772,25 @@ export default function StudentAttendancePage() {
               {lastCheckInResult.status === "OUT_OF_RADIUS" && (
                 <>
                   {lastCheckInResult.detectedName && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Nama Siswa:</span>
-                      <span className="font-semibold text-white">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Nama Siswa:</span>
+                      <span className="font-semibold text-slate-900">
                         {lastCheckInResult.detectedName} ({lastCheckInResult.detectedClass || "-"})
                       </span>
                     </div>
                   )}
                   {lastCheckInResult.locationName && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Titik Sesi:</span>
-                      <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Titik Sesi:</span>
+                      <span className="font-medium text-slate-800 truncate max-w-[180px]">
                         {lastCheckInResult.locationName}
                       </span>
                     </div>
                   )}
                   {lastCheckInResult.distanceMeter !== undefined && lastCheckInResult.distanceMeter !== null && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Jarak Anda:</span>
-                      <span className="font-mono font-semibold text-amber-400">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Jarak Anda:</span>
+                      <span className="font-mono font-semibold text-amber-600">
                         {lastCheckInResult.distanceMeter > 1000
                           ? `${(lastCheckInResult.distanceMeter / 1000).toFixed(1)} km (${Math.round(lastCheckInResult.distanceMeter).toLocaleString("id-ID")} m)`
                           : `${Math.round(lastCheckInResult.distanceMeter)} meter`}
@@ -798,8 +798,8 @@ export default function StudentAttendancePage() {
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Status:</span>
-                    <span className="font-medium text-amber-400">Di Luar Batas Radius</span>
+                    <span className="text-slate-500">Status:</span>
+                    <span className="font-medium text-amber-600">Di Luar Batas Radius</span>
                   </div>
                 </>
               )}
@@ -807,31 +807,31 @@ export default function StudentAttendancePage() {
               {lastCheckInResult.status === "LOCATION_REQUIRED" && (
                 <>
                   {lastCheckInResult.sessionTitle && (
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                      <span className="text-slate-400">Sesi:</span>
-                      <span className="font-medium text-slate-200">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <span className="text-slate-500">Sesi:</span>
+                      <span className="font-medium text-slate-800">
                         {lastCheckInResult.sessionTitle}
                       </span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Status Lokasi:</span>
-                    <span className="font-medium text-amber-400">GPS Tidak Terdeteksi</span>
+                    <span className="text-slate-500">Status Lokasi:</span>
+                    <span className="font-medium text-amber-600">GPS Tidak Terdeteksi</span>
                   </div>
                 </>
               )}
 
               {lastCheckInResult.status === "UNKNOWN_FACE" && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Status Biometrik:</span>
-                  <span className="font-medium text-amber-400">Wajah Belum Terdaftar</span>
+                  <span className="text-slate-500">Status Biometrik:</span>
+                  <span className="font-medium text-amber-600">Wajah Belum Terdaftar</span>
                 </div>
               )}
 
               {lastCheckInResult.status === "ERROR" && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Keterangan:</span>
-                  <span className="font-medium text-rose-400">Terjadi Kesalahan</span>
+                  <span className="text-slate-500">Keterangan:</span>
+                  <span className="font-medium text-rose-600">Terjadi Kesalahan</span>
                 </div>
               )}
             </div>
@@ -843,7 +843,7 @@ export default function StudentAttendancePage() {
                   setLastCheckInResult(null);
                   autoScanCooldownUntilRef.current = Date.now() + 1500;
                 }}
-                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer border border-slate-200"
               >
                 {lastCheckInResult.status === "SUCCESS" || lastCheckInResult.status === "ALREADY_CHECKED_IN" ? "Tutup" : "Coba Lagi"}
               </button>
@@ -852,7 +852,7 @@ export default function StudentAttendancePage() {
                 <Link
                   href="/student"
                   onClick={stopCamera}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   <span>Kembali ke Beranda</span>
                 </Link>

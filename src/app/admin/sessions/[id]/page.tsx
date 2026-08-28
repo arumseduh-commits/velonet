@@ -91,7 +91,6 @@ export default function SessionDetailPage({
 
   useEffect(() => {
     fetchDetail();
-    // Real-time Auto-Sync Poller (Every 5.0s for Cloud performance)
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         fetchDetail(true);
@@ -152,7 +151,7 @@ export default function SessionDetailPage({
 
       if (!res.ok) throw new Error(data.error || "Gagal mem-broadcast pengumuman");
 
-      const successMsg = `📢 Broadcast Berhasil! Terkirim ke ${data.successCount} peserta.`;
+      const successMsg = `Broadcast Berhasil! Terkirim ke ${data.successCount} peserta.`;
       setAlertMessage({
         type: "success",
         text: successMsg,
@@ -191,7 +190,7 @@ export default function SessionDetailPage({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal mem-broadcast follow-up Alpa");
 
-      toast.success(`📢 Follow-up Berhasil! Terkirim ke ${data.successCount} peserta Alpa.`);
+      toast.success(`Follow-up Berhasil! Terkirim ke ${data.successCount} peserta Alpa.`);
     } catch (err: any) {
       toast.error(err.message || "Gagal mem-broadcast follow-up Alpa");
     } finally {
@@ -229,9 +228,9 @@ export default function SessionDetailPage({
 
   if (isLoading || !session) {
     return (
-      <div className="flex flex-col items-center justify-center p-16 space-y-4 bg-slate-900/40 rounded-2xl border border-slate-800">
-        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-        <p className="text-sm text-slate-400">Memuat data rekap absensi sesi...</p>
+      <div className="flex flex-col items-center justify-center p-16 space-y-4 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+        <p className="text-xs sm:text-sm text-slate-600 font-medium">Memuat data rekap absensi sesi...</p>
       </div>
     );
   }
@@ -261,39 +260,38 @@ export default function SessionDetailPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link
           href="/admin/sessions"
-          className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Kembali ke Daftar Sesi</span>
         </Link>
 
-        <div className="flex items-center gap-2">
-          {/* WA Broadcast & Follow-up Alpa buttons ONLY enabled for ongoing/future active sessions */}
+        <div className="flex flex-wrap items-center gap-2">
           {!isExpired && (
             <>
               <button
                 onClick={handleFollowupAlpaWA}
                 disabled={isFollowingUpAlpa}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
                 title="Kirim notifikasi pengingat WA ke peserta yang Alpa (Tidak Hadir)"
               >
                 {isFollowingUpAlpa ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 text-rose-600" />
                 )}
-                <span>📢 Follow-up Alpa (WA)</span>
+                <span>Follow-up Alpa (WA)</span>
               </button>
 
               <button
                 onClick={handleBroadcastWA}
                 disabled={isBroadcasting}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-semibold transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isBroadcasting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 text-blue-600" />
                 )}
                 <span>Broadcast Undangan WA</span>
               </button>
@@ -302,41 +300,41 @@ export default function SessionDetailPage({
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-all cursor-pointer"
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
             <span>Export Excel (.csv)</span>
           </button>
         </div>
       </div>
 
       {/* Session Summary Card */}
-      <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 shadow-xl space-y-4">
+      <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
               Detail Rekap Kehadiran
             </span>
-            <h1 className="text-2xl font-bold text-white mt-0.5">{session.title}</h1>
+            <h1 className="text-2xl font-black text-slate-900 mt-0.5">{session.title}</h1>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {isExpired ? (
-              <span className="px-3 py-1 rounded-full font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
+              <span className="px-3 py-1 rounded-full font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1.5">
                 🔒 Sesi Selesai (Data Absensi Terkunci)
               </span>
             ) : (
-              <span className="px-3 py-1 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="px-3 py-1 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                 Real-time Live Sync
               </span>
             )}
 
             <span
-              className={`px-3 py-1 rounded-full font-semibold border ${
+              className={`px-3 py-1 rounded-full font-bold border ${
                 !isExpired && session.isActive
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                  : "bg-slate-800 text-slate-400 border-slate-700"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
               }`}
             >
               {!isExpired && session.isActive ? "● Sesi Aktif Absen" : "○ Sesi Ditutup"}
@@ -345,53 +343,53 @@ export default function SessionDetailPage({
         </div>
 
         {/* Info Items */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-800/80 text-xs">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60">
-            <Clock className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-200 text-xs">
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+            <Clock className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
-              <span className="text-slate-400 block">Jadwal & Jam Absen</span>
-              <strong className="text-slate-200">
+              <span className="text-slate-500 block">Jadwal & Jam Absen</span>
+              <strong className="text-slate-900 font-bold">
                 {formattedDate} ({startTimeStr} - {endTimeStr} WIB)
               </strong>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60">
-            <MapPin className="w-5 h-5 text-blue-400 shrink-0" />
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+            <MapPin className="w-5 h-5 text-blue-600 shrink-0" />
             <div>
-              <span className="text-slate-400 block">Lokasi & Radius GPS</span>
-              <strong className="text-slate-200">
+              <span className="text-slate-500 block">Lokasi & Radius GPS</span>
+              <strong className="text-slate-900 font-bold">
                 {session.locationName || "Titik Default"} (Radius: {session.radiusMeter}m)
               </strong>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60">
-            <Users className="w-5 h-5 text-amber-400 shrink-0" />
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+            <Users className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
-              <span className="text-slate-400 block">Total Peserta Terdaftar</span>
-              <strong className="text-slate-200">{participants.length} Orang</strong>
+              <span className="text-slate-500 block">Total Peserta Terdaftar</span>
+              <strong className="text-slate-900 font-bold">{participants.length} Orang</strong>
             </div>
           </div>
         </div>
 
         {/* Status Counters Bar (4 Columns) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-          <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-center">
-            <span className="text-xs text-emerald-300 font-medium">Hadir (GPS)</span>
-            <div className="text-xl font-bold text-emerald-400">{hadirCount}</div>
+          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
+            <span className="text-xs text-emerald-800 font-bold">Hadir (GPS)</span>
+            <div className="text-2xl font-black text-emerald-700 mt-0.5">{hadirCount}</div>
           </div>
-          <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/20 text-center">
-            <span className="text-xs text-amber-300 font-medium">Izin / Sakit</span>
-            <div className="text-xl font-bold text-amber-400">{izinCount}</div>
+          <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-center">
+            <span className="text-xs text-amber-800 font-bold">Izin / Sakit</span>
+            <div className="text-2xl font-black text-amber-700 mt-0.5">{izinCount}</div>
           </div>
-          <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/20 text-center">
-            <span className="text-xs text-rose-300 font-medium">Tidak Hadir (Alpa)</span>
-            <div className="text-xl font-bold text-rose-400">{alpaCount}</div>
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center">
+            <span className="text-xs text-rose-800 font-bold">Tidak Hadir (Alpa)</span>
+            <div className="text-2xl font-black text-rose-700 mt-0.5">{alpaCount}</div>
           </div>
-          <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-center">
-            <span className="text-xs text-slate-400 font-medium">Belum Absen</span>
-            <div className="text-xl font-bold text-slate-400">{belumAbsenCount}</div>
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+            <span className="text-xs text-slate-600 font-bold">Belum Absen</span>
+            <div className="text-2xl font-black text-slate-800 mt-0.5">{belumAbsenCount}</div>
           </div>
         </div>
       </div>
@@ -399,40 +397,40 @@ export default function SessionDetailPage({
       {/* Alert Message */}
       {alertMessage && (
         <div
-          className={`flex items-center gap-3 p-4 rounded-xl text-sm font-medium border ${
+          className={`flex items-center gap-3 p-4 rounded-2xl text-xs sm:text-sm font-semibold border ${
             alertMessage.type === "success"
-              ? "bg-emerald-950/60 border-emerald-500/30 text-emerald-300"
-              : "bg-rose-950/60 border-rose-500/30 text-rose-300"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800"
           }`}
         >
           {alertMessage.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           ) : (
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           )}
           <span>{alertMessage.text}</span>
         </div>
       )}
 
       {/* Search & Filter Controls */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-        <div className="relative w-full md:w-80">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Cari nama, kelas, atau No. WA..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+            className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-colors"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <Filter className="w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-slate-500" />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 font-medium cursor-pointer"
           >
             <option value="ALL">Semua Status Kehadiran</option>
             <option value="HADIR">Hadir (GPS)</option>
@@ -444,10 +442,10 @@ export default function SessionDetailPage({
       </div>
 
       {/* Attendance Participants Table */}
-      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl overflow-hidden">
+      <div className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-slate-50/90 text-slate-700 font-bold border-b border-slate-200">
               <tr>
                 <th className="p-4">No</th>
                 <th className="p-4">Nama Peserta</th>
@@ -461,10 +459,10 @@ export default function SessionDetailPage({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <tbody className="divide-y divide-slate-100 text-slate-800">
               {filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-500">
+                  <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">
                     Tidak ada data peserta yang cocok dengan pencarian / filter.
                   </td>
                 </tr>
@@ -481,72 +479,72 @@ export default function SessionDetailPage({
                   return (
                     <tr
                       key={p.participantId}
-                      className="hover:bg-slate-800/40 transition-colors"
+                      className="hover:bg-slate-50/80 transition-colors"
                     >
-                      <td className="p-4 font-mono text-slate-500">{idx + 1}</td>
+                      <td className="p-4 font-mono text-slate-400 font-semibold">{idx + 1}</td>
 
-                      <td className="p-4 font-bold text-white">
+                      <td className="p-4 font-bold text-slate-900">
                         {p.name}
                       </td>
 
-                      <td className="p-4 font-medium text-slate-300">
+                      <td className="p-4 font-medium text-slate-700">
                         {p.studentClass}
                       </td>
 
-                      <td className="p-4 font-mono text-slate-400">
+                      <td className="p-4 font-mono text-slate-600">
                         +{p.phoneNumber}
                       </td>
 
                       <td className="p-4">
                         {p.status === "HADIR" ? (
-                          <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             Hadir
                           </span>
                         ) : p.status === "IZIN" || p.status === "SAKIT" ? (
-                          <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                             {p.status}
                           </span>
                         ) : p.status === "ALPA" ? (
-                          <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                          <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                             Alpa
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-medium">
+                          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-medium">
                             Belum Absen
                           </span>
                         )}
                       </td>
 
-                      <td className="p-4 font-mono text-slate-400">
+                      <td className="p-4 font-mono text-slate-600">
                         {timeStr}
                       </td>
 
-                      <td className="p-4 font-mono text-emerald-400 font-semibold">
+                      <td className="p-4 font-mono text-emerald-700 font-bold">
                         {p.distanceMeter != null ? `${p.distanceMeter}m` : "-"}
                       </td>
 
-                      <td className="p-4 text-slate-400 max-w-xs truncate" title={p.notes || ""}>
+                      <td className="p-4 text-slate-500 max-w-xs truncate" title={p.notes || ""}>
                         {p.notes || "-"}
                       </td>
 
                       <td className="p-4 text-right">
                         {isExpired ? (
-                          <span className="text-[11px] font-medium text-slate-500 italic">
+                          <span className="text-[11px] font-medium text-slate-400 italic">
                             🔒 Rekap Terkunci
                           </span>
                         ) : isUpdatingThis ? (
-                          <Loader2 className="w-4 h-4 text-emerald-400 animate-spin ml-auto" />
+                          <Loader2 className="w-4 h-4 text-emerald-600 animate-spin ml-auto" />
                         ) : (
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => handleUpdateStatus(p.participantId, "HADIR")}
-                              className={`p-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                                 p.status === "HADIR"
-                                  ? "bg-emerald-600 text-white border-emerald-500"
-                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                                  ? "bg-emerald-600 text-white shadow-sm"
+                                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
                               }`}
                               title="Tandai Hadir"
                             >
@@ -555,10 +553,10 @@ export default function SessionDetailPage({
 
                             <button
                               onClick={() => handleUpdateStatus(p.participantId, "IZIN")}
-                              className={`p-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                                 p.status === "IZIN"
-                                  ? "bg-amber-600 text-white border-amber-500"
-                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                                  ? "bg-amber-600 text-white shadow-sm"
+                                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
                               }`}
                               title="Tandai Izin"
                             >
@@ -567,10 +565,10 @@ export default function SessionDetailPage({
 
                             <button
                               onClick={() => handleUpdateStatus(p.participantId, "ALPA")}
-                              className={`p-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                                 p.status === "ALPA"
-                                  ? "bg-rose-600 text-white border-rose-500"
-                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                                  ? "bg-rose-600 text-white shadow-sm"
+                                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
                               }`}
                               title="Tandai Tidak Hadir (Alpa)"
                             >
@@ -579,7 +577,7 @@ export default function SessionDetailPage({
 
                             <button
                               onClick={() => handleUpdateStatus(p.participantId, "DELETE")}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 transition-colors"
+                              className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 transition-colors text-xs cursor-pointer"
                               title="Reset status"
                             >
                               Reset
@@ -598,15 +596,15 @@ export default function SessionDetailPage({
 
       {/* Interactive Map & GPS Validation Card (Bottom Section) */}
       {session.latitude != null && session.longitude != null && (
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3.5 shadow-lg">
+        <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-4 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+              <div className="w-9 h-9 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center border border-blue-200">
                 <MapPin className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-sm">Peta Titik Koordinat GPS Perkumpulan</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="font-bold text-slate-900 text-sm">Peta Titik Koordinat GPS Perkumpulan</h3>
+                <p className="text-xs text-slate-500">
                   Visualisasi titik kumpul lokasi absensi ({session.locationName || "Titik Kumpul"})
                 </p>
               </div>
@@ -617,7 +615,7 @@ export default function SessionDetailPage({
                 href={`https://www.google.com/maps?q=${session.latitude},${session.longitude}`}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+                className="px-3.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
               >
                 <Navigation className="w-3.5 h-3.5" />
                 <span>Buka di Google Maps ↗</span>
@@ -626,7 +624,7 @@ export default function SessionDetailPage({
           </div>
 
           {/* Map Embed Frame */}
-          <div className="relative w-full h-72 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner">
+          <div className="relative w-full h-72 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-inner">
             <iframe
               title="Peta Titik Absensi"
               width="100%"
@@ -636,22 +634,22 @@ export default function SessionDetailPage({
               marginHeight={0}
               marginWidth={0}
               src={`https://www.openstreetmap.org/export/embed.html?bbox=${session.longitude - 0.004}%2C${session.latitude - 0.003}%2C${session.longitude + 0.004}%2C${session.latitude + 0.003}&layer=mapnik&marker=${session.latitude}%2C${session.longitude}`}
-              className="w-full h-full filter contrast-125 saturate-150"
+              className="w-full h-full"
             />
           </div>
 
           {/* Coordinate Details Footer */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
             <div className="flex items-center gap-4">
               <span>
-                Latitude: <strong className="text-emerald-400 font-mono">{session.latitude}</strong>
+                Latitude: <strong className="text-emerald-700 font-mono font-bold">{session.latitude}</strong>
               </span>
               <span>
-                Longitude: <strong className="text-emerald-400 font-mono">{session.longitude}</strong>
+                Longitude: <strong className="text-emerald-700 font-mono font-bold">{session.longitude}</strong>
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-emerald-300 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Radius Validasi: {session.radiusMeter} Meter</span>
             </div>
           </div>
@@ -660,3 +658,4 @@ export default function SessionDetailPage({
     </div>
   );
 }
+

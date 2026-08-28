@@ -433,9 +433,9 @@ export default function CompleteProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-emerald-400 gap-3">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-emerald-600 gap-3">
         <RefreshCw className="w-8 h-8 animate-spin" />
-        <p className="text-sm font-medium text-slate-300">Memuat formulir pendaftaran...</p>
+        <p className="text-sm font-medium text-slate-600">Memuat formulir pendaftaran...</p>
       </div>
     );
   }
@@ -443,7 +443,7 @@ export default function CompleteProfilePage() {
   // --- FULL SCREEN KYC LIVENESS SCANNER VIEW ---
   if (step === "KYC_SCAN") {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col items-center justify-between p-4 sm:p-6 select-none overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-black text-white flex flex-col items-center justify-between p-4 sm:p-6 select-none overflow-hidden">
         {/* Full-Screen Colored Light Flash Overlay (Anti-Spoofing Screen Reflection) */}
         {flashColor && (
           <div
@@ -460,17 +460,17 @@ export default function CompleteProfilePage() {
         )}
 
         {/* Top Header */}
-        <div className="w-full max-w-md flex items-center justify-between pt-2">
+        <div className="w-full max-w-md flex items-center justify-between pt-2 z-20">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white font-extrabold text-sm shadow-lg shadow-emerald-500/20">
               V
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-white flex items-center gap-1.5 drop-shadow-md">
                 <span>Verifikasi Biometrik Wajah</span>
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               </h2>
-              <p className="text-[11px] text-slate-400">KYC Liveness Detection VeloNet</p>
+              <p className="text-[11px] text-slate-300 drop-shadow-sm">KYC Liveness Detection VeloNet</p>
             </div>
           </div>
 
@@ -480,14 +480,14 @@ export default function CompleteProfilePage() {
               setStep("FORM");
             }}
             type="button"
-            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 transition-colors"
+            className="text-xs text-white hover:text-slate-200 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/80 backdrop-blur-md transition-colors cursor-pointer"
           >
             Kembali ke Form
           </button>
         </div>
 
         {/* Circular / Oval Biometric Camera Frame */}
-        <div className="relative flex flex-col items-center justify-center my-auto">
+        <div className="relative flex flex-col items-center justify-center my-auto z-20">
           {/* Oval Glowing Guide Border */}
           <div
             className={`relative w-64 h-80 sm:w-72 sm:h-96 rounded-[120px] overflow-hidden border-4 shadow-2xl transition-all duration-500 ${
@@ -499,7 +499,7 @@ export default function CompleteProfilePage() {
                 ? "border-teal-400 shadow-teal-500/30 animate-pulse"
                 : livenessStage === "BLINK"
                 ? "border-blue-400 shadow-blue-500/30 animate-pulse"
-                : "border-emerald-500/60 shadow-emerald-500/20"
+                : "border-emerald-500/80 shadow-emerald-500/20"
             }`}
           >
             {/* Live Video */}
@@ -511,7 +511,7 @@ export default function CompleteProfilePage() {
             />
 
             {/* Circular Guide Overlay Lines */}
-            <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-white/20 rounded-[116px]" />
+            <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-white/30 rounded-[116px]" />
 
             {cameraLoading && (
               <div className="absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center gap-2">
@@ -523,28 +523,28 @@ export default function CompleteProfilePage() {
 
           {/* Real-time Instructions Badge */}
           <div className="mt-6 text-center space-y-2 max-w-sm px-4">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/95 border border-slate-200 shadow-2xl backdrop-blur-md text-slate-900">
               {livenessStage === "BLINK" ? (
-                <Eye className="w-4 h-4 text-blue-400 animate-bounce" />
+                <Eye className="w-4 h-4 text-blue-600 animate-bounce" />
               ) : livenessStage === "SMILE" ? (
-                <Smile className="w-4 h-4 text-amber-400 animate-bounce" />
+                <Smile className="w-4 h-4 text-amber-500 animate-bounce" />
               ) : livenessStage === "FLASH" ? (
-                <Zap className="w-4 h-4 text-yellow-400 animate-pulse" />
+                <Zap className="w-4 h-4 text-yellow-500 animate-pulse" />
               ) : livenessStage === "DONE" ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               ) : (
-                <Camera className="w-4 h-4 text-emerald-400" />
+                <Camera className="w-4 h-4 text-emerald-600" />
               )}
-              <span className="text-xs font-bold text-white">{guideText}</span>
+              <span className="text-xs font-bold text-slate-900">{guideText}</span>
             </div>
 
             {/* Progress Badges */}
-            <div className="flex items-center justify-center gap-3 pt-1">
+            <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
               <span
                 className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 border transition-all ${
                   blinkProgress
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                    : "bg-slate-900 text-slate-500 border-slate-800"
+                    ? "bg-emerald-500 text-white border-emerald-400 shadow-xs"
+                    : "bg-white/80 text-slate-700 border-slate-200 backdrop-blur-md"
                 }`}
               >
                 {blinkProgress ? "✓" : "1."} Kedip Mata
@@ -553,8 +553,8 @@ export default function CompleteProfilePage() {
               <span
                 className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 border transition-all ${
                   smileProgress
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                    : "bg-slate-900 text-slate-500 border-slate-800"
+                    ? "bg-emerald-500 text-white border-emerald-400 shadow-xs"
+                    : "bg-white/80 text-slate-700 border-slate-200 backdrop-blur-md"
                 }`}
               >
                 {smileProgress ? "✓" : "2."} Senyum
@@ -563,8 +563,8 @@ export default function CompleteProfilePage() {
               <span
                 className={`px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 border transition-all ${
                   livenessStage === "DONE"
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                    : "bg-slate-900 text-slate-500 border-slate-800"
+                    ? "bg-emerald-500 text-white border-emerald-400 shadow-xs"
+                    : "bg-white/80 text-slate-700 border-slate-200 backdrop-blur-md"
                 }`}
               >
                 {livenessStage === "DONE" ? "✓" : "3."} Refleksi Cahaya
@@ -574,8 +574,8 @@ export default function CompleteProfilePage() {
         </div>
 
         {/* Bottom Safety Info */}
-        <div className="w-full max-w-md pb-2 text-center">
-          <p className="text-[11px] text-slate-400">
+        <div className="w-full max-w-md pb-2 text-center z-20">
+          <p className="text-[11px] text-slate-300 drop-shadow-sm">
             🔒 Data biometrik Anda dienkripsi dan hanya digunakan untuk absensi kehadiran resmi ekskul.
           </p>
         </div>
@@ -585,19 +585,19 @@ export default function CompleteProfilePage() {
 
   // --- STEP 1: FORMULIR BIODATA PENDAFTARAN ---
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 selection:bg-emerald-500 selection:text-white">
-      <div className="w-full max-w-xl bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-4 sm:p-6 selection:bg-emerald-500 selection:text-white">
+      <div className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-emerald-500/20 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white font-black text-xl shadow-md shadow-emerald-500/20 shrink-0">
               V
             </div>
             <div>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
                 Pendaftaran Anggota
               </span>
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-wide mt-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-wide mt-1">
                 Lengkapi Data Diri
               </h1>
             </div>
@@ -606,7 +606,7 @@ export default function CompleteProfilePage() {
           <button
             onClick={handleLogout}
             type="button"
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 border border-slate-700/50 transition-colors"
+            className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-rose-600 border border-slate-200 transition-colors cursor-pointer"
             title="Keluar"
           >
             <LogOut className="w-5 h-5" />
@@ -614,20 +614,20 @@ export default function CompleteProfilePage() {
         </div>
 
         {/* Info Banner WhatsApp */}
-        <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex items-start gap-3 text-xs">
-          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-3 text-xs">
+          <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 shrink-0 mt-0.5">
             <ShieldCheck className="w-4 h-4" />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-white">WhatsApp Terverifikasi</span>
+              <span className="font-semibold text-slate-900">WhatsApp Terverifikasi</span>
               {!isLidNumber && initialPhone && (
-                <span className="font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 text-[11px]">
+                <span className="font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[11px]">
                   +{initialPhone}
                 </span>
               )}
             </div>
-            <p className="text-slate-400 leading-relaxed text-[11px]">
+            <p className="text-slate-600 leading-relaxed text-[11px]">
               Akun WhatsApp Anda telah tervalidasi di sistem VeloNet. Silakan lengkapi biodata di bawah ini untuk lanjut ke verifikasi biometrik wajah.
             </p>
           </div>
@@ -636,12 +636,12 @@ export default function CompleteProfilePage() {
         <form onSubmit={handleProceedToKYC} className="space-y-4 text-xs">
           {/* 1. Nama Lengkap (Otomatis Kapital, Min 4 Karakter) */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center justify-between">
+            <label className="text-slate-700 font-semibold flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <User className="w-4 h-4 text-emerald-400" />
-                <span>Nama Lengkap <span className="text-rose-400">*</span></span>
+                <User className="w-4 h-4 text-emerald-600" />
+                <span>Nama Lengkap <span className="text-rose-500">*</span></span>
               </span>
-              <span className="text-[11px] text-slate-500">Min. 4 huruf (KAPITAL)</span>
+              <span className="text-[11px] text-slate-400">Min. 4 huruf (KAPITAL)</span>
             </label>
             <input
               type="text"
@@ -650,18 +650,18 @@ export default function CompleteProfilePage() {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value.toUpperCase() })}
               placeholder="CONTOH: AHMAD FAUZI SYAHPUTRA"
-              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-semibold tracking-wide uppercase transition-colors"
+              className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-semibold tracking-wide uppercase transition-colors"
             />
           </div>
 
-          {/* 2. Tanggal Lahir (3 Dropdown: Tgl, Bulan, Tahun - 100% Rapi & Tidak Keluar Outline) */}
+          {/* 2. Tanggal Lahir (3 Dropdown: Tgl, Bulan, Tahun) */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center justify-between">
+            <label className="text-slate-700 font-semibold flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-emerald-400" />
-                <span>Tanggal Lahir <span className="text-rose-400">*</span></span>
+                <Calendar className="w-4 h-4 text-emerald-600" />
+                <span>Tanggal Lahir <span className="text-rose-500">*</span></span>
               </span>
-              <span className="text-[11px] text-slate-500">Min. 15 thn (Maks. {maxAllowedYear})</span>
+              <span className="text-[11px] text-slate-400">Min. 15 thn (Maks. {maxAllowedYear})</span>
             </label>
 
             <div className="grid grid-cols-3 gap-2">
@@ -671,19 +671,19 @@ export default function CompleteProfilePage() {
                   required
                   value={birthDay}
                   onChange={(e) => setBirthDay(e.target.value)}
-                  className="w-full px-3 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
+                  className="w-full px-3 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
                   style={{ minHeight: "44px" }}
                 >
-                  <option value="" disabled className="bg-slate-950 text-slate-500">
+                  <option value="" disabled className="bg-white text-slate-400">
                     Tgl
                   </option>
                   {DAYS.map((d) => (
-                    <option key={d} value={d} className="bg-slate-950 text-slate-200">
+                    <option key={d} value={d} className="bg-white text-slate-800">
                       {d}
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -696,19 +696,19 @@ export default function CompleteProfilePage() {
                   required
                   value={birthMonth}
                   onChange={(e) => setBirthMonth(e.target.value)}
-                  className="w-full px-2.5 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
+                  className="w-full px-2.5 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
                   style={{ minHeight: "44px" }}
                 >
-                  <option value="" disabled className="bg-slate-950 text-slate-500">
+                  <option value="" disabled className="bg-white text-slate-400">
                     Bulan
                   </option>
                   {MONTHS.map((m) => (
-                    <option key={m.value} value={m.value} className="bg-slate-950 text-slate-200">
+                    <option key={m.value} value={m.value} className="bg-white text-slate-800">
                       {m.label}
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -721,19 +721,19 @@ export default function CompleteProfilePage() {
                   required
                   value={birthYear}
                   onChange={(e) => setBirthYear(e.target.value)}
-                  className="w-full px-3 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
+                  className="w-full px-3 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium transition-colors cursor-pointer appearance-none text-xs text-center"
                   style={{ minHeight: "44px" }}
                 >
-                  <option value="" disabled className="bg-slate-950 text-slate-500">
+                  <option value="" disabled className="bg-white text-slate-400">
                     Tahun
                   </option>
                   {YEARS.map((y) => (
-                    <option key={y} value={y} className="bg-slate-950 text-slate-200">
+                    <option key={y} value={y} className="bg-white text-slate-800">
                       {y}
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -744,9 +744,9 @@ export default function CompleteProfilePage() {
 
           {/* 3. Jenis Kelamin */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-emerald-400" />
-              <span>Jenis Kelamin <span className="text-rose-400">*</span></span>
+            <label className="text-slate-700 font-semibold flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-emerald-600" />
+              <span>Jenis Kelamin <span className="text-rose-500">*</span></span>
             </label>
             <div className="grid grid-cols-2 gap-2.5 pt-0.5">
               <button
@@ -754,8 +754,8 @@ export default function CompleteProfilePage() {
                 onClick={() => setFormData({ ...formData, gender: "Laki-laki" })}
                 className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   formData.gender === "Laki-laki"
-                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-xs font-bold"
+                    : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
                 }`}
                 style={{ minHeight: "44px" }}
               >
@@ -767,8 +767,8 @@ export default function CompleteProfilePage() {
                 onClick={() => setFormData({ ...formData, gender: "Perempuan" })}
                 className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   formData.gender === "Perempuan"
-                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-xs font-bold"
+                    : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
                 }`}
                 style={{ minHeight: "44px" }}
               >
@@ -779,28 +779,28 @@ export default function CompleteProfilePage() {
 
           {/* 4. Kelas (Dropdown Pilihan SMKN 1: 5 Jurusan x 3 Angkatan) */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center justify-between">
+            <label className="text-slate-700 font-semibold flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <GraduationCap className="w-4 h-4 text-emerald-400" />
-                <span>Kelas Asal SMKN 1 <span className="text-rose-400">*</span></span>
+                <GraduationCap className="w-4 h-4 text-emerald-600" />
+                <span>Kelas Asal SMKN 1 <span className="text-rose-500">*</span></span>
               </span>
-              <span className="text-[11px] text-slate-500">Pilih dari 45 kelas</span>
+              <span className="text-[11px] text-slate-400">Pilih dari 45 kelas</span>
             </label>
             <div className="relative">
               <select
                 required
                 value={formData.studentClass}
                 onChange={(e) => setFormData({ ...formData, studentClass: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 font-medium transition-colors cursor-pointer appearance-none text-xs"
+                className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium transition-colors cursor-pointer appearance-none text-xs"
                 style={{ minHeight: "44px" }}
               >
-                <option value="" disabled className="bg-slate-950 text-slate-500">
+                <option value="" disabled className="bg-white text-slate-400">
                   -- Pilih Kelas & Jurusan Asal --
                 </option>
                 {Object.entries(SCHOOL_CLASSES).map(([gradeGroup, classes]) => (
-                  <optgroup key={gradeGroup} label={gradeGroup} className="bg-slate-900 text-emerald-400 font-bold">
+                  <optgroup key={gradeGroup} label={gradeGroup} className="bg-slate-100 text-slate-900 font-bold">
                     {classes.map((cls) => (
-                      <option key={cls} value={cls} className="bg-slate-950 text-slate-200 font-normal py-1">
+                      <option key={cls} value={cls} className="bg-white text-slate-800 font-normal py-1">
                         {cls}
                       </option>
                     ))}
@@ -817,9 +817,9 @@ export default function CompleteProfilePage() {
 
           {/* 5. Alasan / Motivasi Join */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-emerald-400" />
-              <span>Alasan / Motivasi Masuk Ekskul <span className="text-rose-400">*</span></span>
+            <label className="text-slate-700 font-semibold flex items-center gap-1.5">
+              <Target className="w-4 h-4 text-emerald-600" />
+              <span>Alasan / Motivasi Masuk Ekskul <span className="text-rose-500">*</span></span>
             </label>
             <textarea
               required
@@ -827,15 +827,15 @@ export default function CompleteProfilePage() {
               value={formData.motivation}
               onChange={(e) => setFormData({ ...formData, motivation: e.target.value })}
               placeholder="Ceritakan singkat mengapa Anda ingin bergabung dengan Komunitas Velocity..."
-              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium resize-none transition-colors"
+              className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium resize-none transition-colors"
             />
           </div>
 
           {/* 6. Hobi */}
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-              <Heart className="w-4 h-4 text-emerald-400" />
-              <span>Hobi & Minat <span className="text-rose-400">*</span></span>
+            <label className="text-slate-700 font-semibold flex items-center gap-1.5">
+              <Heart className="w-4 h-4 text-emerald-600" />
+              <span>Hobi & Minat <span className="text-rose-500">*</span></span>
             </label>
             <input
               type="text"
@@ -843,7 +843,7 @@ export default function CompleteProfilePage() {
               value={formData.hobby}
               onChange={(e) => setFormData({ ...formData, hobby: e.target.value })}
               placeholder="Contoh: Coding, Desain Grafis, Membaca, Musik, Badminton..."
-              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-medium transition-colors"
+              className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium transition-colors"
             />
           </div>
 
@@ -851,7 +851,7 @@ export default function CompleteProfilePage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
+            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-4"
           >
             {submitting ? (
               <>

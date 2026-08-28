@@ -340,22 +340,22 @@ export default function ParticipantDetailPage({
 
   if (loading) {
     return (
-      <div className="py-16 text-center text-slate-400 space-y-3">
-        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-400" />
-        <p className="text-sm">Memuat detail profil peserta...</p>
+      <div className="py-16 text-center text-slate-500 space-y-3">
+        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600" />
+        <p className="text-sm font-medium">Memuat detail profil peserta...</p>
       </div>
     );
   }
 
   if (error || !participant) {
     return (
-      <div className="p-8 rounded-2xl glass-panel border border-slate-800 text-center space-y-4 max-w-lg mx-auto">
-        <UserX className="w-12 h-12 text-rose-400 mx-auto" />
-        <h2 className="text-lg font-bold text-white">Peserta Tidak Ditemukan</h2>
-        <p className="text-xs text-slate-400 leading-relaxed">{error}</p>
+      <div className="p-8 rounded-2xl bg-white border border-slate-200 shadow-sm text-center space-y-4 max-w-lg mx-auto">
+        <UserX className="w-12 h-12 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-900">Peserta Tidak Ditemukan</h2>
+        <p className="text-xs text-slate-500 leading-relaxed">{error}</p>
         <Link
           href="/admin/participants"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Kembali ke Data Peserta
         </Link>
@@ -364,30 +364,30 @@ export default function ParticipantDetailPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-900 pb-16">
       {/* Back Button Header */}
       <div>
         <Link
           href="/admin/participants"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors mb-2"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors mb-2 cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Kembali ke Data Peserta
         </Link>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl glass-panel border border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-blue-500/20">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-extrabold text-white text-xl shadow-md shadow-blue-500/20">
               {participant.name ? participant.name.charAt(0).toUpperCase() : "P"}
             </div>
 
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-white tracking-tight">
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                   {participant.name || "Peserta Anonim"}
                 </h1>
                 {getStatusBadge(participant.status, participant.isExcluded)}
               </div>
-              <p className="text-sm font-mono text-blue-400 mt-1 flex items-center gap-2">
+              <p className="text-sm font-mono text-blue-600 font-bold mt-1 flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5" /> {formatPhone(participant.phoneNumber)}
               </p>
             </div>
@@ -397,9 +397,9 @@ export default function ParticipantDetailPage({
             {participant.facePhoto && (
               <button
                 onClick={() => setShowFacePreviewModal(true)}
-                className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <Camera className="w-3.5 h-3.5 text-purple-400" />
+                <Camera className="w-3.5 h-3.5 text-purple-600" />
                 <span>Lihat Foto Wajah</span>
               </button>
             )}
@@ -409,17 +409,17 @@ export default function ParticipantDetailPage({
                 setShowFaceModal(true);
                 startAdminCamera();
               }}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <Camera className="w-3.5 h-3.5 text-emerald-400" />
+              <Camera className="w-3.5 h-3.5 text-emerald-600" />
               <span>{participant.faceDescriptor ? "Update Foto Wajah" : "Rekam Wajah"}</span>
             </button>
 
             <button
               onClick={() => setShowDirectMsgModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+              <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
               <span>Kirim WA Personal</span>
             </button>
 
@@ -428,18 +428,18 @@ export default function ParticipantDetailPage({
               disabled={actionLoading}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
                 participant.isExcluded
-                  ? "bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30"
-                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                  ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
               }`}
             >
               {participant.isExcluded ? (
                 <>
-                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Pulihkan (Hapus Exclusion)</span>
                 </>
               ) : (
                 <>
-                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
                   <span>Kecualikan Nomor</span>
                 </>
               )}
@@ -448,7 +448,7 @@ export default function ParticipantDetailPage({
             <button
               onClick={handleDelete}
               disabled={actionLoading}
-              className="p-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
               title="Hapus Peserta"
             >
               <Trash2 className="w-4 h-4" />
@@ -459,13 +459,13 @@ export default function ParticipantDetailPage({
 
       {/* NEW: Student Attendance Performance Overview Card */}
       {stats && (
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 shadow-xl space-y-4">
+        <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <Award className="w-4 h-4" /> Performa & Rekap Keaktifan Siswa
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-emerald-600" /> Performa & Rekap Keaktifan Siswa
               </span>
-              <h2 className="text-lg font-bold text-white mt-0.5">Ringkasan Statistik Kehadiran</h2>
+              <h2 className="text-lg font-bold text-slate-900 mt-0.5">Ringkasan Statistik Kehadiran</h2>
             </div>
 
             {/* Performance Badge Label */}
@@ -473,10 +473,10 @@ export default function ParticipantDetailPage({
               <span
                 className={`px-3 py-1 rounded-full text-xs font-bold border ${
                   stats.percentage >= 75
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                     : stats.percentage >= 50
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-rose-50 text-rose-700 border-rose-200"
                 }`}
               >
                 {stats.percentage >= 75
@@ -490,41 +490,41 @@ export default function ParticipantDetailPage({
 
           {/* 4 Stat Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-              <span className="text-xs text-slate-400 font-medium">Total Sesi Diikuti</span>
-              <div className="text-2xl font-extrabold text-white">{stats.totalSessions}</div>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+              <span className="text-xs text-slate-500 font-medium">Total Sesi Diikuti</span>
+              <div className="text-2xl font-extrabold text-slate-900">{stats.totalSessions}</div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-center">
-              <span className="text-xs text-emerald-300 font-medium">Hadir (GPS)</span>
-              <div className="text-2xl font-extrabold text-emerald-400">{stats.hadirCount}</div>
+            <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-center">
+              <span className="text-xs text-emerald-700 font-medium">Hadir (GPS)</span>
+              <div className="text-2xl font-extrabold text-emerald-700">{stats.hadirCount}</div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/20 text-center">
-              <span className="text-xs text-amber-300 font-medium">Izin / Sakit</span>
-              <div className="text-2xl font-extrabold text-amber-400">{stats.izinCount}</div>
+            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-center">
+              <span className="text-xs text-amber-700 font-medium">Izin / Sakit</span>
+              <div className="text-2xl font-extrabold text-amber-700">{stats.izinCount}</div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/20 text-center">
-              <span className="text-xs text-rose-300 font-medium">Tidak Hadir (Alpa)</span>
-              <div className="text-2xl font-extrabold text-rose-400">{stats.alpaCount}</div>
+            <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200 text-center">
+              <span className="text-xs text-rose-700 font-medium">Tidak Hadir (Alpa)</span>
+              <div className="text-2xl font-extrabold text-rose-700">{stats.alpaCount}</div>
             </div>
           </div>
 
           {/* Progress Bar */}
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">Persentase Kehadiran Siswa:</span>
-              <strong className="text-emerald-400 font-extrabold">{stats.percentage}%</strong>
+              <span className="text-slate-500">Persentase Kehadiran Siswa:</span>
+              <strong className="text-emerald-700 font-extrabold">{stats.percentage}%</strong>
             </div>
-            <div className="w-full h-2.5 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
+            <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   stats.percentage >= 75
-                    ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500"
                     : stats.percentage >= 50
-                    ? "bg-gradient-to-r from-amber-500 to-yellow-400"
-                    : "bg-gradient-to-r from-rose-600 to-rose-400"
+                    ? "bg-gradient-to-r from-amber-500 to-yellow-500"
+                    : "bg-gradient-to-r from-rose-600 to-rose-500"
                 }`}
                 style={{ width: `${stats.percentage}%` }}
               />
@@ -533,21 +533,21 @@ export default function ParticipantDetailPage({
         </div>
       )}
 
-      {/* NEW: Detailed Attendance History Datatable */}
-      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl overflow-hidden space-y-3 p-5">
+      {/* Detailed Attendance History Datatable */}
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden space-y-3 p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <CalendarCheck className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4 text-emerald-600" />
             Riwayat Absensi Per Sesi Pertemuan
           </h3>
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-slate-500">
             Total {attendanceHistory.length} Sesi Terdaftar
           </span>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-800">
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
               <tr>
                 <th className="p-3.5">No</th>
                 <th className="p-3.5">Nama Sesi & Tanggal</th>
@@ -559,10 +559,10 @@ export default function ParticipantDetailPage({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <tbody className="divide-y divide-slate-100 text-slate-800">
               {attendanceHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
                     Belum ada riwayat sesi pertemuan.
                   </td>
                 </tr>
@@ -583,55 +583,55 @@ export default function ParticipantDetailPage({
                     : "-";
 
                   return (
-                    <tr key={item.sessionId} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="p-3.5 font-mono text-slate-500">{idx + 1}</td>
+                    <tr key={item.sessionId} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3.5 font-mono text-slate-400">{idx + 1}</td>
                       <td className="p-3.5">
                         <Link
                           href={`/admin/sessions/${item.sessionId}`}
-                          className="font-bold text-white hover:text-emerald-400 transition-colors block"
+                          className="font-bold text-slate-900 hover:text-blue-600 transition-colors block"
                         >
                           {item.sessionTitle}
                         </Link>
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                          <Clock className="w-3 h-3 text-slate-500" />
+                        <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                          <Clock className="w-3 h-3 text-slate-400" />
                           {dateFormatted}
                         </span>
                       </td>
 
-                      <td className="p-3.5 text-slate-300">
+                      <td className="p-3.5 text-slate-700">
                         <span className="inline-flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5 text-slate-400" />
                           {item.locationName || "Titik Default"}
                         </span>
                       </td>
 
-                      <td className="p-3.5 font-mono text-slate-400">{timeStr}</td>
+                      <td className="p-3.5 font-mono text-slate-600">{timeStr}</td>
 
-                      <td className="p-3.5 font-mono text-emerald-400 font-semibold">
+                      <td className="p-3.5 font-mono text-emerald-700 font-bold">
                         {item.distanceMeter != null ? `${item.distanceMeter}m` : "-"}
                       </td>
 
                       <td className="p-3.5">
                         {item.status === "HADIR" ? (
-                          <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Hadir
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Hadir
                           </span>
                         ) : item.status === "IZIN" || item.status === "SAKIT" ? (
-                          <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> {item.status}
+                          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {item.status}
                           </span>
                         ) : item.status === "ALPA" ? (
-                          <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Tidak Hadir (Alpa)
+                          <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 font-bold inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Tidak Hadir (Alpa)
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-medium">
+                          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-medium">
                             Belum Absen
                           </span>
                         )}
                       </td>
 
-                      <td className="p-3.5 text-slate-400 max-w-xs truncate" title={item.notes || ""}>
+                      <td className="p-3.5 text-slate-500 max-w-xs truncate" title={item.notes || ""}>
                         {item.notes || "-"}
                       </td>
                     </tr>
@@ -646,45 +646,45 @@ export default function ParticipantDetailPage({
       {/* Details Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         {/* Kelas */}
-        <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-2">
-          <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            <BookOpen className="w-4 h-4 text-blue-400" /> Kelas / Rombel
+        <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+          <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+            <BookOpen className="w-4 h-4 text-blue-600" /> Kelas / Rombel
           </div>
-          <div className="text-xl font-bold text-white">
-            {participant.studentClass || <span className="text-slate-500 text-sm font-normal">Belum diisi</span>}
+          <div className="text-xl font-bold text-slate-900">
+            {participant.studentClass || <span className="text-slate-400 text-sm font-normal">Belum diisi</span>}
           </div>
         </div>
 
         {/* Hobi */}
-        <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-2">
-          <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            <Heart className="w-4 h-4 text-rose-400" /> Hobi & Minat
+        <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+          <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+            <Heart className="w-4 h-4 text-rose-500" /> Hobi & Minat
           </div>
-          <div className="text-xl font-bold text-white truncate">
-            {participant.hobby || <span className="text-slate-500 text-sm font-normal">Belum diisi</span>}
+          <div className="text-xl font-bold text-slate-900 truncate">
+            {participant.hobby || <span className="text-slate-400 text-sm font-normal">Belum diisi</span>}
           </div>
         </div>
 
         {/* Tanggal Konfirmasi */}
-        <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-2">
-          <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            <Calendar className="w-4 h-4 text-emerald-400" /> Tanggal Registrasi
+        <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+          <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+            <Calendar className="w-4 h-4 text-emerald-600" /> Tanggal Registrasi
           </div>
-          <div className="text-sm font-medium text-slate-200">
+          <div className="text-sm font-semibold text-slate-800">
             {new Date(participant.createdAt).toLocaleString("id-ID")}
           </div>
         </div>
 
         {/* Biometrik Wajah Face ID */}
-        <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-2">
+        <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider">
-              <Camera className="w-4 h-4 text-amber-400" /> Face ID
+            <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <Camera className="w-4 h-4 text-amber-500" /> Face ID
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               participant.faceDescriptor
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                : "bg-slate-800 text-slate-400"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-slate-100 text-slate-500"
             }`}>
               {participant.faceDescriptor ? "Terdaftar" : "Belum"}
             </span>
@@ -696,11 +696,11 @@ export default function ParticipantDetailPage({
                 src={participant.facePhoto}
                 alt="Foto Wajah"
                 onClick={() => setShowFacePreviewModal(true)}
-                className="w-12 h-12 rounded-xl object-cover border border-emerald-500/40 hover:scale-105 hover:border-purple-400 transition-all cursor-pointer shadow-md"
+                className="w-12 h-12 rounded-xl object-cover border border-emerald-400 hover:scale-105 hover:border-purple-500 transition-all cursor-pointer shadow-sm"
                 title="Klik untuk melihat foto resolusi penuh"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500">
+              <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
                 <User className="w-5 h-5" />
               </div>
             )}
@@ -708,7 +708,7 @@ export default function ParticipantDetailPage({
               {participant.facePhoto && (
                 <button
                   onClick={() => setShowFacePreviewModal(true)}
-                  className="text-xs text-purple-400 hover:text-purple-300 font-semibold text-left hover:underline cursor-pointer flex items-center gap-1"
+                  className="text-xs text-purple-600 hover:text-purple-700 font-semibold text-left hover:underline cursor-pointer flex items-center gap-1"
                 >
                   <Camera className="w-3 h-3" />
                   <span>Lihat Foto Wajah</span>
@@ -719,7 +719,7 @@ export default function ParticipantDetailPage({
                   setShowFaceModal(true);
                   startAdminCamera();
                 }}
-                className="text-xs text-blue-400 hover:text-blue-300 font-semibold text-left hover:underline cursor-pointer"
+                className="text-xs text-blue-600 hover:text-blue-700 font-semibold text-left hover:underline cursor-pointer"
               >
                 {participant.faceDescriptor ? "Ubah / Rekam Ulang" : "Rekam Sekarang"}
               </button>
@@ -729,33 +729,33 @@ export default function ParticipantDetailPage({
       </div>
 
       {/* Motivasi & Alasan Card */}
-      <div className="p-6 rounded-2xl glass-panel border border-slate-800 space-y-3">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" /> Alasan & Motivasi Bergabung Ekskul
+      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-amber-500" /> Alasan & Motivasi Bergabung Ekskul
         </h3>
 
-        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-sm text-slate-200 leading-relaxed italic">
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 leading-relaxed italic">
           {participant.motivation ? (
             `"${participant.motivation}"`
           ) : (
-            <span className="text-slate-500 not-italic">Belum mengisi alasan/motivasi pendaftaran.</span>
+            <span className="text-slate-400 not-italic">Belum mengisi alasan/motivasi pendaftaran.</span>
           )}
         </div>
       </div>
 
       {/* Modal: Direct WA Message */}
       {showDirectMsgModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col space-y-4 p-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col space-y-4 p-5">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
                   <MessageSquare className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-sm">Kirim Pesan WA Personal</h3>
-                  <p className="text-xs text-slate-400">
-                    Ke: <strong className="text-blue-400">{participant.name || "Peserta"} (+{participant.phoneNumber})</strong>
+                  <h3 className="font-bold text-slate-900 text-sm">Kirim Pesan WA Personal</h3>
+                  <p className="text-xs text-slate-500">
+                    Ke: <strong className="text-blue-600">{participant.name || "Peserta"} (+{participant.phoneNumber})</strong>
                   </p>
                 </div>
               </div>
@@ -763,7 +763,7 @@ export default function ParticipantDetailPage({
               <button
                 type="button"
                 onClick={() => setShowDirectMsgModal(false)}
-                className="text-slate-400 hover:text-white text-xl font-bold px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-slate-700 text-xl font-bold px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 &times;
               </button>
@@ -771,7 +771,7 @@ export default function ParticipantDetailPage({
 
             <form onSubmit={handleSendDirectMessage} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Isi Pesan WhatsApp Personal:
                 </label>
                 <textarea
@@ -779,15 +779,15 @@ export default function ParticipantDetailPage({
                   placeholder="Ketik pesan yang ingin dikirimkan ke siswa ini via WhatsApp..."
                   value={directMsgText}
                   onChange={(e) => setDirectMsgText(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full p-3 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowDirectMsgModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer border border-slate-200"
                 >
                   Batal
                 </button>
@@ -795,7 +795,7 @@ export default function ParticipantDetailPage({
                 <button
                   type="submit"
                   disabled={sendingDirectMsg}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
                   {sendingDirectMsg ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -812,16 +812,16 @@ export default function ParticipantDetailPage({
 
       {/* Modal: Admin Face Capture */}
       {showFaceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col space-y-4 p-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col space-y-4 p-6">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
                   <Camera className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-sm">Perekaman Wajah Peserta</h3>
-                  <p className="text-xs text-slate-400">{participant.name || participant.phoneNumber}</p>
+                  <h3 className="font-bold text-slate-900 text-sm">Perekaman Wajah Peserta</h3>
+                  <p className="text-xs text-slate-500">{participant.name || participant.phoneNumber}</p>
                 </div>
               </div>
 
@@ -831,7 +831,7 @@ export default function ParticipantDetailPage({
                   stopAdminCamera();
                   setShowFaceModal(false);
                 }}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -853,19 +853,19 @@ export default function ParticipantDetailPage({
                 )}
               </div>
 
-              <p className="text-xs text-slate-400 text-center">
+              <p className="text-xs text-slate-600 text-center">
                 Posisikan wajah siswa di dalam garis panduan, lalu tekan tombol di bawah.
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => {
                   stopAdminCamera();
                   setShowFaceModal(false);
                 }}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer border border-slate-200"
               >
                 Tutup
               </button>
@@ -874,7 +874,7 @@ export default function ParticipantDetailPage({
                 type="button"
                 onClick={handleCaptureAdminFace}
                 disabled={capturingFace || !faceCamActive}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {capturingFace ? (
                   <>
@@ -895,30 +895,30 @@ export default function ParticipantDetailPage({
 
       {/* ADMIN FACE PREVIEW MODAL */}
       {showFacePreviewModal && participant && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                <div className="p-2 rounded-xl bg-purple-50 border border-purple-200 text-purple-600">
                   <Camera className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Preview Face ID Biometrik</h3>
-                  <p className="text-[11px] text-slate-400">{participant.name || "Peserta"}</p>
+                  <h3 className="text-sm font-bold text-slate-900">Preview Face ID Biometrik</h3>
+                  <p className="text-[11px] text-slate-500">{participant.name || "Peserta"}</p>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowFacePreviewModal(false)}
-                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4 text-center">
-              <div className="relative aspect-square max-h-[300px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-purple-500/30 flex items-center justify-center shadow-xl mx-auto">
+              <div className="relative aspect-square max-h-[300px] w-full rounded-2xl overflow-hidden bg-slate-100 border border-purple-200 flex items-center justify-center shadow-md mx-auto">
                 {participant.facePhoto ? (
                   <img
                     src={participant.facePhoto}
@@ -926,42 +926,42 @@ export default function ParticipantDetailPage({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-slate-500 gap-2">
-                    <User className="w-12 h-12 text-slate-600" />
+                  <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
+                    <User className="w-12 h-12 text-slate-400" />
                     <span className="text-xs">Foto biometrik belum tersedia.</span>
                   </div>
                 )}
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 text-left text-xs">
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-left text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Status Biometrik:</span>
+                  <span className="text-slate-500">Status Biometrik:</span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     participant.faceDescriptor
-                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                      : "bg-slate-800 text-slate-400"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-slate-200 text-slate-600"
                   }`}>
                     {participant.faceDescriptor ? "Vektor 128-d Terdaftar ✅" : "Belum Direkam ⚠️"}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Kelas / Tingkat:</span>
-                  <span className="font-semibold text-white">{participant.studentClass || "-"}</span>
+                  <span className="text-slate-500">Kelas / Tingkat:</span>
+                  <span className="font-bold text-slate-900">{participant.studentClass || "-"}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Nomor WhatsApp:</span>
-                  <span className="font-mono text-emerald-400 font-bold">+{participant.phoneNumber}</span>
+                  <span className="text-slate-500">Nomor WhatsApp:</span>
+                  <span className="font-mono text-emerald-700 font-bold">+{participant.phoneNumber}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setShowFacePreviewModal(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer border border-slate-200"
               >
                 Tutup
               </button>
@@ -973,7 +973,7 @@ export default function ParticipantDetailPage({
                   setShowFaceModal(true);
                   startAdminCamera();
                 }}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-600/20"
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20"
               >
                 <Camera className="w-3.5 h-3.5" />
                 <span>{participant.faceDescriptor ? "Ubah / Rekam Ulang" : "Rekam Sekarang"}</span>

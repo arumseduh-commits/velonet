@@ -90,15 +90,17 @@ export default function QuizTakingPage() {
 
   if (loading) {
     return (
-      <div className="p-8 text-center text-slate-400 text-sm">Memuat kuis...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500 text-sm font-medium">
+        Memuat kuis...
+      </div>
     );
   }
 
   if (!quiz) {
     return (
-      <div className="p-8 text-center text-slate-400 text-sm">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8 text-center text-slate-500 text-sm">
         <p>Kuis tidak ditemukan atau tidak tersedia.</p>
-        <button onClick={() => router.back()} className="mt-4 text-blue-400 hover:underline">
+        <button onClick={() => router.back()} className="mt-4 text-blue-600 font-semibold hover:underline cursor-pointer">
           Kembali
         </button>
       </div>
@@ -106,23 +108,23 @@ export default function QuizTakingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 space-y-6 max-w-4xl mx-auto pb-28">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700"
+            className="p-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors border border-slate-200 cursor-pointer"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              <BrainCircuit className="w-6 h-6 text-blue-400" />
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <BrainCircuit className="w-6 h-6 text-blue-600" />
               <span>{quiz.title}</span>
             </h1>
             {quiz.description && (
-              <p className="text-xs text-slate-400 mt-1">{quiz.description}</p>
+              <p className="text-xs text-slate-500 mt-1">{quiz.description}</p>
             )}
           </div>
         </div>
@@ -131,8 +133,8 @@ export default function QuizTakingPage() {
       {/* Quiz Content */}
       <div className="space-y-6">
         {quiz.questions.map((q: any, qIdx: number) => (
-          <div key={q.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-            <h3 className="font-semibold text-white text-sm sm:text-base">
+          <div key={q.id} className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4 text-slate-900">
+            <h3 className="font-bold text-slate-900 text-sm sm:text-base">
               {qIdx + 1}. {q.text}
             </h3>
             <div className="space-y-2">
@@ -142,14 +144,14 @@ export default function QuizTakingPage() {
                   <button
                     key={opt.id}
                     onClick={() => handleSelectOption(qIdx, opt.id)}
-                    className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between text-sm sm:text-base ${
+                    className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between text-sm cursor-pointer ${
                       isSelected
-                        ? "bg-blue-500/20 border-blue-500 text-blue-300 font-semibold"
-                        : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
+                        ? "bg-blue-50 border-blue-500 text-blue-800 font-semibold shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50/50 hover:border-blue-300"
                     }`}
                   >
                     <span>{String.fromCharCode(65 + optIdx)}. {opt.text}</span>
-                    {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />}
+                    {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />}
                   </button>
                 );
               })}
@@ -159,11 +161,11 @@ export default function QuizTakingPage() {
       </div>
 
       {/* Submit Button */}
-      <div className="sticky bottom-4 pt-4 pb-4 bg-slate-950/80 backdrop-blur-md">
+      <div className="sticky bottom-4 pt-4 pb-4 bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl px-4 shadow-lg">
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full py-3 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-3.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
         >
           {submitting ? "Mengumpulkan..." : "Kumpulkan Jawaban"}
         </button>

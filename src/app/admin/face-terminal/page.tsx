@@ -289,24 +289,24 @@ export default function AdminFaceTerminalPage() {
   return (
     <div className="space-y-6">
       {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-blue-950/50 via-slate-900 to-indigo-950/40 border border-blue-500/20 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50/40 to-white border border-blue-200/80 shadow-sm">
         <div className="flex items-center gap-3">
           <Link
             href="/admin"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-sm transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-white tracking-wide">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                 Terminal Absensi Face Recognition
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold animate-pulse">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold animate-pulse">
                 LIVE KIOSK
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-600">
               Mode pemindaian otomatis di meja registrasi pintu masuk lokasi pertemuan
             </p>
           </div>
@@ -315,19 +315,19 @@ export default function AdminFaceTerminalPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setAudioFeedback((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
               audioFeedback
-                ? "bg-blue-500/20 border-blue-500/30 text-blue-300"
-                : "bg-slate-800 border-slate-700 text-slate-400"
+                ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+                : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
             }`}
           >
-            {audioFeedback ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {audioFeedback ? <Volume2 className="w-4 h-4 text-blue-600" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
             <span>Suara {audioFeedback ? "Aktif" : "Mati"}</span>
           </button>
 
           <button
             onClick={() => setFacingMode((prev) => (prev === "user" ? "environment" : "user"))}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-bold transition-colors cursor-pointer shadow-sm"
             title="Ganti Kamera"
           >
             <SwitchCamera className="w-4 h-4" />
@@ -337,21 +337,21 @@ export default function AdminFaceTerminalPage() {
 
       {/* Active Session Info Pill */}
       {activeSessions.length > 0 ? (
-        <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300">
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-900 font-medium">
           <div className="flex items-center gap-2">
-            <CalendarCheck className="w-4 h-4 text-emerald-400" />
+            <CalendarCheck className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>
               Sesi Aktif Saat Ini: <b>{activeSessions[0].title}</b> di <b>{activeSessions[0].locationName || "Titik Kumpul"}</b>
             </span>
           </div>
-          <span className="text-[10px] font-mono text-emerald-400">
+          <span className="text-[11px] font-mono text-emerald-700 font-bold">
             {new Date(activeSessions[0].startTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} -{" "}
             {new Date(activeSessions[0].endTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
           </span>
         </div>
       ) : (
-        <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/30 flex items-center gap-2 text-xs text-amber-300">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-xs text-amber-900 font-medium">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span>Tidak ada sesi pertemuan yang sedang aktif saat ini. Buat sesi di menu Sesi Absensi.</span>
         </div>
       )}
@@ -360,8 +360,8 @@ export default function AdminFaceTerminalPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Camera Live Stream (7 Cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="p-4 rounded-3xl glass-panel border border-slate-800 space-y-4 shadow-2xl relative">
-            <div className="relative aspect-4/3 w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner">
+          <div className="p-5 rounded-3xl bg-white border border-slate-200 space-y-4 shadow-sm relative">
+            <div className="relative aspect-4/3 w-full bg-slate-950 rounded-2xl border-4 border-slate-200 overflow-hidden flex items-center justify-center shadow-lg">
               <video
                 ref={videoRef}
                 playsInline
@@ -408,12 +408,12 @@ export default function AdminFaceTerminalPage() {
 
               {/* Floating Real-time Identification Pill */}
               {currentDetection && (
-                <div className="absolute bottom-4 inset-x-4 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 backdrop-blur-xl shadow-2xl animate-in slide-in-from-bottom-2 duration-200 flex items-center justify-between">
+                <div className="absolute bottom-4 inset-x-4 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 backdrop-blur-xl shadow-2xl animate-in slide-in-from-bottom-2 duration-200 flex items-center justify-between text-white">
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-base ${
                         currentDetection.status === "MATCH"
-                          ? "bg-gradient-to-tr from-emerald-500 to-teal-500"
+                          ? "bg-gradient-to-tr from-emerald-500 to-teal-500 shadow-md shadow-emerald-500/30"
                           : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                       }`}
                     >
@@ -421,7 +421,7 @@ export default function AdminFaceTerminalPage() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-white">{currentDetection.name}</h4>
-                      <p className="text-[11px] text-slate-400">Kelas {currentDetection.studentClass}</p>
+                      <p className="text-[11px] text-slate-300">Kelas {currentDetection.studentClass}</p>
                     </div>
                   </div>
 
@@ -439,13 +439,13 @@ export default function AdminFaceTerminalPage() {
 
             {/* Quick Status Stats */}
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-400">Total Wajah Terdaftar:</span>
-                <p className="text-lg font-bold text-white mt-0.5">{enrolledStudents.length} Siswa</p>
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 font-semibold">Total Wajah Terdaftar:</span>
+                <p className="text-lg font-black text-slate-900 mt-0.5">{enrolledStudents.length} Siswa</p>
               </div>
-              <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-400">Kehadiran Hari Ini:</span>
-                <p className="text-lg font-bold text-emerald-400 mt-0.5">{recentScans.length} Check-in</p>
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                <span className="text-emerald-800 font-semibold">Kehadiran Hari Ini:</span>
+                <p className="text-lg font-black text-emerald-700 mt-0.5">{recentScans.length} Check-in</p>
               </div>
             </div>
           </div>
@@ -453,52 +453,52 @@ export default function AdminFaceTerminalPage() {
 
         {/* Live Attendance Activity Log (5 Cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="p-5 rounded-3xl glass-panel border border-slate-800 space-y-4 shadow-xl flex flex-col h-[520px]">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+          <div className="p-5 rounded-3xl bg-white border border-slate-200 space-y-4 shadow-sm flex flex-col h-[540px]">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-600" />
                 <span>Aktivitas Check-In Masuk</span>
               </h2>
-              <span className="text-[10px] font-mono text-slate-500">Real-time Feed</span>
+              <span className="text-[10px] font-mono text-slate-400 font-bold">Real-time Feed</span>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
               {recentScans.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 space-y-2">
-                  <Camera className="w-8 h-8 text-slate-600" />
-                  <p className="text-xs">Menunggu siswa melakukan scan wajah di kamera...</p>
+                <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 space-y-2">
+                  <Camera className="w-8 h-8 text-slate-300" />
+                  <p className="text-xs font-medium">Menunggu siswa melakukan scan wajah di kamera...</p>
                 </div>
               ) : (
                 recentScans.map((scan) => (
                   <div
                     key={scan.id}
-                    className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between gap-3 animate-in fade-in duration-200"
+                    className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100/70 transition-all flex items-center justify-between gap-3 animate-in fade-in duration-200"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       {scan.photo ? (
                         <img
                           src={scan.photo}
                           alt={scan.name}
-                          className="w-9 h-9 rounded-xl object-cover border border-emerald-500/30 shrink-0"
+                          className="w-10 h-10 rounded-xl object-cover border border-emerald-300 shrink-0 shadow-sm"
                         />
                       ) : (
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-bold text-white text-xs shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-sm">
                           {scan.name.charAt(0)}
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{scan.name}</p>
-                        <p className="text-[10px] text-slate-400 truncate">
+                        <p className="text-xs font-bold text-slate-900 truncate">{scan.name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">
                           Kelas {scan.studentClass} • {scan.similarity}% Cocok
                         </p>
                       </div>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
                         HADIR
                       </span>
-                      <p className="text-[10px] font-mono text-slate-500 mt-0.5">{scan.time}</p>
+                      <p className="text-[10px] font-mono text-slate-400 mt-0.5 font-medium">{scan.time}</p>
                     </div>
                   </div>
                 ))
@@ -510,3 +510,4 @@ export default function AdminFaceTerminalPage() {
     </div>
   );
 }
+

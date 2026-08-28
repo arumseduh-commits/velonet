@@ -377,31 +377,31 @@ function StudentLoginContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Background Glow Overlay */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main Container Card */}
-      <div className="w-full max-w-md bg-slate-900/80 border border-slate-800/80 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl relative z-10 space-y-5">
+      <div className="w-full max-w-md bg-white border border-slate-200 shadow-xl rounded-3xl p-5 sm:p-7 relative z-10 space-y-5">
         {/* Brand Header */}
         <div className="text-center space-y-1.5">
-          <div className="inline-flex items-center justify-center p-2.5 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-400 mb-1">
+          <div className="inline-flex items-center justify-center p-2.5 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-50 border border-emerald-200 text-emerald-600 mb-1 shadow-xs">
             <Sparkles className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Portal Siswa</h1>
-          <p className="text-xs text-slate-400">Pilih metode masuk ke akun VeloNet Anda</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Portal Siswa</h1>
+          <p className="text-xs text-slate-500">Pilih metode masuk ke akun VeloNet Anda</p>
         </div>
 
         {/* 3-Tab Toggle: WA (Default) | FACE_ID | PASSWORD */}
-        <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950/80 rounded-2xl border border-slate-800 shadow-inner">
+        <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
           <button
             type="button"
             onClick={() => setLoginMethod("WA")}
             className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               loginMethod === "WA"
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20 border border-emerald-400/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-white text-emerald-700 shadow-sm border border-emerald-300 font-bold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <MessageSquareCode className="w-4 h-4" />
@@ -413,8 +413,8 @@ function StudentLoginContent() {
             onClick={() => setLoginMethod("FACE_ID")}
             className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               loginMethod === "FACE_ID"
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20 border border-emerald-400/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-white text-emerald-700 shadow-sm border border-emerald-300 font-bold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <ScanFace className="w-4 h-4" />
@@ -426,8 +426,8 @@ function StudentLoginContent() {
             onClick={() => setLoginMethod("PASSWORD")}
             className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               loginMethod === "PASSWORD"
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20 border border-emerald-400/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-white text-emerald-700 shadow-sm border border-emerald-300 font-bold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <Key className="w-4 h-4" />
@@ -437,24 +437,24 @@ function StudentLoginContent() {
 
         {/* 1. TAB: WHATSAPP LOGIN (DEFAULT) */}
         {loginMethod === "WA" && (
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-4 shadow-lg animate-in fade-in duration-200">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 via-emerald-50/40 to-white border border-emerald-200 space-y-4 shadow-sm animate-in fade-in duration-200">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+              <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
                 <MessageSquareCode className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                   Login Instan via WhatsApp
                 </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="text-[11px] text-slate-600 mt-0.5">
                   Tekan tombol di bawah untuk membuka WhatsApp dan mengirim pesan verifikasi otomatis.
                 </p>
               </div>
             </div>
 
             {loadingWa ? (
-              <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+              <div className="py-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
                 <span>Membuat sesi login WhatsApp...</span>
               </div>
             ) : (
@@ -470,13 +470,13 @@ function StudentLoginContent() {
             )}
 
             {/* Live Status Detector */}
-            <div className="mt-4 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-3">
+            <div className="mt-4 p-4 rounded-2xl bg-white border border-slate-200 flex items-center gap-3 shadow-xs">
               <div className="relative shrink-0">
-                <span className="w-3 h-3 rounded-full bg-emerald-400 block" />
-                <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping absolute inset-0 opacity-75" />
+                <span className="w-3 h-3 rounded-full bg-emerald-500 block" />
+                <span className="w-3 h-3 rounded-full bg-emerald-500 animate-ping absolute inset-0 opacity-75" />
               </div>
               <div className="text-xs">
-                <p className="font-semibold text-slate-200">
+                <p className="font-semibold text-slate-800">
                   {verifyingWa ? "Verifikasi Sukses! Mengalihkan..." : "Menunggu pengiriman pesan WhatsApp Anda..."}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5">
@@ -489,16 +489,16 @@ function StudentLoginContent() {
 
         {/* 2. TAB: FACE ID LOGIN (LAUNCHER CARD) */}
         {loginMethod === "FACE_ID" && (
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 space-y-4 shadow-lg animate-in fade-in duration-200 text-center">
-            <div className="mx-auto w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/10">
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50/60 via-slate-50 to-white border border-blue-200 space-y-4 shadow-sm animate-in fade-in duration-200 text-center">
+            <div className="mx-auto w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-50 to-teal-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-md shadow-emerald-500/10">
               <ScanFace className="w-9 h-9" />
             </div>
 
             <div className="space-y-1">
-              <h2 className="text-sm font-bold text-white tracking-wide">
+              <h2 className="text-sm font-bold text-slate-900 tracking-wide">
                 Masuk Instan dengan Face ID AI
               </h2>
-              <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+              <p className="text-xs text-slate-600 leading-relaxed max-w-xs mx-auto">
                 Pindai biometrik wajah Anda dalam mode Full Screen tanpa perlu password atau kode OTP.
               </p>
             </div>
@@ -506,7 +506,7 @@ function StudentLoginContent() {
             <button
               type="button"
               onClick={handleOpenFaceModal}
-              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-xl shadow-emerald-600/30 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/20 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer"
             >
               <Camera className="w-4 h-4" />
               <span>BUKA KAMERA PINDAI WAJAH (FULL SCREEN)</span>
@@ -522,30 +522,30 @@ function StudentLoginContent() {
         {loginMethod === "PASSWORD" && (
           <form onSubmit={handlePasswordLogin} className="space-y-4 animate-in fade-in duration-200">
             <div className="space-y-1.5">
-              <label className="text-xs text-slate-400 font-medium ml-1">Nomor WhatsApp</label>
+              <label className="text-xs text-slate-700 font-semibold ml-1">Nomor WhatsApp</label>
               <input
                 type="text"
                 placeholder="Contoh: 08123456789"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs text-slate-400 font-medium ml-1">Password / PIN</label>
+              <label className="text-xs text-slate-700 font-semibold ml-1">Password / PIN</label>
               <input
                 type="password"
                 placeholder="Masukkan kata sandi Anda"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
               />
             </div>
 
             <button
               type="submit"
               disabled={loadingPassword}
-              className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold shadow-lg shadow-blue-600/25 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+              className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
               {loadingPassword ? (
                 <>
@@ -569,19 +569,19 @@ function StudentLoginContent() {
         <div className="pt-2">
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-800" />
+              <span className="w-full border-t border-slate-200" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-slate-900 px-2 text-slate-500">Atau</span>
+              <span className="bg-white px-2 text-slate-400 font-medium">Atau</span>
             </div>
           </div>
 
           <div className="mt-5 text-center space-y-2.5">
-            <p className="text-xs text-slate-400">Belum terdaftar sebagai anggota VeloNet?</p>
+            <p className="text-xs text-slate-600">Belum terdaftar sebagai anggota VeloNet?</p>
             <button
               onClick={handleRegisterClick}
               disabled={loadingRegister}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 hover:border-emerald-500/50 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
             >
               {loadingRegister ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -717,8 +717,8 @@ export default function StudentLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500">
+          <RefreshCw className="w-6 h-6 animate-spin text-emerald-600" />
         </div>
       }
     >
