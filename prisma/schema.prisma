@@ -287,6 +287,14 @@ model UserBadge {
   awardedAt DateTime            @default(now())
 }
 
+enum QuestionType {
+  SINGLE_CHOICE
+  CHECKBOXES
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+}
+
 model Quiz {
   id          String   @id @default(uuid())
   title       String
@@ -310,16 +318,24 @@ model Quiz {
 }
 
 model Question {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   quizId        String
-  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type          QuestionType @default(SINGLE_CHOICE)
   text          String
-  points        Int      @default(10)
+  points        Int          @default(10)
+  order         Int          @default(0)
+  
+  // Rubrik & Panduan Penilaian untuk Soal Uraian / Isian
+  sampleAnswer  String?      // Contoh jawaban ideal
+  gradingRubric String?      // Kriteria rubrik & kata kunci penilaian
+  caseSensitive Boolean      @default(false)
   
   options       Option[]
+  studentAnswers QuizStudentAnswer[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model Option {
@@ -331,28 +347,60 @@ model Option {
 }
 
 model QuizAttempt {
-  id          String   @id @default(uuid())
+  id          String               @id @default(uuid())
   quizId      String
-  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quiz        Quiz                 @relation(fields: [quizId], references: [id], onDelete: Cascade)
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  status      String   @default("IN_PROGRESS") // IN_PROGRESS, LOCKED, SUBMITTED, DISQUALIFIED
-  strikeCount Int      @default(0)
-  score       Int      @default(0)
-  totalScore  Int      @default(0)
+  status      String               @default("IN_PROGRESS") // IN_PROGRESS, LOCKED, SUBMITTED, GRADED, DISQUALIFIED
+  strikeCount Int                  @default(0)
+  score       Float                @default(0)
+  totalScore  Float                @default(0)
   
-  answers     String?  // JSON stringified user answers { [questionId]: optionId }
+  isFullyGraded Boolean            @default(false)
   
-  startedAt   DateTime @default(now())
+  answers     String?              // JSON stringified user answers fallback
+  
+  startedAt   DateTime             @default(now())
   submittedAt DateTime?
+  gradedAt    DateTime?
 
+  detailedAnswers QuizStudentAnswer[]
   violations  ExamViolationLog[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
 
   @@unique([quizId, userId])
+}
+
+model QuizStudentAnswer {
+  id                   String      @id @default(uuid())
+  attemptId            String
+  attempt              QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId           String
+  question             Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  selectedOptionIds    String?     // JSON array string misal '["opt-1", "opt-2"]'
+  textResponse         String?     // Isian teks untuk SHORT_ANSWER atau ESSAY
+  
+  isAutoGraded         Boolean     @default(false)
+  earnedPoints         Float       @default(0)
+  
+  // Penilaian AI untuk Essay
+  aiSuggestedScore     Float?
+  aiEvaluationFeedback String?
+  
+  // Penilaian Manual Guru (Teacher Override)
+  teacherScore         Float?
+  teacherFeedback      String?
+  gradedByUserId       String?
+
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@unique([attemptId, questionId])
 }
 
 model ExamViolationLog {
@@ -366,4 +414,29 @@ model ExamViolationLog {
 
   @@index([attemptId])
 }
+
+model AIChatSession {
+  id             String          @id @default(uuid())
+  userId         String          // ID Guru / Mentor
+  title          String          @default("Sesi Konsultasi Guru")
+  contextTopicId String?         // ID artikel MisterGuru jika ada
+  
+  messages       AIChatMessage[]
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model AIChatMessage {
+  id                 String        @id @default(uuid())
+  sessionId          String
+  session            AIChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  role               String        // "user" atau "assistant"
+  content            String
+  generatedQuizDraft String?       // JSON stringified draft quiz payload
+  
+  createdAt          DateTime      @default(now())
+}
+
 

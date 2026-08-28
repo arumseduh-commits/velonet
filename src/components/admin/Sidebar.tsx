@@ -132,15 +132,15 @@ export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
               LMS & Pembelajaran
             </div>
             <Link
-              href="/admin/learning"
+              href="/admin/ai-assistant"
               className={`flex items-center gap-3 px-3 py-2 rounded-xl font-semibold text-xs transition-all ${
-                pathname.startsWith("/admin/learning")
+                pathname.startsWith("/admin/ai-assistant")
                   ? "bg-blue-50 text-blue-700 font-bold border border-blue-200/80 shadow-xs"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
-              <Sparkles className={`w-4 h-4 ${pathname.startsWith("/admin/learning") ? "text-amber-500" : "text-slate-400"}`} />
-              <span>AI Quiz Assistant</span>
+              <Sparkles className={`w-4 h-4 ${pathname.startsWith("/admin/ai-assistant") ? "text-amber-500" : "text-slate-400"}`} />
+              <span>AI Teacher Assistant</span>
             </Link>
 
             <Link

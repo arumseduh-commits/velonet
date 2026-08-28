@@ -18,12 +18,13 @@ export async function GET(
       where: { id: quizId },
       include: {
         questions: {
+          orderBy: { order: "asc" },
           include: {
             options: {
               select: {
                 id: true,
                 text: true,
-                // Do not return isCorrect to the client!
+                // Do not return isCorrect to student!
               },
             },
           },
@@ -44,6 +45,7 @@ export async function GET(
         },
       },
       include: {
+        detailedAnswers: true,
         violations: {
           orderBy: { timestamp: "desc" },
           take: 10,
@@ -51,18 +53,14 @@ export async function GET(
       },
     });
 
-    // Randomize questions/options if enabled and student is taking the quiz for the first time
-    let formattedQuestions = [...quiz.questions];
-    if (quiz.shuffleQuestions) {
-      formattedQuestions = formattedQuestions.sort(() => Math.random() - 0.5);
-    }
-
-    if (quiz.shuffleOptions) {
-      formattedQuestions = formattedQuestions.map((q) => ({
-        ...q,
-        options: [...q.options].sort(() => Math.random() - 0.5),
-      }));
-    }
+    // Structure questions for student player
+    const formattedQuestions = quiz.questions.map((q) => ({
+      id: q.id,
+      type: q.type,
+      text: q.text,
+      points: q.points,
+      options: q.options,
+    }));
 
     const sanitizedQuiz = {
       id: quiz.id,
@@ -89,7 +87,9 @@ export async function GET(
               submittedAt: attempt.submittedAt,
               score: attempt.score,
               totalScore: attempt.totalScore,
+              isFullyGraded: attempt.isFullyGraded,
               answers: attempt.answers ? JSON.parse(attempt.answers) : {},
+              detailedAnswers: attempt.detailedAnswers,
               violations: attempt.violations,
             }
           : null,

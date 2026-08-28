@@ -72,11 +72,11 @@ export default function AdminExamsListPage() {
 
         <div className="relative z-10 flex flex-wrap items-center gap-3">
           <Link
-            href="/admin/learning"
+            href="/admin/ai-assistant"
             className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md shadow-amber-500/25 transition-all flex items-center gap-2"
           >
             <Sparkles className="w-4 h-4 text-white" />
-            <span>✨ Buat Soal AI Assistant</span>
+            <span>✨ Chat AI Teacher Copilot</span>
           </Link>
 
           <button
@@ -236,17 +236,26 @@ export default function AdminExamsListPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="pt-4 border-t border-slate-100 flex items-center gap-2">
+                <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
                   <Link
                     href={`/admin/exams/${exam.id}/proctor`}
-                    className={`flex-1 py-2.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all ${
+                    className={`flex-1 py-2.5 px-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all ${
                       hasLocked
                         ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/25 animate-pulse"
                         : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25"
                     }`}
                   >
                     <ShieldAlert className="w-3.5 h-3.5" />
-                    <span>Live Proctoring</span>
+                    <span>Live Proctor</span>
+                  </Link>
+
+                  <Link
+                    href={`/admin/exams/${exam.id}/grading`}
+                    className="py-2.5 px-3 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs flex items-center gap-1 transition-colors"
+                    title="Buku Nilai & Koreksi Uraian Siswa"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Koreksi</span>
                   </Link>
 
                   <Link

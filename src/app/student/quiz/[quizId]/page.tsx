@@ -19,12 +19,22 @@ import {
   Sparkles,
   Trophy,
   HelpCircle,
+  CheckSquare,
+  Square,
+  FileText,
+  AlignLeft,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { useExamSecurity } from "@/hooks/useExamSecurity";
 import FaceProctorWidget from "@/components/exam/FaceProctorWidget";
 import ExamPreCheckModal from "@/components/exam/ExamPreCheckModal";
 import ExamLockedScreen from "@/components/exam/ExamLockedScreen";
+
+interface StudentAnswerState {
+  optionId?: string;
+  selectedOptionIds?: string[];
+  textResponse?: string;
+}
 
 export default function QuizTakingPage() {
   const router = useRouter();
@@ -40,7 +50,7 @@ export default function QuizTakingPage() {
   // Exam Interaction States
   const [hasStarted, setHasStarted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<{ [questionId: string]: string }>({});
+  const [answers, setAnswers] = useState<{ [questionId: string]: StudentAnswerState }>({});
   const [flagged, setFlagged] = useState<{ [qIndex: number]: boolean }>({});
   const [submitting, setSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -56,7 +66,7 @@ export default function QuizTakingPage() {
   const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(30 * 60);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Initial Load
+  // 1. Initial Load & LocalStorage Recovery
   useEffect(() => {
     fetchQuizData();
   }, [quizId]);
@@ -73,23 +83,33 @@ export default function QuizTakingPage() {
         setQuiz(qData);
         setAttempt(att);
 
+        // Try local storage draft recovery
+        let localDraft: any = null;
+        try {
+          const stored = localStorage.getItem(`velonet_cbt_draft_${quizId}`);
+          if (stored) localDraft = JSON.parse(stored);
+        } catch (e) {}
+
         if (att) {
           setStrikeCount(att.strikeCount || 0);
           if (att.status === "LOCKED") {
             setIsLocked(true);
             setHasStarted(true);
-          } else if (att.status === "SUBMITTED" || att.status === "DISQUALIFIED") {
+          } else if (att.status === "SUBMITTED" || att.status === "GRADED" || att.status === "DISQUALIFIED") {
             setIsCompleted(true);
             setResultData(att);
           } else if (att.status === "IN_PROGRESS") {
             setHasStarted(true);
-            if (att.answers && typeof att.answers === "object") {
+            if (localDraft) {
+              setAnswers(localDraft);
+            } else if (att.answers && typeof att.answers === "object") {
               setAnswers(att.answers);
             }
           }
         } else {
           // New attempt needed -> show precheck modal
           setShowPreCheck(true);
+          if (localDraft) setAnswers(localDraft);
         }
 
         // Initialize duration timer
@@ -104,6 +124,15 @@ export default function QuizTakingPage() {
       setLoading(false);
     }
   };
+
+  // Persist draft to local storage on change
+  useEffect(() => {
+    if (hasStarted && Object.keys(answers).length > 0) {
+      try {
+        localStorage.setItem(`velonet_cbt_draft_${quizId}`, JSON.stringify(answers));
+      } catch (e) {}
+    }
+  }, [answers, hasStarted, quizId]);
 
   // 2. Violation Handler (Triggered by Fullscreen exit, Tab switch, Face anomality, Devtools)
   const handleViolation = useCallback(
@@ -173,7 +202,6 @@ export default function QuizTakingPage() {
   // 5. Start Exam Process
   const handleStartExam = async () => {
     try {
-      // Enter fullscreen first
       if (quiz?.enableFullscreenLock) {
         await enterFullscreen();
       }
@@ -195,9 +223,30 @@ export default function QuizTakingPage() {
     }
   };
 
-  // 6. Select Option
-  const handleSelectOption = (questionId: string, optionId: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
+  // 6. Multi-Format Answer Handlers
+  const handleSelectSingleChoice = (questionId: string, optionId: string) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: { optionId },
+    }));
+  };
+
+  const handleToggleCheckbox = (questionId: string, optionId: string) => {
+    const current = answers[questionId]?.selectedOptionIds || [];
+    const exists = current.includes(optionId);
+    const updated = exists ? current.filter((id) => id !== optionId) : [...current, optionId];
+
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: { selectedOptionIds: updated },
+    }));
+  };
+
+  const handleTextResponseChange = (questionId: string, text: string) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: { textResponse: text },
+    }));
   };
 
   // 7. Toggle Flag / Ragu-ragu
@@ -207,7 +256,11 @@ export default function QuizTakingPage() {
 
   // 8. Submit Final Confirmation
   const handleSubmitConfirmation = async () => {
-    const answeredCount = Object.keys(answers).length;
+    const answeredCount = Object.keys(answers).filter((k) => {
+      const a = answers[k];
+      return a.optionId || (a.selectedOptionIds && a.selectedOptionIds.length > 0) || (a.textResponse && a.textResponse.trim().length > 0);
+    }).length;
+
     const totalCount = quiz.questions.length;
 
     if (answeredCount < totalCount) {
@@ -237,10 +290,15 @@ export default function QuizTakingPage() {
   const executeSubmit = async () => {
     setSubmitting(true);
     try {
-      const formattedAnswers = quiz.questions.map((q: any) => ({
-        questionId: q.id,
-        optionId: answers[q.id] || null,
-      }));
+      const formattedAnswers = quiz.questions.map((q: any) => {
+        const a = answers[q.id] || {};
+        return {
+          questionId: q.id,
+          optionId: a.optionId || null,
+          selectedOptionIds: a.selectedOptionIds || [],
+          textResponse: a.textResponse || null,
+        };
+      });
 
       const res = await fetch("/api/quiz/submit", {
         method: "POST",
@@ -250,6 +308,10 @@ export default function QuizTakingPage() {
 
       const json = await res.json();
       if (json.success) {
+        try {
+          localStorage.removeItem(`velonet_cbt_draft_${quizId}`);
+        } catch (e) {}
+
         setIsCompleted(true);
         setResultData(json.data);
         toast.success("Ujian berhasil dikumpulkan!");
@@ -306,9 +368,10 @@ export default function QuizTakingPage() {
   // Completed State View (Result & Gamification)
   if (isCompleted) {
     const score = resultData?.score ?? 0;
-    const totalScore = resultData?.totalScore ?? quiz.questions.length * 10;
+    const totalScore = resultData?.totalScore ?? quiz.questions.reduce((acc: number, q: any) => acc + q.points, 0);
     const percentage = totalScore > 0 ? Math.round((score / totalScore) * 100) : 0;
     const isPassed = percentage >= 70;
+    const hasPendingEssays = resultData?.hasPendingEssays;
 
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 text-slate-900">
@@ -324,20 +387,30 @@ export default function QuizTakingPage() {
           <div>
             <span
               className={`text-xs font-extrabold uppercase px-3 py-1 rounded-full ${
-                isPassed ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"
+                hasPendingEssays
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : isPassed
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}
             >
-              {isPassed ? "Lulus dengan Baik" : "Hasil Ujian"}
+              {hasPendingEssays ? "Terkumpul (Menunggu Review Essay)" : isPassed ? "Lulus dengan Baik" : "Hasil Ujian"}
             </span>
             <h2 className="text-2xl font-black text-slate-900 mt-2">{quiz.title}</h2>
-            <p className="text-xs text-slate-500 mt-1">Ujian Anda telah selesai dan dinilai secara otomatis.</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {hasPendingEssays
+                ? "Soal pilihan ganda dinilai otomatis. Bagian uraian sedang ditinjau oleh Guru & AI."
+                : "Ujian Anda telah selesai dan dinilai secara otomatis."}
+            </p>
           </div>
 
           {/* Score Box */}
           <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-around">
             <div>
-              <span className="text-xs text-slate-500 font-medium">Nilai Akhir</span>
-              <div className="text-3xl font-black text-slate-900 mt-0.5">{score} <span className="text-xs text-slate-400 font-normal">/ {totalScore}</span></div>
+              <span className="text-xs text-slate-500 font-medium">Nilai Diperoleh</span>
+              <div className="text-3xl font-black text-slate-900 mt-0.5">
+                {score} <span className="text-xs text-slate-400 font-normal">/ {totalScore}</span>
+              </div>
             </div>
             <div className="w-px h-10 bg-slate-200"></div>
             <div>
@@ -394,7 +467,13 @@ export default function QuizTakingPage() {
 
   const currentQuestion = quiz.questions[currentIndex];
   const isLastQuestion = currentIndex === quiz.questions.length - 1;
-  const answeredTotal = Object.keys(answers).length;
+  const answeredTotal = Object.keys(answers).filter((k) => {
+    const a = answers[k];
+    return a.optionId || (a.selectedOptionIds && a.selectedOptionIds.length > 0) || (a.textResponse && a.textResponse.trim().length > 0);
+  }).length;
+
+  const qType = currentQuestion?.type || "SINGLE_CHOICE";
+  const currentAnswer = answers[currentQuestion?.id] || {};
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col select-none">
@@ -409,7 +488,7 @@ export default function QuizTakingPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-md">
-                  VeloExambro Active
+                  VeloExambro CBT
                 </span>
               </div>
               <h1 className="text-xs sm:text-sm font-bold text-white truncate mt-0.5">
@@ -482,6 +561,9 @@ export default function QuizTakingPage() {
                   <span className="text-xs font-semibold text-slate-400">
                     dari {quiz.questions.length} Soal
                   </span>
+                  <span className="text-[10px] font-bold uppercase text-slate-300 bg-slate-700/70 px-2 py-0.5 rounded-md">
+                    {qType}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -503,39 +585,143 @@ export default function QuizTakingPage() {
               </div>
 
               {/* Question Text */}
-              <div className="text-sm sm:text-base font-semibold text-slate-100 leading-relaxed">
+              <div className="text-sm sm:text-base font-semibold text-slate-100 leading-relaxed whitespace-pre-line">
                 {currentQuestion.text}
               </div>
 
-              {/* Options List */}
-              <div className="mt-6 space-y-3">
-                {currentQuestion.options.map((opt: any, optIdx: number) => {
-                  const isSelected = answers[currentQuestion.id] === opt.id;
-                  const letter = String.fromCharCode(65 + optIdx); // A, B, C, D...
+              {/* DYNAMIC QUESTION INPUT BASED ON TYPE */}
+              <div className="mt-6">
+                {/* 1. SINGLE CHOICE */}
+                {qType === "SINGLE_CHOICE" && (
+                  <div className="space-y-3">
+                    {currentQuestion.options?.map((opt: any, optIdx: number) => {
+                      const isSelected = currentAnswer.optionId === opt.id;
+                      const letter = String.fromCharCode(65 + optIdx);
 
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => handleSelectOption(currentQuestion.id, opt.id)}
-                      className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center gap-3.5 cursor-pointer text-sm ${
-                        isSelected
-                          ? "bg-blue-600/20 border-blue-500 text-white font-semibold ring-1 ring-blue-500/50 shadow-md"
-                          : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/50 hover:border-slate-600"
-                      }`}
-                    >
-                      <span
-                        className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
-                          isSelected
-                            ? "bg-blue-600 text-white"
-                            : "bg-slate-800 border border-slate-700 text-slate-400"
-                        }`}
-                      >
-                        {letter}
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleSelectSingleChoice(currentQuestion.id, opt.id)}
+                          className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center gap-3.5 cursor-pointer text-sm ${
+                            isSelected
+                              ? "bg-blue-600/20 border-blue-500 text-white font-semibold ring-1 ring-blue-500/50 shadow-md"
+                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/50 hover:border-slate-600"
+                          }`}
+                        >
+                          <span
+                            className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
+                              isSelected
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-800 border border-slate-700 text-slate-400"
+                            }`}
+                          >
+                            {letter}
+                          </span>
+                          <span className="flex-1 leading-snug">{opt.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 2. CHECKBOXES (Multi-Select) */}
+                {qType === "CHECKBOXES" && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-amber-300/80 mb-2 italic">
+                      * Pilih satu atau lebih jawaban yang benar.
+                    </p>
+                    {currentQuestion.options?.map((opt: any, optIdx: number) => {
+                      const isSelected = (currentAnswer.selectedOptionIds || []).includes(opt.id);
+                      const letter = String.fromCharCode(65 + optIdx);
+
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleToggleCheckbox(currentQuestion.id, opt.id)}
+                          className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center gap-3.5 cursor-pointer text-sm ${
+                            isSelected
+                              ? "bg-blue-600/20 border-blue-500 text-white font-semibold ring-1 ring-blue-500/50 shadow-md"
+                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/50 hover:border-slate-600"
+                          }`}
+                        >
+                          <div
+                            className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
+                              isSelected
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-800 border border-slate-700 text-slate-400"
+                            }`}
+                          >
+                            {isSelected ? <CheckSquare className="w-4 h-4" /> : letter}
+                          </div>
+                          <span className="flex-1 leading-snug">{opt.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 3. TRUE / FALSE */}
+                {qType === "TRUE_FALSE" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {currentQuestion.options?.map((opt: any) => {
+                      const isSelected = currentAnswer.optionId === opt.id;
+                      const isTrue = opt.text.toUpperCase() === "BENAR";
+
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleSelectSingleChoice(currentQuestion.id, opt.id)}
+                          className={`p-6 rounded-3xl border text-center transition-all cursor-pointer font-black text-lg sm:text-xl flex flex-col items-center justify-center gap-2 ${
+                            isSelected
+                              ? isTrue
+                                ? "bg-emerald-600/30 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/50 shadow-lg"
+                                : "bg-rose-600/30 border-rose-500 text-rose-300 ring-2 ring-rose-500/50 shadow-lg"
+                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/50"
+                          }`}
+                        >
+                          <span>{opt.text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 4. SHORT ANSWER */}
+                {qType === "SHORT_ANSWER" && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 block">
+                      Tuliskan Jawaban Singkat Anda:
+                    </label>
+                    <input
+                      type="text"
+                      value={currentAnswer.textResponse || ""}
+                      onChange={(e) => handleTextResponseChange(currentQuestion.id, e.target.value)}
+                      placeholder="Ketik jawaban di sini..."
+                      className="w-full p-4 rounded-2xl bg-slate-900/90 border border-slate-700 text-white font-medium text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                    />
+                  </div>
+                )}
+
+                {/* 5. ESSAY / URAIAN */}
+                {qType === "ESSAY" && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-400 block">
+                        Tuliskan Uraian Lengkap Anda:
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {(currentAnswer.textResponse || "").trim().split(/\s+/).filter(Boolean).length} Kata
                       </span>
-                      <span className="flex-1 leading-snug">{opt.text}</span>
-                    </button>
-                  );
-                })}
+                    </div>
+                    <textarea
+                      rows={6}
+                      value={currentAnswer.textResponse || ""}
+                      onChange={(e) => handleTextResponseChange(currentQuestion.id, e.target.value)}
+                      placeholder="Jelaskan secara rinci dan terstruktur sesuai pertanyaan..."
+                      className="w-full p-4 rounded-2xl bg-slate-900/90 border border-slate-700 text-white font-medium text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden resize-y leading-relaxed"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -612,7 +798,13 @@ export default function QuizTakingPage() {
             {/* Question Buttons Grid */}
             <div className="grid grid-cols-5 gap-2.5 max-h-72 overflow-y-auto pr-1">
               {quiz.questions.map((q: any, idx: number) => {
-                const isAnswered = !!answers[q.id];
+                const a = answers[q.id];
+                const isAnswered =
+                  a &&
+                  (a.optionId ||
+                    (a.selectedOptionIds && a.selectedOptionIds.length > 0) ||
+                    (a.textResponse && a.textResponse.trim().length > 0));
+
                 const isFlagged = !!flagged[idx];
                 const isCurrent = currentIndex === idx;
 
