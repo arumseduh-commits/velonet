@@ -17,6 +17,7 @@ import {
   Camera,
   Maximize,
   CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -69,7 +70,15 @@ export default function AdminExamsListPage() {
           </p>
         </div>
 
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10 flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/learning"
+            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md shadow-amber-500/25 transition-all flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4 text-white" />
+            <span>✨ Buat Soal AI Assistant</span>
+          </Link>
+
           <button
             onClick={fetchExams}
             disabled={loading}

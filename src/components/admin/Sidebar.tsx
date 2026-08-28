@@ -140,7 +140,7 @@ export function AdminSidebar({ isOpen = false, onClose }: AdminSidebarProps) {
               }`}
             >
               <Sparkles className={`w-4 h-4 ${pathname.startsWith("/admin/learning") ? "text-amber-500" : "text-slate-400"}`} />
-              <span>MisterGuru Scraper Hub</span>
+              <span>AI Quiz Assistant</span>
             </Link>
 
             <Link
