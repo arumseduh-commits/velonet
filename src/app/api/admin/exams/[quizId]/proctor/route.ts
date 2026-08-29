@@ -18,7 +18,8 @@ export async function GET(
       where: { id: quizId },
       include: {
         questions: {
-          select: { id: true, text: true, points: true },
+          select: { id: true, text: true, points: true, order: true, type: true },
+          orderBy: { order: "asc" },
         },
       },
     });
@@ -56,18 +57,33 @@ export async function GET(
     });
 
     const totalQuestions = quiz.questions.length;
+    const calculatedQuizTotalPoints = quiz.questions.reduce((acc, q) => acc + (q.points || 0), 0);
 
     const formattedAttempts = attempts
       .map((att) => {
-        let answeredCount = 0;
+        const answeredQuestionIdsSet = new Set<string>();
+
         if (att.answers) {
           try {
             const parsed = JSON.parse(att.answers);
-            answeredCount = Object.keys(parsed).length;
+            if (typeof parsed === "object" && parsed !== null) {
+              Object.entries(parsed).forEach(([qId, val]: [string, any]) => {
+                if (
+                  val &&
+                  (val.optionId ||
+                    (Array.isArray(val.selectedOptionIds) && val.selectedOptionIds.length > 0) ||
+                    (typeof val.textResponse === "string" && val.textResponse.trim().length > 0) ||
+                    (typeof val === "string" && val.trim().length > 0))
+                ) {
+                  answeredQuestionIdsSet.add(qId);
+                }
+              });
+            }
           } catch (e) {}
         }
-        if (answeredCount === 0 && att.detailedAnswers.length > 0) {
-          answeredCount = att.detailedAnswers.filter((a) => {
+
+        if (att.detailedAnswers && att.detailedAnswers.length > 0) {
+          att.detailedAnswers.forEach((a) => {
             let hasOptions = false;
             if (a.selectedOptionIds) {
               try {
@@ -76,28 +92,37 @@ export async function GET(
               } catch (e) {}
             }
             const hasText = Boolean(a.textResponse && a.textResponse.trim());
-            return hasOptions || hasText;
-          }).length;
+            if (hasOptions || hasText) {
+              answeredQuestionIdsSet.add(a.questionId);
+            }
+          });
         }
 
+        const answeredQuestionIds = Array.from(answeredQuestionIdsSet);
+        const answeredCount = answeredQuestionIds.length;
         const progressPercentage = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
         return {
           id: att.id,
+          studentId: att.userId,
           userId: att.userId,
+          studentName: att.user?.name || "Peserta Tanpa Nama",
           userName: att.user?.name || "Peserta Tanpa Nama",
           phoneNumber: att.user?.phoneNumber || "-",
           studentClass: att.user?.studentClass || "-",
-          status: att.status,
+          status: att.status as "IN_PROGRESS" | "LOCKED" | "SUBMITTED" | "GRADED" | "DISQUALIFIED",
+          strikes: att.strikeCount,
           strikeCount: att.strikeCount,
           score: att.score,
-          totalScore: att.totalScore,
+          totalScore: att.totalScore || calculatedQuizTotalPoints,
           answeredCount,
           totalQuestions,
           progressPercentage,
+          answeredQuestionIds,
           startedAt: att.startedAt,
           submittedAt: att.submittedAt,
           updatedAt: att.updatedAt,
+          lastPing: att.updatedAt,
           violations: att.violations,
         };
       })
@@ -117,7 +142,7 @@ export async function GET(
       totalParticipants: formattedAttempts.length,
       inProgress: formattedAttempts.filter((a) => a.status === "IN_PROGRESS").length,
       locked: formattedAttempts.filter((a) => a.status === "LOCKED").length,
-      submitted: formattedAttempts.filter((a) => a.status === "SUBMITTED").length,
+      submitted: formattedAttempts.filter((a) => a.status === "SUBMITTED" || a.status === "GRADED").length,
       disqualified: formattedAttempts.filter((a) => a.status === "DISQUALIFIED").length,
     };
 
@@ -134,9 +159,11 @@ export async function GET(
           enableCameraProctor: quiz.enableCameraProctor,
           enableFullscreenLock: quiz.enableFullscreenLock,
           totalQuestions: quiz.questions.length,
+          questions: quiz.questions,
         },
         stats,
         attempts: formattedAttempts,
+        participants: formattedAttempts,
       },
     });
   } catch (err) {

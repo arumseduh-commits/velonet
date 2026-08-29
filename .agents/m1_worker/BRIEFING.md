@@ -1,4 +1,4 @@
-# BRIEFING — 2026-08-29T18:55:00Z
+# BRIEFING — 2026-08-30T01:58:00Z
 
 ## Mission
 Implement Milestone 1: Window of Availability Scheduling (Admin & Student UI, Runner Gating, Timer Reset & Exam Token Bug Fixes) with zero build/type errors.
@@ -18,23 +18,25 @@ Implement Milestone 1: Window of Availability Scheduling (Admin & Student UI, Ru
 
 ## Current Parent
 - Conversation ID: e6c02ec6-02af-40ab-b2e8-ee32e727ea1b
-- Updated: not yet
+- Updated: 2026-08-30T01:58:00Z
 
 ## Task Summary
 - **What to build**:
-  1. Verify Prisma DB sync (`npx prisma db push`).
-  2. Admin Exam Create & Edit UI (`openAt`, `closeAt`, timezone handling, validation, clear buttons, payload).
-  3. Admin Exam List Status badges & schedule date displays.
-  4. Student Exam Hub (`student/exams/page.tsx`): fix JSX error, countdown timer, schedule indicators, status badges, disabled states, mobile responsiveness.
-  5. Student Quiz Runner (`student/quiz/[quizId]/page.tsx`): Waiting/expired gating screens, countdown auto-unlock, timer reset fix on resume, exam token passing fix.
-  6. ExamPreCheckModal and API start route token payload compatibility.
-  7. Verification with `npm run build`.
+  1. Verify Prisma DB sync (`npx prisma db push`) - COMPLETED.
+  2. Admin Exam Create & Edit UI (`openAt`, `closeAt`, timezone handling, validation, clear buttons, payload) - COMPLETED.
+  3. Admin Exam List Status badges & schedule date displays - COMPLETED.
+  4. Student Exam Hub (`student/exams/page.tsx`): fix JSX error, countdown timer, schedule indicators, status badges, disabled states, mobile responsiveness - COMPLETED.
+  5. Student Quiz Runner (`student/quiz/[quizId]/page.tsx`): Waiting/expired gating screens, countdown auto-unlock, timer reset fix on resume, exam token passing fix - COMPLETED.
+  6. ExamPreCheckModal and API start route token payload compatibility - COMPLETED.
+  7. Verification with `npm run build` (Passed with 0 errors) - COMPLETED.
 - **Success criteria**: 0 TypeScript and build errors, proper UI and behavior in admin & student flows.
 - **Interface contracts**: `PROJECT.md`
 - **Code layout**: Next.js App Router in `src/`
 
 ## Key Decisions Made
-- [TBD]
+- Used local component extraction in `toLocalDatetimeInputString()` to prevent UTC ISO shifts during date editing.
+- Implemented live ticking countdown with auto-transition on timer reaching 0.
+- Preserved personal duration timer tolerance for any attempt started before `closeAt`.
 
 ## Artifact Index
 - `.agents/m1_worker/DISPATCH.md` — Assignment
@@ -43,11 +45,18 @@ Implement Milestone 1: Window of Availability Scheduling (Admin & Student UI, Ru
 - `.agents/m1_worker/handoff.md` — Final handoff report
 
 ## Change Tracker
-- **Files modified**: None yet
-- **Build status**: Untested
+- **Files modified**:
+  - `src/app/admin/exams/create/page.tsx`: Schedule validation, clear buttons, duration preview, inline warnings
+  - `src/app/admin/exams/[quizId]/edit/page.tsx`: Timezone-safe datetime input helper, validation, clear buttons
+  - `src/app/admin/exams/page.tsx`: Visual availability status badges, schedule display box
+  - `src/app/student/exams/page.tsx`: Syntax fix, ticking countdown, availability badges, disabled states
+  - `src/app/student/quiz/[quizId]/page.tsx`: Window gating screens, auto-unlock, timer reset fix on resume, token fix
+  - `src/components/exam/ExamPreCheckModal.tsx`: Pass token input on start
+  - `src/app/api/quiz/[quizId]/start/route.ts`: Support both token and examToken fields
+- **Build status**: PASSED (`npm run build` exited with code 0)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Pending
-- **Lint status**: Pending
-- **Tests added/modified**: Pending
+- **Build/test result**: Pass (0 errors)
+- **Lint status**: Clean
+- **Tests added/modified**: Verified via end-to-end build and static page generation

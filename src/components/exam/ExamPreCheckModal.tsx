@@ -23,7 +23,7 @@ interface ExamPreCheckModalProps {
   examTokenInput?: string;
   onTokenChange?: (token: string) => void;
   isPreview?: boolean;
-  onStartExam: () => void;
+  onStartExam: (token?: string) => void;
 }
 
 export default function ExamPreCheckModal({
@@ -190,7 +190,7 @@ export default function ExamPreCheckModal({
         {/* Action Button */}
         <div className="mt-6 flex flex-col sm:flex-row gap-3">
           <button
-            onClick={onStartExam}
+            onClick={() => onStartExam(examTokenInput)}
             disabled={!isReadyToStart}
             className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
               isReadyToStart

@@ -31,6 +31,10 @@ import {
   Zap,
   X,
   BookOpen,
+  Calendar,
+  RefreshCw,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { useExamSecurity } from "@/hooks/useExamSecurity";
@@ -70,6 +74,7 @@ export default function QuizTakingPage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [isDisqualified, setIsDisqualified] = useState(false);
   const [resultData, setResultData] = useState<any>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<"SAVED" | "SAVING" | "OFFLINE">("SAVED");
 
   // Security & Proctoring States
   const [strikeCount, setStrikeCount] = useState(0);
@@ -87,9 +92,18 @@ export default function QuizTakingPage() {
     description: string;
   } | null>(null);
 
-  // Timer States
+  // Timer & Clock States
   const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(30 * 60);
+  const [now, setNow] = useState<Date>(new Date());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Live ticking clock for scheduling countdowns
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // 1. Initial Load & LocalStorage Recovery
   useEffect(() => {
@@ -151,9 +165,26 @@ export default function QuizTakingPage() {
           }
         }
 
-        // Initialize duration timer
-        const totalSecs = (qData.durationMinutes || 30) * 60;
-        setTimeLeftSeconds(totalSecs);
+        // Initialize duration timer - Fix timer reset bug on resume
+        if (att && att.startedAt && (att.status === "IN_PROGRESS" || att.status === "LOCKED") && !isPrev) {
+          const remaining = typeof att.remainingDurationSecs === "number"
+            ? att.remainingDurationSecs
+            : Math.max(
+                0,
+                (qData.durationMinutes || 30) * 60 -
+                  Math.floor((Date.now() - new Date(att.startedAt).getTime()) / 1000)
+              );
+          setTimeLeftSeconds(remaining);
+
+          if (att.status === "IN_PROGRESS" && remaining <= 0) {
+            setTimeout(() => {
+              handleAutoSubmitOnTimeout();
+            }, 500);
+          }
+        } else {
+          const totalSecs = (qData.durationMinutes || 30) * 60;
+          setTimeLeftSeconds(totalSecs);
+        }
       } else {
         toast.error("Kuis tidak ditemukan atau tidak tersedia.");
       }
@@ -256,25 +287,39 @@ export default function QuizTakingPage() {
     };
   }, [hasStarted, isLocked, isCompleted]);
 
-  // Background auto-sync progress for Live Proctor Leaderboard
+  // Background auto-sync helper for Live Proctor Leaderboard
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  useEffect(() => {
-    if (!hasStarted || isCompleted || isPreview) return;
-    if (Object.keys(answers).length === 0) return;
 
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(() => {
-      fetch(`/api/quiz/${quizId}/progress`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
-      }).catch(() => {});
-    }, 1200);
+  const syncProgressToServer = useCallback(
+    async (
+      answersToSync: { [questionId: string]: StudentAnswerState },
+      singleQ?: { questionId: string; answer: StudentAnswerState }
+    ) => {
+      if (isPreview || !hasStarted || isCompleted || isDisqualified) return;
+      try {
+        setCloudSyncStatus("SAVING");
+        const bodyPayload = singleQ
+          ? { questionId: singleQ.questionId, answer: singleQ.answer, answers: answersToSync }
+          : { answers: answersToSync };
 
-    return () => {
-      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    };
-  }, [answers, hasStarted, isCompleted, isPreview, quizId]);
+        const res = await fetch(`/api/quiz/${quizId}/progress`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyPayload),
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          setCloudSyncStatus("SAVED");
+        } else {
+          setCloudSyncStatus("OFFLINE");
+        }
+      } catch (e) {
+        setCloudSyncStatus("OFFLINE");
+      }
+    },
+    [hasStarted, isCompleted, isDisqualified, isPreview, quizId]
+  );
 
   const handleAutoSubmitOnTimeout = async () => {
     toast.warning("Waktu ujian telah habis! Mengumpulkan jawaban secara otomatis...");
@@ -285,15 +330,20 @@ export default function QuizTakingPage() {
   const handleStartExam = async (token?: string) => {
     try {
       if (!isPreview) {
+        const tokenToSend = (token || examTokenInput || "").trim();
         const res = await fetch(`/api/quiz/${quizId}/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ examToken: token }),
+          body: JSON.stringify({ token: tokenToSend, examToken: tokenToSend }),
         });
         const json = await res.json();
         if (!json.success) {
           toast.error(json.error || "Gagal memulai ujian.");
           return;
+        }
+
+        if (json.data && typeof json.data.remainingDurationSecs === "number") {
+          setTimeLeftSeconds(json.data.remainingDurationSecs);
         }
       }
 
@@ -309,40 +359,68 @@ export default function QuizTakingPage() {
     }
   };
 
-  // 6. Answer selection handlers
+  // 6. Answer selection handlers (Optimistic state + immediate draft + fast non-blocking cloud sync)
   const handleSelectOption = (questionId: string, optionId: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        ...prev[questionId],
-        optionId,
-      },
-    }));
+    const newAns: StudentAnswerState = {
+      ...answers[questionId],
+      optionId,
+      selectedOptionIds: [optionId],
+    };
+    const updatedAnswers = {
+      ...answers,
+      [questionId]: newAns,
+    };
+    setAnswers(updatedAnswers);
+    try {
+      localStorage.setItem(`velonet_cbt_draft_${quizId}`, JSON.stringify(updatedAnswers));
+    } catch (e) {}
+
+    // Immediate sync for MCQ/TF
+    syncProgressToServer(updatedAnswers, { questionId, answer: newAns });
   };
 
   const handleToggleMultipleOption = (questionId: string, optionId: string) => {
-    setAnswers((prev) => {
-      const current = prev[questionId]?.selectedOptionIds || [];
-      const exists = current.includes(optionId);
-      const updated = exists ? current.filter((id) => id !== optionId) : [...current, optionId];
-      return {
-        ...prev,
-        [questionId]: {
-          ...prev[questionId],
-          selectedOptionIds: updated,
-        },
-      };
-    });
+    const current = answers[questionId]?.selectedOptionIds || [];
+    const exists = current.includes(optionId);
+    const updated = exists ? current.filter((id) => id !== optionId) : [...current, optionId];
+    const newAns: StudentAnswerState = {
+      ...answers[questionId],
+      selectedOptionIds: updated,
+      optionId: updated[0] || undefined,
+    };
+    const updatedAnswers = {
+      ...answers,
+      [questionId]: newAns,
+    };
+    setAnswers(updatedAnswers);
+    try {
+      localStorage.setItem(`velonet_cbt_draft_${quizId}`, JSON.stringify(updatedAnswers));
+    } catch (e) {}
+
+    // Immediate sync for Checkboxes
+    syncProgressToServer(updatedAnswers, { questionId, answer: newAns });
   };
 
   const handleTextResponseChange = (questionId: string, text: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        ...prev[questionId],
-        textResponse: text,
-      },
-    }));
+    const newAns: StudentAnswerState = {
+      ...answers[questionId],
+      textResponse: text,
+    };
+    const updatedAnswers = {
+      ...answers,
+      [questionId]: newAns,
+    };
+    setAnswers(updatedAnswers);
+    try {
+      localStorage.setItem(`velonet_cbt_draft_${quizId}`, JSON.stringify(updatedAnswers));
+    } catch (e) {}
+
+    // Debounce sync for text answers (600-800ms)
+    setCloudSyncStatus("SAVING");
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      syncProgressToServer(updatedAnswers, { questionId, answer: newAns });
+    }, 700);
   };
 
   const handleToggleFlag = (index: number) => {
@@ -448,10 +526,173 @@ export default function QuizTakingPage() {
         </p>
         <button
           onClick={() => router.push("/student/exams")}
-          className="mt-6 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
+          className="mt-6 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer"
         >
           Kembali ke Pusat Ujian
         </button>
+      </div>
+    );
+  }
+
+  // Window of Availability Gating Checks
+  const hasActiveAttempt = Boolean(attempt && (attempt.status === "IN_PROGRESS" || attempt.status === "LOCKED"));
+  const hasCompletedAttempt = Boolean(
+    attempt && (attempt.status === "SUBMITTED" || attempt.status === "GRADED" || attempt.status === "DISQUALIFIED")
+  );
+
+  const isUpcoming =
+    Boolean(quiz?.openAt && now < new Date(quiz.openAt)) &&
+    !hasActiveAttempt &&
+    !hasCompletedAttempt &&
+    !isPreview;
+
+  const isExpired =
+    Boolean(quiz?.closeAt && now > new Date(quiz.closeAt)) &&
+    !hasActiveAttempt &&
+    !hasCompletedAttempt &&
+    !isPreview;
+
+  // 1. Dedicated "Ujian Belum Dibuka" Screen with Live Ticking Countdown
+  if (isUpcoming) {
+    const diff = Math.max(0, Math.floor((new Date(quiz.openAt).getTime() - now.getTime()) / 1000));
+    const days = Math.floor(diff / 86400);
+    const hours = Math.floor((diff % 86400) / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100">
+        <div className="w-full max-w-lg bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-200">
+          <div className="w-20 h-20 rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mx-auto animate-pulse shadow-lg shadow-amber-500/20">
+            <Calendar className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="px-3 py-1 rounded-full bg-amber-950 text-amber-300 border border-amber-700 text-xs font-black uppercase tracking-wider">
+              UJIAN BELUM DIBUKA
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-white">{quiz.title}</h2>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+              Sesi ujian ini dijadwalkan dibuka secara otomatis saat hitung mundur mencapai waktu mulai.
+            </p>
+          </div>
+
+          {/* Live Countdown Grid */}
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30">
+            <div className="text-xs font-bold text-amber-400 mb-3 flex items-center justify-center gap-1.5">
+              <Clock className="w-4 h-4 animate-spin" />
+              <span>HITUNG MUNDUR PEMBUKAAN UJIAN</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div className="text-2xl sm:text-3xl font-black font-mono text-amber-400">{String(days).padStart(2, "0")}</div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Hari</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div className="text-2xl sm:text-3xl font-black font-mono text-amber-400">{String(hours).padStart(2, "0")}</div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Jam</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div className="text-2xl sm:text-3xl font-black font-mono text-amber-400">{String(minutes).padStart(2, "0")}</div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Menit</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div className="text-2xl sm:text-3xl font-black font-mono text-amber-400">{String(seconds).padStart(2, "0")}</div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Detik</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Exam Schedule Meta */}
+          <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 text-left space-y-2 text-xs">
+            <div className="flex items-center justify-between text-slate-300">
+              <span className="text-slate-400">Jadwal Dibuka:</span>
+              <span className="font-bold text-white">
+                {new Date(quiz.openAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })} WIB
+              </span>
+            </div>
+            {quiz.closeAt && (
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="text-slate-400">Jadwal Ditutup:</span>
+                <span className="font-bold text-white">
+                  {new Date(quiz.closeAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })} WIB
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-slate-300">
+              <span className="text-slate-400">Durasi Pengerjaan:</span>
+              <span className="font-bold text-white">{quiz.durationMinutes} Menit</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300">
+              <span className="text-slate-400">Jumlah Soal:</span>
+              <span className="font-bold text-white">{quiz.questions?.length || 0} Soal</span>
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="space-y-2">
+            <button
+              onClick={() => fetchQuizData()}
+              className="w-full py-3 px-5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Cek Status / Muat Ulang</span>
+            </button>
+            <button
+              onClick={() => router.push("/student/exams")}
+              className="w-full py-3 px-5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer border border-slate-700 transition-all"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Pusat Ujian</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Dedicated "Ujian Telah Ditutup / Berakhir" Screen
+  if (isExpired) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100">
+        <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-200">
+          <div className="w-20 h-20 rounded-3xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 mx-auto shadow-lg">
+            <Clock className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-xs font-black uppercase tracking-wider">
+              UJIAN TELAH DITUTUP
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-white">{quiz.title}</h2>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+              Waktu pengerjaan untuk ujian ini telah berakhir pada{" "}
+              <strong className="text-slate-200">
+                {new Date(quiz.closeAt).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" })} WIB
+              </strong>
+              . Anda belum sempat memulai ujian selama jendela waktu yang tersedia.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/80 text-left space-y-2 text-xs">
+            <div className="flex items-center justify-between text-slate-300">
+              <span className="text-slate-400">Durasi Pengerjaan:</span>
+              <span className="font-bold text-white">{quiz.durationMinutes} Menit</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300">
+              <span className="text-slate-400">Total Soal:</span>
+              <span className="font-bold text-white">{quiz.questions?.length || 0} Soal</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => router.push("/student/exams")}
+            className="w-full py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer border border-slate-700 transition-all shadow-md"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Kembali ke Pusat Ujian CBT</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -784,8 +1025,43 @@ export default function QuizTakingPage() {
             </div>
           </div>
 
-          {/* Center/Right: Timer, Strikes, Tutorial Help, Palette */}
+          {/* Center/Right: Cloud Sync, Timer, Strikes, Tutorial Help, Palette */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Cloud Sync Status Indicator */}
+            <div
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-medium transition-all ${
+                cloudSyncStatus === "SAVING"
+                  ? "bg-blue-950/70 border-blue-600/60 text-blue-300 animate-pulse"
+                  : cloudSyncStatus === "OFFLINE"
+                  ? "bg-amber-950/70 border-amber-600/60 text-amber-300"
+                  : "bg-emerald-950/60 border-emerald-700/60 text-emerald-300"
+              }`}
+              title={
+                cloudSyncStatus === "SAVING"
+                  ? "Menyinkronkan progres ke server CBT..."
+                  : cloudSyncStatus === "OFFLINE"
+                  ? "Koneksi terputus. Jawaban tersimpan lokal di browser (Draft Offline)."
+                  : "Seluruh jawaban tersinkronisasi dan tersimpan aman di Cloud CBT."
+              }
+            >
+              {cloudSyncStatus === "SAVING" ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : cloudSyncStatus === "OFFLINE" ? (
+                <>
+                  <CloudOff className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Offline</span>
+                </>
+              ) : (
+                <>
+                  <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Tersimpan di Cloud</span>
+                </>
+              )}
+            </div>
+
             {/* Timer Badge */}
             <div
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-mono font-bold shadow-xs transition-colors ${

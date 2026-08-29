@@ -15,13 +15,10 @@ import {
   ArrowRight,
   RefreshCw,
   Search,
-  BookOpen,
   Trophy,
   Layers,
-  Camera,
-  Maximize,
-  HelpCircle,
   Calendar,
+  Hourglass,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import ExamLeaderboardModal from "@/components/exam/ExamLeaderboardModal";
@@ -59,6 +56,26 @@ interface ExamItem {
   } | null;
 }
 
+function formatCountdown(targetDateStr: string, now: Date): { text: string; isImminent: boolean } {
+  const target = new Date(targetDateStr).getTime();
+  const diff = target - now.getTime();
+  if (diff <= 0) return { text: "00:00:00", isImminent: true };
+
+  const totalSecs = Math.floor(diff / 1000);
+  const hours = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
+
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return { text: `${days} hari ${remHours} jam lagi`, isImminent: false };
+  }
+
+  const formatted = `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  return { text: formatted, isImminent: true };
+}
+
 export default function StudentExamsPage() {
   const { toast } = useDialog();
 
@@ -67,6 +84,15 @@ export default function StudentExamsPage() {
   const [activeTab, setActiveTab] = useState<"ALL" | "ACTIVE" | "COMPLETED">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLeaderboardQuiz, setSelectedLeaderboardQuiz] = useState<{ id: string; title: string } | null>(null);
+  const [now, setNow] = useState<Date>(new Date());
+
+  // 1-second interval for live countdowns
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchExams = async () => {
     setLoading(true);
@@ -89,6 +115,22 @@ export default function StudentExamsPage() {
     fetchExams();
   }, []);
 
+  const isExamDone = (exam: ExamItem) => {
+    const status = exam.attempt?.status;
+    return status === "SUBMITTED" || status === "GRADED" || status === "DISQUALIFIED";
+  };
+
+  const isExamExpired = (exam: ExamItem) => {
+    const isPastClose = Boolean(exam.closeAt && now > new Date(exam.closeAt));
+    return (exam.availability === "CLOSED" || isPastClose) && !exam.attempt;
+  };
+
+  const getComputedAvailability = (exam: ExamItem): "UPCOMING" | "OPEN" | "CLOSED" => {
+    if (exam.openAt && now < new Date(exam.openAt)) return "UPCOMING";
+    if (exam.closeAt && now > new Date(exam.closeAt) && !exam.attempt) return "CLOSED";
+    return "OPEN";
+  };
+
   const filteredExams = exams.filter((exam) => {
     const matchesSearch =
       exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -96,26 +138,19 @@ export default function StudentExamsPage() {
 
     if (!matchesSearch) return false;
 
-    const isDone =
-      exam.attempt?.status === "SUBMITTED" ||
-      exam.attempt?.status === "GRADED" ||
-      exam.attempt?.status === "DISQUALIFIED";
+    const done = isExamDone(exam);
+    const expired = isExamExpired(exam);
 
-    if (activeTab === "ACTIVE") return !isDone;
-    if (activeTab === "COMPLETED") return isDone;
+    if (activeTab === "ACTIVE") return !done && !expired;
+    if (activeTab === "COMPLETED") return done || expired;
     return true;
   });
 
-  const activeCount = exams.filter(
-    (e) => !e.attempt || e.attempt.status === "IN_PROGRESS" || e.attempt.status === "LOCKED"
-  ).length;
-
-  const completedCount = exams.filter(
-    (e) => e.attempt?.status === "SUBMITTED" || e.attempt?.status === "GRADED"
-  ).length;
+  const activeCount = exams.filter((e) => !isExamDone(e) && !isExamExpired(e)).length;
+  const completedCount = exams.filter((e) => isExamDone(e) || isExamExpired(e)).length;
 
   return (
-    <div className="space-y-6 pb-24 max-w-5xl mx-auto">
+    <div className="space-y-6 pb-24 max-w-5xl mx-auto px-3 sm:px-0">
       {/* Header Banner */}
       <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 space-y-2">
@@ -146,10 +181,10 @@ export default function StudentExamsPage() {
 
       {/* Tabs & Search Filter */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200 self-start">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200 self-start w-full sm:w-auto">
           <button
             onClick={() => setActiveTab("ALL")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
               activeTab === "ALL"
                 ? "bg-white text-slate-900 shadow-xs"
                 : "text-slate-500 hover:text-slate-900"
@@ -159,7 +194,7 @@ export default function StudentExamsPage() {
           </button>
           <button
             onClick={() => setActiveTab("ACTIVE")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
               activeTab === "ACTIVE"
                 ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-500 hover:text-slate-900"
@@ -169,17 +204,17 @@ export default function StudentExamsPage() {
           </button>
           <button
             onClick={() => setActiveTab("COMPLETED")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
               activeTab === "COMPLETED"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            Selesai ({completedCount})
+            Riwayat / Selesai ({completedCount})
           </button>
         </div>
 
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 max-w-full sm:max-w-sm">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -219,11 +254,17 @@ export default function StudentExamsPage() {
             const isLocked = attempt?.status === "LOCKED";
             const isInProgress = attempt?.status === "IN_PROGRESS";
             const isScoreVisible = exam.isScoreVisible ?? (attempt?.score !== null && attempt?.score !== undefined);
+            const currentAvailability = getComputedAvailability(exam);
+
+            // Countdown helper for upcoming exam
+            const openCountdown = exam.openAt && currentAvailability === "UPCOMING"
+              ? formatCountdown(exam.openAt, now)
+              : null;
 
             return (
               <div
                 key={exam.id}
-                className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between hover:border-blue-300 transition-all"
+                className="p-5 sm:p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between hover:border-blue-300 transition-all"
               >
                 <div className="space-y-3">
                   {/* Top Status Badges */}
@@ -254,19 +295,20 @@ export default function StudentExamsPage() {
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
                         <span>Sedang Dikerjakan</span>
                       </span>
-                    ) : exam.availability === "UPCOMING" ? (
+                    ) : currentAvailability === "UPCOMING" ? (
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-amber-600" />
                         <span>Ujian Belum Dibuka</span>
                       </span>
-                    ) : exam.availability === "CLOSED" ? (
+                    ) : currentAvailability === "CLOSED" ? (
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1">
                         <Clock className="w-3 h-3 text-slate-400" />
                         <span>Ujian Telah Ditutup</span>
                       </span>
                     ) : (
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                        Siap Dikerjakan
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        <span>Sedang Berlangsung</span>
                       </span>
                     )}
                   </div>
@@ -308,9 +350,9 @@ export default function StudentExamsPage() {
                     )}
 
                     {(exam.openAt || exam.closeAt) && (
-                      <span className="flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-xl border border-indigo-100 font-semibold">
-                        <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>
+                      <span className="flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-xl border border-indigo-100 font-semibold w-full sm:w-auto">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                        <span className="truncate">
                           {exam.openAt
                             ? `Buka: ${new Date(exam.openAt).toLocaleDateString("id-ID", {
                                 day: "numeric",
@@ -330,11 +372,19 @@ export default function StudentExamsPage() {
                         </span>
                       </span>
                     )}
+
+                    {/* Realtime Live Countdown Badge for UPCOMING */}
+                    {openCountdown && (
+                      <span className="flex items-center gap-1 bg-amber-100 text-amber-900 px-2.5 py-1 rounded-xl border border-amber-200 font-mono font-bold text-[11px] animate-pulse">
+                        <Hourglass className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Dibuka dalam: {openCountdown.text}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Bottom Action / Score Section */}
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   {isDisqualified ? (
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center font-mono font-black text-xs">
@@ -371,29 +421,29 @@ export default function StudentExamsPage() {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 justify-end">
                     {/* Leaderboard Button for Completed Exams */}
                     {isCompleted && isScoreVisible && (
                       <button
                         type="button"
                         onClick={() => setSelectedLeaderboardQuiz({ id: exam.id, title: exam.title })}
-                        className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                        className="px-3 py-2.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
                         title="Lihat Papan Peringkat"
                       >
                         <Trophy className="w-3.5 h-3.5 text-amber-600" />
-                        <span className="hidden sm:inline">Peringkat</span>
+                        <span>Peringkat</span>
                       </button>
                     )}
 
-                    {exam.availability === "UPCOMING" && !isInProgress && !isCompleted ? (
+                    {currentAvailability === "UPCOMING" && !isInProgress && !isCompleted ? (
                       <button
                         disabled
                         className="px-4 py-2.5 rounded-2xl font-bold text-xs bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed flex items-center gap-1.5"
                       >
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Lock className="w-3.5 h-3.5" />
                         <span>Belum Dibuka</span>
                       </button>
-                    ) : exam.availability === "CLOSED" && !isInProgress && !isCompleted ? (
+                    ) : currentAvailability === "CLOSED" && !isInProgress && !isCompleted ? (
                       <button
                         disabled
                         className="px-4 py-2.5 rounded-2xl font-bold text-xs bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed flex items-center gap-1.5"
@@ -404,7 +454,7 @@ export default function StudentExamsPage() {
                     ) : (
                       <Link
                         href={`/student/quiz/${exam.id}`}
-                        className={`px-4 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all ${
+                        className={`px-4 py-2.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all ${
                           isDisqualified
                             ? "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200"
                             : isCompleted
@@ -425,7 +475,7 @@ export default function StudentExamsPage() {
                             ? "Buka Kunci"
                             : isInProgress
                             ? "Lanjutkan Ujian"
-                            : "Ikuti Ujian"}
+                            : "Mulai Ujian"}
                         </span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </Link>

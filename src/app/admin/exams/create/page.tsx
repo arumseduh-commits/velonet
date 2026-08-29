@@ -25,6 +25,7 @@ import {
   Sparkles,
   FileSpreadsheet,
   X,
+  RefreshCw,
   Calendar,
   AlertTriangle,
 } from "lucide-react";
@@ -389,6 +390,15 @@ export default function CreateExamPage() {
       return;
     }
 
+    if (openAt && closeAt) {
+      const openTime = new Date(openAt).getTime();
+      const closeTime = new Date(closeAt).getTime();
+      if (openTime >= closeTime) {
+        toast.warning("Jadwal tutup ujian (closeAt) harus lebih akhir dari jadwal buka ujian (openAt)!");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -586,16 +596,34 @@ export default function CreateExamPage() {
 
         {/* Window of Availability (Jadwal Buka & Tutup) */}
         <div className="pt-4 border-t border-slate-100 space-y-3">
-          <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-indigo-600" />
-            <span>Jadwal Rentang Waktu Ujian Dibuka (Window of Availability)</span>
-          </span>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-indigo-600" />
+              <span>Jadwal Rentang Waktu Ujian Dibuka (Window of Availability)</span>
+            </span>
+            {openAt && closeAt && new Date(openAt) < new Date(closeAt) && (
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                ✓ Rentang Valid: {Math.round((new Date(closeAt).getTime() - new Date(openAt).getTime()) / (1000 * 60))} Menit Terbuka
+              </span>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-              <label className="text-xs font-bold text-slate-700 block">
-                Tanggal & Jam Mulai Dibuka:
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">
+                  Tanggal & Jam Mulai Dibuka:
+                </label>
+                {openAt && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenAt("")}
+                    className="text-[10px] font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                  >
+                    Hapus Jadwal
+                  </button>
+                )}
+              </div>
               <input
                 type="datetime-local"
                 value={openAt}
@@ -608,9 +636,20 @@ export default function CreateExamPage() {
             </div>
 
             <div className="space-y-1.5 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-              <label className="text-xs font-bold text-slate-700 block">
-                Tanggal & Jam Ditutup (Selesai):
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">
+                  Tanggal & Jam Ditutup (Selesai):
+                </label>
+                {closeAt && (
+                  <button
+                    type="button"
+                    onClick={() => setCloseAt("")}
+                    className="text-[10px] font-bold text-rose-500 hover:text-rose-700 cursor-pointer"
+                  >
+                    Hapus Batas
+                  </button>
+                )}
+              </div>
               <input
                 type="datetime-local"
                 value={closeAt}
@@ -622,6 +661,13 @@ export default function CreateExamPage() {
               </p>
             </div>
           </div>
+
+          {openAt && closeAt && new Date(openAt) >= new Date(closeAt) && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>Perhatian: Jadwal tutup ujian harus lebih akhir daripada jadwal buka ujian.</span>
+            </div>
+          )}
         </div>
 
         {/* Security Anti-Cheat ExamBro Toggles */}

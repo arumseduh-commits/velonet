@@ -16,27 +16,27 @@ VeloNet CBT is a Next.js 14+ App Router application with PostgreSQL, Prisma ORM,
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Prisma Schema & DB Push | `openAt DateTime?` and `closeAt DateTime?` on Quiz model, verified via `npx prisma db push` | M1 | ORIGINAL_REQUEST §R1.1 |
-| 2 | Admin Exam Create & Edit Scheduling Form | Date/time pickers (`type="datetime-local"`) for `openAt` & `closeAt`, chronological validation (`openAt < closeAt`), payload persistence | M1 | ORIGINAL_REQUEST §R1.2 |
-| 3 | Student Exams Availability Display | Status badges ("Ujian Belum Dibuka", "Sedang Berlangsung", "Ujian Telah Ditutup") with countdown & disabled action buttons | M1 | ORIGINAL_REQUEST §R1.3 |
-| 4 | Student Quiz Runner Window Restrictions | Dedicated "Ujian Belum Dibuka" waiting screen with live ticking countdown, "Ujian Telah Ditutup" expired screen, personal timer tolerance if started before `closeAt` | M1 | ORIGINAL_REQUEST §R1.3 |
-| 5 | Quiz Runner Token & Timer Bug Fixes | Fix token payload mismatch (`examToken` vs `token`) and timer reset on page reload (`remainingDurationSecs`) | M1 | Survey Finding |
-| 6 | Fast Background Progress Sync Hook & API | Connect runner answer changes to `/api/quiz/[quizId]/progress` with optimistic UI and non-blocking background sync | M2 | ORIGINAL_REQUEST §R3.1 |
-| 7 | Live Proctor Realtime Polling (3s) | High-frequency polling (3s) with concurrency lock, silent background update, and live connection status | M3 | ORIGINAL_REQUEST §R2.1 |
-| 8 | Gamified Top 3 Podium ala Quizizz | Gold #1, Silver #2, Bronze #3 podium with animated rank transitions, delta badges (`↑`, `↓`, `=`), and score points | M3 | ORIGINAL_REQUEST §R2.2 |
-| 9 | Live Participant List with Progress Bar & Question Matrix | Progress bar (% answered) + per-question visual dot matrix, realtime score, connection status, strike indicators (Yellow 1-2, Red 3+) | M3 | ORIGINAL_REQUEST §R2.3 |
-| 10 | Quick Proctor Actions with useDialog | Unlock, Force Submit, Kick/Disqualify, Reset Strikes using custom `useDialog` from `@/components/ui/DialogProvider` | M3 | ORIGINAL_REQUEST §R2.4, AGENTS.md |
-| 11 | Class Filtering & Sorting Controls | Filter by `studentClass` and sort by Highest Score, Fastest Progress, Most Strikes, Name | M3 | ORIGINAL_REQUEST §R2.5 |
-| 12 | 100% Mobile Responsiveness (<640px) | Responsive tables (`overflow-x-auto`), flex-col/sm:flex-row headers, responsive modal dialogs, drawer menus | M3 | AGENTS.md |
+| 1 | Prisma Schema & DB Push | `openAt DateTime?` and `closeAt DateTime?` on Quiz model, verified via `npx prisma db push` | M1 (DONE) | ORIGINAL_REQUEST §R1.1 |
+| 2 | Admin Exam Create & Edit Scheduling Form | Date/time pickers (`type="datetime-local"`) for `openAt` & `closeAt`, chronological validation (`openAt < closeAt`), payload persistence | M1 (DONE) | ORIGINAL_REQUEST §R1.2 |
+| 3 | Student Exams Availability Display | Status badges ("Ujian Belum Dibuka", "Sedang Berlangsung", "Ujian Telah Ditutup") with countdown & disabled action buttons | M1 (DONE) | ORIGINAL_REQUEST §R1.3 |
+| 4 | Student Quiz Runner Window Restrictions | Dedicated "Ujian Belum Dibuka" waiting screen with live ticking countdown, "Ujian Telah Ditutup" expired screen, personal timer tolerance if started before `closeAt` | M1 (DONE) | ORIGINAL_REQUEST §R1.3 |
+| 5 | Quiz Runner Token & Timer Bug Fixes | Fix token payload mismatch (`examToken` vs `token`) and timer reset on page reload (`remainingDurationSecs`) | M1 (DONE) | Survey Finding |
+| 6 | Fast Background Progress Sync Hook & API | Connect runner answer changes to `/api/quiz/[quizId]/progress` with optimistic UI and non-blocking background sync | M2 (DONE) | ORIGINAL_REQUEST §R3.1 |
+| 7 | Live Proctor Realtime Polling (3s) | High-frequency polling (3s) with concurrency lock, silent background update, and live connection status | M3 (DONE) | ORIGINAL_REQUEST §R2.1 |
+| 8 | Gamified Top 3 Podium ala Quizizz | Gold #1, Silver #2, Bronze #3 podium with animated rank transitions, delta badges (`↑`, `↓`, `=`), and score points | M3 (DONE) | ORIGINAL_REQUEST §R2.2 |
+| 9 | Live Participant List with Progress Bar & Question Matrix | Progress bar (% answered) + per-question visual dot matrix, realtime score, connection status, strike indicators (Yellow 1-2, Red 3+) | M3 (DONE) | ORIGINAL_REQUEST §R2.3 |
+| 10 | Quick Proctor Actions with useDialog | Unlock, Force Submit, Kick/Disqualify, Reset Strikes using custom `useDialog` from `@/components/ui/DialogProvider` | M3 (DONE) | ORIGINAL_REQUEST §R2.4, AGENTS.md |
+| 11 | Class Filtering & Sorting Controls | Filter by `studentClass` and sort by Highest Score, Fastest Progress, Most Strikes, Name | M3 (DONE) | ORIGINAL_REQUEST §R2.5 |
+| 12 | 100% Mobile Responsiveness (<640px) | Responsive tables (`overflow-x-auto`), flex-col/sm:flex-row headers, responsive modal dialogs, drawer menus | M3 (DONE) | AGENTS.md |
 | 13 | E2E Testing Suite (Tiers 1-4) & Build Verification | Requirement-driven test suite, `npm run build` with 0 TypeScript/ESLint errors, Git commit & push | M4 | AGENTS.md, ORIGINAL_REQUEST Acceptance |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Window of Availability Scheduling | Prisma schema, db push, Admin Create/Edit forms, Student Exams hub, Quiz Runner gating & countdowns, timer bugfixes | none | PLANNED |
-| M2 | Student Fast Progress Sync | Background sync hook in runner, non-blocking `/api/quiz/[quizId]/progress` integration | M1 | PLANNED |
-| M3 | Realtime Live Proctor & Gamified Leaderboard | `/admin/exams/[quizId]/proctor`, 3s polling, Top 3 Podium, live progress matrix, strike badges, supervisor actions with `useDialog`, mobile responsive | M2 | PLANNED |
-| M4 | E2E Testing, Build Check & GitHub Sync | Comprehensive test suite, `npm run build` verification, `git commit` and `git push origin main` | M3 | PLANNED |
+| M1 | Window of Availability Scheduling | Prisma schema, db push, Admin Create/Edit forms, Student Exams hub, Quiz Runner gating & countdowns, timer bugfixes | none | DONE |
+| M2 | Student Fast Progress Sync | Background sync hook in runner, non-blocking `/api/quiz/[quizId]/progress` integration | M1 | DONE |
+| M3 | Realtime Live Proctor & Gamified Leaderboard | `/admin/exams/[quizId]/proctor`, 3s polling, Top 3 Podium, live progress matrix, strike badges, supervisor actions with `useDialog`, mobile responsive | M2 | DONE |
+| M4 | E2E Testing, Build Check & GitHub Sync | Comprehensive test suite, `npm run build` verification, `git commit` and `git push origin main` | M3 | IN_PROGRESS |
 
 ## Interface Contracts
 ### Admin Exam API ↔ Create/Edit Form

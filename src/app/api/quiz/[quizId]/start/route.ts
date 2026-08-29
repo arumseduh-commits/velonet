@@ -94,7 +94,7 @@ export async function POST(
 
     // Validate Exam Token if required
     if (quiz.examToken && quiz.examToken.trim()) {
-      const userToken = (body.token || "").trim().toUpperCase();
+      const userToken = (body.token || body.examToken || "").trim().toUpperCase();
       const expectedToken = quiz.examToken.trim().toUpperCase();
 
       if (!userToken || userToken !== expectedToken) {

@@ -20,8 +20,64 @@ import {
   Sparkles,
   Pencil,
   Trash2,
+  Calendar,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+
+function formatIndonesianDateTime(dateInput: string | Date | null | undefined): string {
+  if (!dateInput) return "-";
+  const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return "-";
+  return (
+    d.toLocaleString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }) + " WIB"
+  );
+}
+
+function getExamAvailability(openAt?: string | null, closeAt?: string | null) {
+  if (!openAt && !closeAt) {
+    return {
+      status: "FLEXIBLE",
+      label: "Akses Fleksibel",
+      badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
+      dotClass: "bg-slate-400",
+    };
+  }
+
+  const now = new Date();
+  const openDate = openAt ? new Date(openAt) : null;
+  const closeDate = closeAt ? new Date(closeAt) : null;
+
+  if (openDate && now < openDate) {
+    return {
+      status: "UPCOMING",
+      label: "Terjadwal",
+      badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
+      dotClass: "bg-amber-500",
+    };
+  }
+
+  if (closeDate && now > closeDate) {
+    return {
+      status: "CLOSED",
+      label: "Telah Berakhir",
+      badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+      dotClass: "bg-rose-500",
+    };
+  }
+
+  return {
+    status: "ACTIVE",
+    label: "Sedang Berlangsung",
+    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    dotClass: "bg-emerald-500 animate-ping",
+  };
+}
 
 export default function AdminExamsListPage() {
   const { confirm, toast } = useDialog();
@@ -200,6 +256,7 @@ export default function AdminExamsListPage() {
           {filteredExams.map((exam) => {
             const hasLocked = exam.stats?.locked > 0;
             const hasActive = exam.stats?.inProgress > 0;
+            const availability = getExamAvailability(exam.openAt, exam.closeAt);
 
             return (
               <div
@@ -208,7 +265,7 @@ export default function AdminExamsListPage() {
                   hasLocked ? "border-rose-300 ring-2 ring-rose-400/20" : "border-slate-200"
                 }`}
               >
-                <div>
+                <div className="space-y-4">
                   {/* Top Meta */}
                   <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
                     <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100 flex items-center gap-1">
@@ -223,15 +280,46 @@ export default function AdminExamsListPage() {
                   </div>
 
                   {/* Title & Description */}
-                  <h3 className="font-extrabold text-slate-900 text-base mt-3 line-clamp-2">
-                    {exam.title}
-                  </h3>
-                  {exam.description && (
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{exam.description}</p>
-                  )}
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base line-clamp-2">
+                      {exam.title}
+                    </h3>
+                    {exam.description && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{exam.description}</p>
+                    )}
+                  </div>
+
+                  {/* Schedule & Availability Box */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-indigo-600" />
+                        <span>Jadwal Akses Ujian</span>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${availability.badgeClass}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${availability.dotClass}`}></span>
+                        <span>{availability.label}</span>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] pt-1 text-slate-700">
+                      <div className="truncate">
+                        <span className="text-slate-400 font-normal">Buka: </span>
+                        <strong className="text-slate-800 font-mono">
+                          {exam.openAt ? formatIndonesianDateTime(exam.openAt) : "Kapan Saja"}
+                        </strong>
+                      </div>
+                      <div className="truncate">
+                        <span className="text-slate-400 font-normal">Tutup: </span>
+                        <strong className="text-slate-800 font-mono">
+                          {exam.closeAt ? formatIndonesianDateTime(exam.closeAt) : "Tanpa Batas"}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Security Badges */}
-                  <div className="mt-4 flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5">
                     {exam.enableFullscreenLock && (
                       <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1">
                         <Maximize className="w-3 h-3" /> Fullscreen Lock
@@ -248,7 +336,7 @@ export default function AdminExamsListPage() {
                   </div>
 
                   {/* PIN & Live Activity */}
-                  <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 text-slate-700">
                       <KeyRound className="w-3.5 h-3.5 text-blue-600" />
                       <span>PIN: <strong className="font-mono text-slate-900">{exam.supervisorPin || "123456"}</strong></span>
