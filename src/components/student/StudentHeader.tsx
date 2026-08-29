@@ -11,6 +11,7 @@ import {
   User,
   LogOut,
   Sparkles,
+  ShieldAlert,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -58,12 +59,14 @@ export function StudentHeader() {
     }
   };
 
-  // Don't render header on login, complete-profile, expired, or full-camera attendance pages
+  // Don't render header on login, complete-profile, expired, or full-camera / CBT exam runner pages
   if (
     pathname === "/student/login" ||
     pathname === "/student/complete-profile" ||
     pathname === "/student/expired" ||
-    pathname === "/student/attendance"
+    pathname === "/student/attendance" ||
+    pathname.startsWith("/student/quiz") ||
+    pathname.startsWith("/student/face-register")
   ) {
     return null;
   }
@@ -76,10 +79,16 @@ export function StudentHeader() {
       isActive: pathname === "/student" || pathname === "/student/dashboard",
     },
     {
+      href: "/student/exams",
+      label: "Ujian CBT",
+      icon: ShieldAlert,
+      isActive: pathname.startsWith("/student/exams"),
+    },
+    {
       href: "/student/learning",
-      label: "Materi & Kuis",
+      label: "Materi LMS",
       icon: BookOpen,
-      isActive: pathname.startsWith("/student/learning") || pathname.startsWith("/student/quiz"),
+      isActive: pathname.startsWith("/student/learning"),
     },
     {
       href: "/student/attendance",

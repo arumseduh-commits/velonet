@@ -122,6 +122,9 @@ export default function AdminEditExamPage({
   const [supervisorPin, setSupervisorPin] = useState("123456");
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleOptions, setShuffleOptions] = useState(true);
+  const [examToken, setExamToken] = useState("");
+  const [showScoreImmediately, setShowScoreImmediately] = useState(true);
+  const [showDiscussion, setShowDiscussion] = useState(false);
 
   // Questions List
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
@@ -143,6 +146,9 @@ export default function AdminEditExamPage({
           setSupervisorPin(q.supervisorPin || "123456");
           setShuffleQuestions(Boolean(q.shuffleQuestions));
           setShuffleOptions(Boolean(q.shuffleOptions));
+          setExamToken(q.examToken || "");
+          setShowScoreImmediately(q.showScoreImmediately ?? true);
+          setShowDiscussion(q.showDiscussion ?? false);
 
           if (q.questions && q.questions.length > 0) {
             setQuestions(
@@ -421,10 +427,12 @@ export default function AdminEditExamPage({
         enableFullscreenLock,
         enableTabSwitchDetect,
         maxStrikes: Number(maxStrikes) || 3,
-        enableCameraProctor,
         supervisorPin: supervisorPin.trim() || "123456",
         shuffleQuestions,
         shuffleOptions,
+        examToken: examToken.trim() ? examToken.trim().toUpperCase() : null,
+        showScoreImmediately,
+        showDiscussion,
         questions: questions.map((q, idx) => ({
           ...q,
           order: idx,
@@ -601,6 +609,25 @@ export default function AdminEditExamPage({
               className="w-full px-4 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 font-mono font-bold"
             />
           </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Token Masuk Ujian (Opsional / Token 5-Huruf)</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                Kosongkan jika siswa bisa langsung mulai tanpa token
+              </span>
+            </label>
+            <input
+              type="text"
+              value={examToken}
+              onChange={(e) => setExamToken(e.target.value.toUpperCase())}
+              placeholder="Contoh: VELO1 (Diberikan guru di kelas saat jam ujian)"
+              className="w-full uppercase px-4 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-mono font-bold tracking-wider"
+            />
+          </div>
         </div>
 
         {/* Security Anti-Cheat ExamBro Toggles */}
@@ -692,6 +719,32 @@ export default function AdminEditExamPage({
                 <option value={5}>5 Strikes</option>
               </select>
             </div>
+
+            <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3 cursor-pointer hover:bg-slate-100/80 transition-colors">
+              <input
+                type="checkbox"
+                checked={showScoreImmediately}
+                onChange={(e) => setShowScoreImmediately(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+              />
+              <div className="text-xs">
+                <span className="font-bold text-slate-800 block">Tampilkan Nilai Langsung</span>
+                <span className="text-[11px] text-slate-500">Skor muncul seketika setelah kirim</span>
+              </div>
+            </label>
+
+            <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3 cursor-pointer hover:bg-slate-100/80 transition-colors">
+              <input
+                type="checkbox"
+                checked={showDiscussion}
+                onChange={(e) => setShowDiscussion(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+              />
+              <div className="text-xs">
+                <span className="font-bold text-slate-800 block">Tampilkan Pembahasan</span>
+                <span className="text-[11px] text-slate-500">Bolehkan siswa lihat kunci/pembahasan</span>
+              </div>
+            </label>
           </div>
         </div>
       </div>

@@ -9,17 +9,20 @@ import {
   Camera,
   Trophy,
   User,
+  ShieldAlert,
 } from "lucide-react";
 
 export function StudentBottomBar() {
   const pathname = usePathname();
 
-  // Don't render on login, complete-profile, expired, or full-camera attendance pages
+  // Don't render on login, complete-profile, expired, full-camera attendance, or CBT exam runner pages
   if (
     pathname === "/student/login" ||
     pathname === "/student/complete-profile" ||
     pathname === "/student/expired" ||
-    pathname === "/student/attendance"
+    pathname === "/student/attendance" ||
+    pathname.startsWith("/student/quiz") ||
+    pathname.startsWith("/student/face-register")
   ) {
     return null;
   }
@@ -32,22 +35,22 @@ export function StudentBottomBar() {
       isActive: pathname === "/student" || pathname === "/student/dashboard",
     },
     {
+      href: "/student/exams",
+      label: "Ujian",
+      icon: ShieldAlert,
+      isActive: pathname.startsWith("/student/exams"),
+    },
+    {
       href: "/student/learning",
       label: "Materi",
       icon: BookOpen,
-      isActive: pathname.startsWith("/student/learning") || pathname.startsWith("/student/quiz"),
+      isActive: pathname.startsWith("/student/learning"),
     },
     {
       href: "/student/attendance",
       label: "Absen",
       icon: Camera,
       isActive: pathname === "/student/attendance",
-    },
-    {
-      href: "/student/leaderboard",
-      label: "Rank",
-      icon: Trophy,
-      isActive: pathname === "/student/leaderboard",
     },
     {
       href: "/student/profile",

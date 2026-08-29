@@ -72,6 +72,9 @@ export async function PATCH(
       supervisorPin,
       shuffleQuestions,
       shuffleOptions,
+      examToken,
+      showScoreImmediately,
+      showDiscussion,
       questions, // if provided, sync questions
     } = body;
 
@@ -94,6 +97,11 @@ export async function PATCH(
         ...(supervisorPin !== undefined && { supervisorPin: supervisorPin?.trim() || "123456" }),
         ...(shuffleQuestions !== undefined && { shuffleQuestions: Boolean(shuffleQuestions) }),
         ...(shuffleOptions !== undefined && { shuffleOptions: Boolean(shuffleOptions) }),
+        ...(examToken !== undefined && {
+          examToken: examToken && examToken.trim() ? examToken.trim().toUpperCase() : null,
+        }),
+        ...(showScoreImmediately !== undefined && { showScoreImmediately: Boolean(showScoreImmediately) }),
+        ...(showDiscussion !== undefined && { showDiscussion: Boolean(showDiscussion) }),
       },
     });
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInStudent } from "@/lib/student-auth";
+import { getLoggedInAdmin } from "@/lib/admin-auth";
 
 export async function GET(
   req: Request,
@@ -8,7 +9,9 @@ export async function GET(
 ) {
   try {
     const student = await getLoggedInStudent();
-    if (!student) {
+    const admin = !student ? await getLoggedInAdmin() : null;
+
+    if (!student && !admin) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -24,7 +27,7 @@ export async function GET(
               select: {
                 id: true,
                 text: true,
-                // Do not return isCorrect to student!
+                isCorrect: Boolean(admin), // Only expose isCorrect to admin preview!
               },
             },
           },
@@ -36,23 +39,26 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Quiz not found" }, { status: 404 });
     }
 
-    // Check existing attempt for this student
-    const attempt = await prisma.quizAttempt.findFirst({
-      where: {
-        quizId,
-        userId: student.id,
-      },
-      orderBy: { createdAt: "desc" },
-      include: {
-        detailedAnswers: true,
-        violations: {
-          orderBy: { timestamp: "desc" },
-          take: 10,
+    // Check existing attempt for this student (if student logged in)
+    let attempt: any = null;
+    if (student) {
+      attempt = await prisma.quizAttempt.findFirst({
+        where: {
+          quizId,
+          userId: student.id,
         },
-      },
-    });
+        orderBy: { createdAt: "desc" },
+        include: {
+          detailedAnswers: true,
+          violations: {
+            orderBy: { timestamp: "desc" },
+            take: 10,
+          },
+        },
+      });
+    }
 
-    // Structure questions for student player
+    // Structure questions for student player / admin preview
     const formattedQuestions = quiz.questions.map((q) => ({
       id: q.id,
       type: q.type,
@@ -60,6 +66,8 @@ export async function GET(
       imageUrl: q.imageUrl || null,
       points: q.points,
       options: q.options,
+      sampleAnswer: admin ? q.sampleAnswer : null,
+      gradingRubric: admin ? q.gradingRubric : null,
     }));
 
     const sanitizedQuiz = {
@@ -71,6 +79,10 @@ export async function GET(
       enableTabSwitchDetect: quiz.enableTabSwitchDetect ?? true,
       maxStrikes: quiz.maxStrikes || 3,
       enableCameraProctor: quiz.enableCameraProctor ?? true,
+      hasExamToken: Boolean(quiz.examToken),
+      examToken: admin ? quiz.examToken : undefined, // Only admin can see the actual token
+      showScoreImmediately: quiz.showScoreImmediately ?? true,
+      showDiscussion: quiz.showDiscussion ?? false,
       questions: formattedQuestions,
     };
 
@@ -78,6 +90,7 @@ export async function GET(
       success: true,
       data: {
         quiz: sanitizedQuiz,
+        isPreview: Boolean(admin),
         attempt: attempt
           ? {
               id: attempt.id,

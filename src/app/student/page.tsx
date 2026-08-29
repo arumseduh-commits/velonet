@@ -33,6 +33,9 @@ import {
   ArrowRight,
   BookMarked,
   Layers,
+  ShieldAlert,
+  KeyRound,
+  Lock,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -85,6 +88,7 @@ export default function StudentDashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [featuredMaterials, setFeaturedMaterials] = useState<FeaturedMaterial[]>([]);
+  const [studentExams, setStudentExams] = useState<any[]>([]);
   const [activeSession, setActiveSession] = useState<{
     id: string;
     title: string;
@@ -97,10 +101,11 @@ export default function StudentDashboardPage() {
   const fetchStudentData = async () => {
     setLoading(true);
     try {
-      const [meRes, matRes, sessRes] = await Promise.all([
+      const [meRes, matRes, sessRes, examRes] = await Promise.all([
         fetch("/api/student/auth/me"),
         fetch("/api/learning/articles"),
         fetch("/api/attendance/active-locations"),
+        fetch("/api/student/exams"),
       ]);
 
       const json = await meRes.json();
@@ -144,6 +149,12 @@ export default function StudentDashboardPage() {
       const sessJson = await sessRes.json();
       if (sessJson.success && Array.isArray(sessJson.data) && sessJson.data.length > 0) {
         setActiveSession(sessJson.data[0]);
+      }
+
+      // Fetch CBT exams
+      const examJson = await examRes.json();
+      if (examJson.success && Array.isArray(examJson.data)) {
+        setStudentExams(examJson.data);
       }
     } catch (err) {
       console.error("Failed to fetch student data:", err);
@@ -248,11 +259,19 @@ export default function StudentDashboardPage() {
           {/* Quick Action Buttons Right */}
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
             <Link
+              href="/student/exams"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
+            >
+              <ShieldAlert className="w-4 h-4 text-indigo-100" />
+              <span>Ujian CBT</span>
+            </Link>
+
+            <Link
               href="/student/learning"
               className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
             >
               <BookOpen className="w-4 h-4 text-blue-100" />
-              <span>Buka Materi LMS</span>
+              <span>Materi LMS</span>
             </Link>
 
             <Link
@@ -367,7 +386,142 @@ export default function StudentDashboardPage() {
         </div>
       </div>
 
-      {/* 4. LEARNING LMS HUB & FEATURED TRACKS */}
+      {/* 4. OFFICIAL CBT EXAM HUB (ExamBro Safe) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-indigo-600" />
+              <span>Ujian CBT Resmi (ExamBro Safe)</span>
+            </h2>
+            <p className="text-xs text-slate-500">
+              Modul ujian resmi terjadwal dengan pengawasan AI dan anti-kecurangan
+            </p>
+          </div>
+
+          <Link
+            href="/student/exams"
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors"
+          >
+            <span>Semua Ujian & Nilai ({studentExams.length})</span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {studentExams.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center text-xs text-slate-400">
+            Belum ada modul ujian resmi yang diterbitkan saat ini.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {studentExams.slice(0, 2).map((exam) => {
+              const attempt = exam.attempt;
+              const isCompleted =
+                attempt?.status === "SUBMITTED" ||
+                attempt?.status === "GRADED" ||
+                attempt?.status === "DISQUALIFIED";
+              const isLocked = attempt?.status === "LOCKED";
+              const isInProgress = attempt?.status === "IN_PROGRESS";
+
+              return (
+                <div
+                  key={exam.id}
+                  className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-indigo-300 transition-all flex flex-col justify-between space-y-3"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>ExamBro CBT</span>
+                      </span>
+
+                      {isCompleted ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Selesai</span>
+                        </span>
+                      ) : isLocked ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                          <Lock className="w-3 h-3" />
+                          <span>Terkunci</span>
+                        </span>
+                      ) : isInProgress ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                          <span>Sedang Mengerjakan</span>
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          Tersedia
+                        </span>
+                      )}
+                    </div>
+
+                    <h4 className="text-sm font-bold text-slate-900 line-clamp-1">
+                      {exam.title}
+                    </h4>
+
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
+                      <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                        <Clock className="w-3 h-3 text-blue-600" />
+                        <span>{exam.durationMinutes} Menit</span>
+                      </span>
+                      <span className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
+                        <Layers className="w-3 h-3 text-indigo-600" />
+                        <span>{exam.totalQuestions} Soal</span>
+                      </span>
+                      {exam.hasExamToken && (
+                        <span className="flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg border border-purple-200 font-bold text-[10px]">
+                          <KeyRound className="w-3 h-3" />
+                          <span>Token</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    {isCompleted && exam.showScoreImmediately ? (
+                      <span className="text-xs font-bold text-emerald-700 font-mono">
+                        Nilai: {attempt?.score ?? 0} / {exam.totalPoints} Poin
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">
+                        {isCompleted ? "Menunggu verifikasi guru" : "Ujian Berbatas Waktu"}
+                      </span>
+                    )}
+
+                    <Link
+                      href={`/student/quiz/${exam.id}`}
+                      className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all ${
+                        isCompleted
+                          ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                          : isLocked
+                          ? "bg-rose-600 hover:bg-rose-700 text-white"
+                          : isInProgress
+                          ? "bg-amber-500 hover:bg-amber-600 text-white"
+                          : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                      }`}
+                    >
+                      <span>
+                        {isCompleted
+                          ? "Lihat Hasil"
+                          : isLocked
+                          ? "Buka Kunci"
+                          : isInProgress
+                          ? "Lanjutkan"
+                          : "Mulai Ujian"}
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 5. LEARNING LMS HUB & FEATURED TRACKS */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>

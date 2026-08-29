@@ -79,6 +79,9 @@ export async function POST(req: Request) {
       supervisorPin = "123456",
       shuffleQuestions = true,
       shuffleOptions = true,
+      examToken = null,
+      showScoreImmediately = true,
+      showDiscussion = false,
       questions = [],
     } = body;
 
@@ -99,6 +102,9 @@ export async function POST(req: Request) {
         supervisorPin: supervisorPin?.trim() || "123456",
         shuffleQuestions: Boolean(shuffleQuestions),
         shuffleOptions: Boolean(shuffleOptions),
+        examToken: examToken && examToken.trim() ? examToken.trim().toUpperCase() : null,
+        showScoreImmediately: Boolean(showScoreImmediately),
+        showDiscussion: Boolean(showDiscussion),
         questions: {
           create: questions.map((q: any, idx: number) => ({
             type: q.type || "SINGLE_CHOICE",

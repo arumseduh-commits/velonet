@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInStudent } from "@/lib/student-auth";
+import { getLoggedInAdmin } from "@/lib/admin-auth";
 
 export async function POST(
   req: Request,
@@ -8,7 +9,9 @@ export async function POST(
 ) {
   try {
     const student = await getLoggedInStudent();
-    if (!student) {
+    const admin = !student ? await getLoggedInAdmin() : null;
+
+    if (!student && !admin) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -21,14 +24,27 @@ export async function POST(
     });
 
     if (!quiz) {
-      return NextResponse.json({ success: false, error: "Kuis tidak ditemukan." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Ujian tidak ditemukan." }, { status: 404 });
+    }
+
+    // If Admin Preview Mode, return simulated violation response
+    if (admin) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          strikeCount: 1,
+          status: "IN_PROGRESS",
+          isLocked: false,
+          isPreview: true,
+        },
+      });
     }
 
     // Find attempt
     let attempt = await prisma.quizAttempt.findFirst({
       where: {
         quizId,
-        userId: student.id,
+        userId: student!.id,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -37,7 +53,7 @@ export async function POST(
       attempt = await prisma.quizAttempt.create({
         data: {
           quizId,
-          userId: student.id,
+          userId: student!.id,
           status: "IN_PROGRESS",
           strikeCount: 0,
         },
@@ -59,14 +75,13 @@ export async function POST(
     const newStrikeCount = attempt.strikeCount + 1;
     const maxStrikes = quiz.maxStrikes || 3;
     const isLocked = newStrikeCount >= maxStrikes;
-    const nextStatus = isLocked ? "LOCKED" : attempt.status;
 
-    // Create violation record
+    // Log the violation
     await prisma.examViolationLog.create({
       data: {
         attemptId: attempt.id,
-        type: type || "UNKNOWN_VIOLATION",
-        description: description || "Pelanggaran terdeteksi oleh sistem keamanan.",
+        type: type || "UNKNOWN",
+        description: description || "Pelanggaran terdeteksi sistem ExamBro",
         snapshotUrl: snapshotUrl || null,
       },
     });
@@ -76,7 +91,7 @@ export async function POST(
       where: { id: attempt.id },
       data: {
         strikeCount: newStrikeCount,
-        status: nextStatus,
+        status: isLocked ? "LOCKED" : attempt.status,
       },
     });
 
@@ -85,8 +100,7 @@ export async function POST(
       data: {
         strikeCount: updatedAttempt.strikeCount,
         status: updatedAttempt.status,
-        isLocked: updatedAttempt.status === "LOCKED",
-        maxStrikes,
+        isLocked,
       },
     });
   } catch (err) {

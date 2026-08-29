@@ -310,6 +310,11 @@ model Quiz {
   shuffleQuestions       Boolean  @default(true)
   shuffleOptions         Boolean  @default(true)
 
+  // Token Masuk & Pengaturan Hasil Ujian
+  examToken              String?
+  showScoreImmediately   Boolean  @default(true)
+  showDiscussion         Boolean  @default(false)
+
   questions   Question[]
   attempts    QuizAttempt[]
 

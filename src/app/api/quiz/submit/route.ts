@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInStudent } from "@/lib/student-auth";
+import { getLoggedInAdmin } from "@/lib/admin-auth";
 import { awardXP, evaluateBadges } from "@/lib/gamification";
 import { evaluateStudentEssay } from "@/lib/ai-essay-evaluator";
 
 export async function POST(req: Request) {
   try {
     const student = await getLoggedInStudent();
-    if (!student) {
+    const admin = !student ? await getLoggedInAdmin() : null;
+
+    if (!student && !admin) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
@@ -132,11 +135,27 @@ export async function POST(req: Request) {
       });
     }
 
+    // If Admin Preview Mode, return evaluated score without modifying database
+    if (admin) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          attemptId: "preview-attempt-id",
+          score: earnedScore,
+          totalScore,
+          isFullyGraded: !hasPendingEssays,
+          earnedXP: 0,
+          newBadges: [],
+          isPreview: true,
+        },
+      });
+    }
+
     // Find existing attempt or create new
     let existingAttempt = await prisma.quizAttempt.findFirst({
       where: {
         quizId,
-        userId: student.id,
+        userId: student!.id,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -158,7 +177,7 @@ export async function POST(req: Request) {
       quizAttempt = await prisma.quizAttempt.create({
         data: {
           quizId,
-          userId: student.id,
+          userId: student!.id,
           score: earnedScore,
           totalScore,
           status: hasPendingEssays ? "SUBMITTED" : "GRADED",
@@ -201,8 +220,8 @@ export async function POST(req: Request) {
     }
 
     try {
-      await awardXP(student.id, 50, "Menyelesaikan Ujian CBT");
-      await evaluateBadges(student.id);
+      await awardXP(student!.id, 50, "Menyelesaikan Ujian CBT");
+      await evaluateBadges(student!.id);
     } catch (xpErr) {
       console.error("[Quiz API POST] Error awarding XP:", xpErr);
     }

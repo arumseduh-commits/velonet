@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Sparkles,
   Lock,
+  KeyRound,
 } from "lucide-react";
 
 interface ExamPreCheckModalProps {
@@ -18,6 +19,10 @@ interface ExamPreCheckModalProps {
   maxStrikes: number;
   enableCamera: boolean;
   enableFullscreen: boolean;
+  hasExamToken?: boolean;
+  examTokenInput?: string;
+  onTokenChange?: (token: string) => void;
+  isPreview?: boolean;
   onStartExam: () => void;
 }
 
@@ -27,19 +32,23 @@ export default function ExamPreCheckModal({
   maxStrikes,
   enableCamera,
   enableFullscreen,
+  hasExamToken = false,
+  examTokenInput = "",
+  onTokenChange,
+  isPreview = false,
   onStartExam,
 }: ExamPreCheckModalProps) {
-  const [hasAgreed, setHasAgreed] = useState(false);
+  const [hasAgreed, setHasAgreed] = useState(isPreview);
   const [cameraPermission, setCameraPermission] = useState<"pending" | "granted" | "denied">(
-    enableCamera ? "pending" : "granted"
+    enableCamera && !isPreview ? "pending" : "granted"
   );
   const [testingCamera, setTestingCamera] = useState(false);
 
   useEffect(() => {
-    if (enableCamera) {
+    if (enableCamera && !isPreview) {
       checkCameraAccess();
     }
-  }, [enableCamera]);
+  }, [enableCamera, isPreview]);
 
   const checkCameraAccess = async () => {
     setTestingCamera(true);
@@ -55,8 +64,9 @@ export default function ExamPreCheckModal({
     }
   };
 
+  const isTokenValid = !hasExamToken || isPreview || (examTokenInput && examTokenInput.trim().length > 0);
   const isReadyToStart =
-    hasAgreed && (enableCamera ? cameraPermission === "granted" : true);
+    hasAgreed && (enableCamera && !isPreview ? cameraPermission === "granted" : true) && isTokenValid;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
@@ -68,10 +78,10 @@ export default function ExamPreCheckModal({
           </div>
           <div>
             <span className="text-[11px] font-bold tracking-wider uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-              VeloExambro Secure CBT
+              {isPreview ? "Mode Pratinjau Guru" : "VeloExambro Secure CBT"}
             </span>
             <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
-              Verifikasi Kesiapan Ujian
+              {isPreview ? "Pratinjau Modul Ujian" : "Verifikasi Kesiapan Ujian"}
             </h2>
           </div>
         </div>
@@ -90,6 +100,27 @@ export default function ExamPreCheckModal({
             </div>
           </div>
         </div>
+
+        {/* Exam Token Input (If Required) */}
+        {hasExamToken && !isPreview && (
+          <div className="mt-4 p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2">
+            <label className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+              <KeyRound className="w-4 h-4 text-indigo-600" />
+              <span>Masukkan Token Ujian (Dari Pengawas):</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Ketik 5 huruf token (Contoh: VELO1)"
+              value={examTokenInput}
+              onChange={(e) => onTokenChange && onTokenChange(e.target.value.toUpperCase())}
+              className="w-full uppercase tracking-widest text-center px-4 py-2.5 rounded-xl bg-white border border-indigo-300 font-mono font-bold text-sm text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-[10px] text-indigo-700">
+              Token dibagikan oleh guru / pengawas di kelas saat jam ujian dimulai.
+            </p>
+          </div>
+        )}
 
         {/* Security Rules Checklist */}
         <div className="mt-5 space-y-3">
@@ -116,7 +147,7 @@ export default function ExamPreCheckModal({
               </div>
             </div>
 
-            {enableCamera && (
+            {enableCamera && !isPreview && (
               <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50/70 border border-slate-200">
                 <Camera className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
@@ -167,7 +198,7 @@ export default function ExamPreCheckModal({
                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
             }`}
           >
-            <span>Mulai Ujian Sekarang</span>
+            <span>{isPreview ? "Mulai Pratinjau Ujian" : "Mulai Ujian Sekarang"}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
