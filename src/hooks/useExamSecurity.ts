@@ -18,10 +18,23 @@ export function useExamSecurity({
   onViolation,
 }: ExamSecurityOptions) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const violationCooldownRef = useRef<{ [key: string]: number }>({});
 
+  // Detect Mobile / iOS / Android Environment
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const ua = window.navigator.userAgent || "";
+      const isApple = /iPhone|iPad|iPod/i.test(ua) || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+      const isGoogle = /Android/i.test(ua);
+      setIsIOS(isApple);
+      setIsAndroid(isGoogle);
+    }
+  }, []);
+
   const reportViolation = useCallback(
-    (type: string, description: string, cooldownMs = 2000) => {
+    (type: string, description: string, cooldownMs = 2500) => {
       if (!enabled) return;
       const now = Date.now();
       const lastTime = violationCooldownRef.current[type] || 0;
@@ -46,8 +59,10 @@ export function useExamSecurity({
       setIsFullscreen(true);
       return true;
     } catch (err) {
-      console.warn("[ExamSecurity] Failed to enter fullscreen:", err);
-      return false;
+      // On iOS Safari, standard HTML5 requestFullscreen on non-video elements is not supported.
+      // We fall back to simulated viewport lock.
+      setIsFullscreen(true);
+      return true;
     }
   }, []);
 
@@ -62,30 +77,44 @@ export function useExamSecurity({
     }
   }, []);
 
-  // 2. Event Listeners for Fullscreen, Tab Switch, and Blur
+  // 2. Cross-Platform Event Listeners (iOS, Android, Windows)
   useEffect(() => {
     if (!enabled) return;
 
-    // Fullscreen change handler
+    // Fullscreen change handler (Android & Windows)
     const handleFullscreenChange = () => {
       const isFull = !!document.fullscreenElement;
       setIsFullscreen(isFull);
-      if (!isFull && enableFullscreenLock) {
+      if (!isFull && enableFullscreenLock && !isIOS) {
         reportViolation("FULLSCREEN_EXIT", "Peserta keluar dari mode layar penuh (Fullscreen).");
       }
     };
 
-    // Page Visibility change handler (Tab Switch)
+    // Page Visibility change handler (Tab switch / Minimize / Home button on mobile)
     const handleVisibilityChange = () => {
       if (document.hidden && enableTabSwitchDetect) {
-        reportViolation("TAB_SWITCH", "Peserta beralih tab atau membuka aplikasi lain.");
+        reportViolation("TAB_SWITCH", "Peserta beralih tab browser atau membuka aplikasi lain.");
       }
     };
 
-    // Window Blur handler (Application Switch / Split Screen)
+    // Pagehide handler (Crucial for iOS Safari when switching apps or navigating away)
+    const handlePageHide = () => {
+      if (enableTabSwitchDetect) {
+        reportViolation("TAB_SWITCH", "Peserta meninggalkan halaman ujian / beralih aplikasi.");
+      }
+    };
+
+    // Window Blur handler (Application Switch on Windows / Split Screen on Android)
     const handleWindowBlur = () => {
       if (enableTabSwitchDetect) {
-        reportViolation("TAB_SWITCH", "Peserta mengalihkan fokus dari jendela ujian.");
+        // Small timeout to avoid triggering blur on internal input focus transitions
+        setTimeout(() => {
+          if (document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+            if (document.hidden) {
+              reportViolation("TAB_SWITCH", "Peserta mengalihkan fokus dari jendela ujian.");
+            }
+          }
+        }, 150);
       }
     };
 
@@ -95,10 +124,10 @@ export function useExamSecurity({
       reportViolation("UNAUTHORIZED_KEYPRESS", "Aksi klik kanan diblokir demi keamanan ujian.", 4000);
     };
 
-    // Keyboard shortcut blocker
+    // Keyboard shortcut blocker (Ctrl+C, Ctrl+V, F12, DevTools, Inspect)
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key ? e.key.toUpperCase() : "";
-      
+
       // F12 or Developer tools
       if (
         key === "F12" ||
@@ -111,12 +140,16 @@ export function useExamSecurity({
         return false;
       }
 
-      // Copy, Cut, Paste
+      // Copy, Cut, Paste, Select All
       if (e.ctrlKey && ["C", "V", "X", "A"].includes(key)) {
-        e.preventDefault();
-        e.stopPropagation();
-        reportViolation("UNAUTHORIZED_KEYPRESS", `Pintasan clipboard (Ctrl+${key}) dinonaktifkan.`, 3000);
-        return false;
+        const target = e.target as HTMLElement;
+        // Allow text input typing, but block outside inputs
+        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+          e.preventDefault();
+          e.stopPropagation();
+          reportViolation("UNAUTHORIZED_KEYPRESS", `Pintasan clipboard (Ctrl+${key}) dinonaktifkan.`, 3000);
+          return false;
+        }
       }
 
       // Print Screen
@@ -126,10 +159,9 @@ export function useExamSecurity({
       }
     };
 
-    // Selection prevention
+    // Selection prevention outside form inputs
     const handleSelectStart = (e: Event) => {
       const target = e.target as HTMLElement;
-      // Allow selection inside inputs/textareas if needed, otherwise block
       if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
         e.preventDefault();
       }
@@ -137,27 +169,29 @@ export function useExamSecurity({
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("blur", handleWindowBlur);
     document.addEventListener("contextmenu", handleContextMenu);
     window.addEventListener("keydown", handleKeyDown, true);
     document.addEventListener("selectstart", handleSelectStart);
 
-    // Initial fullscreen check
+    // Initial fullscreen state check
     setIsFullscreen(!!document.fullscreenElement);
 
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("blur", handleWindowBlur);
       document.removeEventListener("contextmenu", handleContextMenu);
       window.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("selectstart", handleSelectStart);
     };
-  }, [enabled, enableFullscreenLock, enableTabSwitchDetect, reportViolation]);
+  }, [enabled, enableFullscreenLock, enableTabSwitchDetect, isIOS, reportViolation]);
 
-  // 3. DevTools resize/debugger trap
+  // 3. DevTools resize/debugger trap on desktop
   useEffect(() => {
-    if (!enabled || !enableDevToolsDetect) return;
+    if (!enabled || !enableDevToolsDetect || isIOS || isAndroid) return;
 
     let devtoolsOpen = false;
     const threshold = 160;
@@ -177,10 +211,12 @@ export function useExamSecurity({
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [enabled, enableDevToolsDetect, reportViolation]);
+  }, [enabled, enableDevToolsDetect, isIOS, isAndroid, reportViolation]);
 
   return {
     isFullscreen,
+    isIOS,
+    isAndroid,
     enterFullscreen,
     exitFullscreen,
   };

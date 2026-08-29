@@ -63,6 +63,7 @@ export default function QuizTakingPage() {
   const [flagged, setFlagged] = useState<{ [qIndex: number]: boolean }>({});
   const [submitting, setSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isDisqualified, setIsDisqualified] = useState(false);
   const [resultData, setResultData] = useState<any>(null);
 
   // Security & Proctoring States
@@ -70,6 +71,12 @@ export default function QuizTakingPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [showPreCheck, setShowPreCheck] = useState(false);
   const [showQuestionPalette, setShowQuestionPalette] = useState(false);
+  const [warningModalData, setWarningModalData] = useState<{
+    open: boolean;
+    strikeCount: number;
+    maxStrikes: number;
+    description: string;
+  } | null>(null);
 
   // Timer States
   const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(30 * 60);
@@ -103,10 +110,14 @@ export default function QuizTakingPage() {
 
         if (att && !isPrev) {
           setStrikeCount(att.strikeCount || 0);
-          if (att.status === "LOCKED") {
+          if (att.status === "DISQUALIFIED") {
+            setIsDisqualified(true);
+            setIsCompleted(true);
+            setResultData(att);
+          } else if (att.status === "LOCKED") {
             setIsLocked(true);
             setHasStarted(true);
-          } else if (att.status === "SUBMITTED" || att.status === "GRADED" || att.status === "DISQUALIFIED") {
+          } else if (att.status === "SUBMITTED" || att.status === "GRADED") {
             setIsCompleted(true);
             setResultData(att);
           } else if (att.status === "IN_PROGRESS") {
@@ -138,17 +149,17 @@ export default function QuizTakingPage() {
 
   // Persist draft to local storage on change
   useEffect(() => {
-    if (hasStarted && Object.keys(answers).length > 0) {
+    if (hasStarted && Object.keys(answers).length > 0 && !isDisqualified) {
       try {
         localStorage.setItem(`velonet_cbt_draft_${quizId}`, JSON.stringify(answers));
       } catch (e) {}
     }
-  }, [answers, hasStarted, quizId]);
+  }, [answers, hasStarted, isDisqualified, quizId]);
 
   // 2. Violation Handler (Triggered by Fullscreen exit, Tab switch, Face anomality, Devtools)
   const handleViolation = useCallback(
     async (type: string, description: string) => {
-      if (isCompleted || isLocked || !hasStarted) return;
+      if (isCompleted || isDisqualified || !hasStarted) return;
 
       try {
         const res = await fetch(`/api/quiz/${quizId}/violation`, {
@@ -158,22 +169,44 @@ export default function QuizTakingPage() {
         });
 
         const json = await res.json();
-        if (json.success) {
+        if (json.success && json.data) {
           const newStrikes = json.data.strikeCount;
           setStrikeCount(newStrikes);
 
-          if (json.data.isLocked) {
-            setIsLocked(true);
-            toast.error("Batas pelanggaran terlampaui. Ujian Anda telah dikunci!");
-          } else {
-            toast.warning(`Peringatan Pelanggaran (${newStrikes}/${quiz?.maxStrikes || 3}): ${description}`);
+          if (json.data.isDisqualified) {
+            // Fatal Strike 3: Disqualified permanently (Score 0)
+            setIsDisqualified(true);
+            setIsCompleted(true);
+            setAnswers({});
+            try {
+              localStorage.removeItem(`velonet_cbt_draft_${quizId}`);
+            } catch (e) {}
+            setResultData({
+              status: "DISQUALIFIED",
+              score: 0,
+              totalScore: quiz?.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 100,
+            });
+            toast.error("Batas 3x pelanggaran terlampaui. Anda telah DIDISKUALIFIKASI (Nilai 0)!");
+          } else if (json.data.isReset) {
+            // Strike 1 or 2: Wipe all answers, reset to question #1, timer continues running
+            setAnswers({});
+            setCurrentIndex(0);
+            try {
+              localStorage.removeItem(`velonet_cbt_draft_${quizId}`);
+            } catch (e) {}
+            setWarningModalData({
+              open: true,
+              strikeCount: newStrikes,
+              maxStrikes: json.data.maxStrikes || 3,
+              description: description || "Peserta terdeteksi beralih tab atau membuka aplikasi lain.",
+            });
           }
         }
       } catch (err) {
         console.error("Violation logging failed:", err);
       }
     },
-    [isCompleted, isLocked, hasStarted, quizId, quiz?.maxStrikes, toast]
+    [isCompleted, isDisqualified, hasStarted, quizId, quiz?.questions, toast]
   );
 
   // 3. Exam Security Hook (Fullscreen & Tab Switch & Key Lock)
@@ -382,7 +415,59 @@ export default function QuizTakingPage() {
     );
   }
 
-  // Completed State View (Result & Gamification)
+  // Disqualified State View (Permanent 0 Score)
+  if (isDisqualified || resultData?.status === "DISQUALIFIED") {
+    const totalPossiblePoints = quiz?.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 100;
+
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100 select-none">
+        <div className="w-full max-w-lg bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-rose-600/60 text-center space-y-6 animate-in fade-in zoom-in duration-200">
+          <div className="w-20 h-20 rounded-3xl bg-rose-600/20 border border-rose-500/50 flex items-center justify-center mx-auto text-rose-500 shadow-lg shadow-rose-500/25">
+            <ShieldAlert className="w-10 h-10 animate-pulse" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="px-3 py-1 rounded-full bg-rose-950 text-rose-400 border border-rose-700 text-xs font-black uppercase tracking-wider">
+              STATUS: DIDISKUALIFIKASI (NILAI 0)
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-white">
+              Ujian Ditutup Karena Kecurangan
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+              Anda telah mencapai batas <b>3 kali pelanggaran</b> (berpindah tab browser atau membuka aplikasi lain). Sesi ujian Anda telah dihentikan secara permanen oleh sistem ExamBro.
+            </p>
+          </div>
+
+          {/* Disqualification Score Box */}
+          <div className="p-5 rounded-2xl bg-rose-950/40 border border-rose-800/80 flex items-center justify-around">
+            <div>
+              <span className="text-xs text-rose-300 font-medium">Nilai Akhir</span>
+              <div className="text-3xl font-black text-rose-400 mt-0.5">
+                0 <span className="text-xs text-rose-300 font-normal">/ {totalPossiblePoints}</span>
+              </div>
+            </div>
+            <div className="w-px h-10 bg-rose-800"></div>
+            <div>
+              <span className="text-xs text-rose-300 font-medium">Total Pelanggaran</span>
+              <div className="text-3xl font-black text-rose-400 mt-0.5">
+                3x Strike
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => router.push(isPreview ? `/admin/exams/${quizId}/edit` : "/student/exams")}
+            className="w-full py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer border border-slate-700 transition-all shadow-md"
+          >
+            <span>{isPreview ? "Kembali ke Editor Ujian Admin" : "Kembali ke Pusat Ujian CBT"}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal Completed State View (Result & Gamification)
   if (isCompleted) {
     const score = resultData?.score ?? 0;
     const totalScore = resultData?.totalScore ?? quiz.questions.reduce((acc: number, q: any) => acc + q.points, 0);
@@ -497,7 +582,7 @@ export default function QuizTakingPage() {
   const currentAnswer = answers[currentQuestion?.id] || {};
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col select-none relative">
+    <div className="min-h-screen h-dvh bg-slate-900 text-slate-100 flex flex-col select-none relative overflow-y-auto overscroll-none touch-manipulation">
       {/* 0. ADMIN PREVIEW TOP BANNER */}
       {isPreview && (
         <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between gap-3 shadow-md z-40">
@@ -962,7 +1047,63 @@ export default function QuizTakingPage() {
         onViolation={handleViolation}
       />
 
-      {/* 4. FLOATING SUPERVISOR TOOLBAR (ADMIN PREVIEW ONLY) */}
+      {/* 4. WARNING ALERT MODAL (STRIKE 1 & 2 RESET) */}
+      {warningModalData?.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+          <div className="relative w-full max-w-md bg-slate-900 border border-amber-500/80 rounded-3xl p-6 sm:p-8 text-center space-y-5 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400 mx-auto animate-bounce shadow-lg shadow-amber-500/20">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600/80 text-amber-300 text-xs font-black uppercase tracking-wider">
+                <span>Pelanggaran {warningModalData.strikeCount} dari {warningModalData.maxStrikes}</span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-black text-white">
+                Jawaban Dikosongkan & Diulang!
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {warningModalData.description}
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-800/90 border border-slate-700 text-xs text-amber-200 text-left space-y-2 font-medium">
+              <div className="flex items-start gap-2">
+                <span className="text-rose-400 font-bold">•</span>
+                <span>Seluruh jawaban Anda sebelumnya telah <b>dihapus bersih</b>.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-rose-400 font-bold">•</span>
+                <span>Ujian Anda <b>diulang kembali dari soal nomor 1</b>.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-rose-400 font-bold">•</span>
+                <span>
+                  Sisa kesempatan: <b>{Math.max(0, warningModalData.maxStrikes - warningModalData.strikeCount)}x lagi</b> sebelum akun Anda <b>DIDISKUALIFIKASI (Nilai 0)</b>.
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-blue-400 font-bold">•</span>
+                <span>Waktu timer ujian <b>tetap berjalan</b> sesuai durasi tersisa.</span>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                setWarningModalData(null);
+                if (quiz?.enableFullscreenLock && !isPreview) {
+                  await enterFullscreen();
+                }
+              }}
+              className="w-full py-3.5 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/25 transition-all cursor-pointer active:scale-98"
+            >
+              Saya Paham & Mulai Ulang dari Soal No. 1
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. FLOATING SUPERVISOR TOOLBAR (ADMIN PREVIEW ONLY) */}
       {isPreview && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-2xl w-full px-4">
           <div className="p-3 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-md flex flex-wrap items-center justify-between gap-2">

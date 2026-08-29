@@ -34,13 +34,15 @@ export async function POST(
         data: {
           strikeCount: 1,
           status: "IN_PROGRESS",
-          isLocked: false,
+          isReset: true,
+          isDisqualified: false,
+          maxStrikes: quiz.maxStrikes || 3,
           isPreview: true,
         },
       });
     }
 
-    // Find attempt
+    // Find attempt for student
     let attempt = await prisma.quizAttempt.findFirst({
       where: {
         quizId,
@@ -60,23 +62,25 @@ export async function POST(
       });
     }
 
-    // Do not log violation if already submitted or disqualified
+    // Do not process further if already permanently submitted or disqualified
     if (attempt.status === "SUBMITTED" || attempt.status === "DISQUALIFIED") {
       return NextResponse.json({
         success: true,
         data: {
           strikeCount: attempt.strikeCount,
           status: attempt.status,
-          isLocked: false,
+          isDisqualified: attempt.status === "DISQUALIFIED",
+          isReset: false,
+          maxStrikes: quiz.maxStrikes || 3,
         },
       });
     }
 
     const newStrikeCount = attempt.strikeCount + 1;
     const maxStrikes = quiz.maxStrikes || 3;
-    const isLocked = newStrikeCount >= maxStrikes;
+    const isDisqualified = newStrikeCount >= maxStrikes;
 
-    // Log the violation
+    // Log the violation in database
     await prisma.examViolationLog.create({
       data: {
         attemptId: attempt.id,
@@ -86,23 +90,59 @@ export async function POST(
       },
     });
 
-    // Update attempt
-    const updatedAttempt = await prisma.quizAttempt.update({
-      where: { id: attempt.id },
-      data: {
-        strikeCount: newStrikeCount,
-        status: isLocked ? "LOCKED" : attempt.status,
-      },
+    // Wipe all existing answer records in database (Reset All Answers)
+    await prisma.quizStudentAnswer.deleteMany({
+      where: { attemptId: attempt.id },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        strikeCount: updatedAttempt.strikeCount,
-        status: updatedAttempt.status,
-        isLocked,
-      },
-    });
+    if (isDisqualified) {
+      // Strike 3: Permanently Disqualify with 0 Score
+      const updatedAttempt = await prisma.quizAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          strikeCount: newStrikeCount,
+          status: "DISQUALIFIED",
+          score: 0,
+          isFullyGraded: true,
+          submittedAt: new Date(),
+          answers: null,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          strikeCount: updatedAttempt.strikeCount,
+          status: "DISQUALIFIED",
+          isDisqualified: true,
+          isReset: true,
+          maxStrikes,
+          score: 0,
+        },
+      });
+    } else {
+      // Strike 1 or 2: Reset Answers to Empty, Status remains IN_PROGRESS
+      const updatedAttempt = await prisma.quizAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          strikeCount: newStrikeCount,
+          status: "IN_PROGRESS",
+          score: 0,
+          answers: null,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          strikeCount: updatedAttempt.strikeCount,
+          status: "IN_PROGRESS",
+          isDisqualified: false,
+          isReset: true,
+          maxStrikes,
+        },
+      });
+    }
   } catch (err) {
     console.error("[Quiz API VIOLATION]", err);
     return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
