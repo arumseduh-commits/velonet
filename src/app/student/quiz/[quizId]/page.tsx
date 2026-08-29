@@ -29,6 +29,7 @@ import {
   RotateCcw,
   Edit,
   Zap,
+  X,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { useExamSecurity } from "@/hooks/useExamSecurity";
@@ -71,6 +72,7 @@ export default function QuizTakingPage() {
   const [isLocked, setIsLocked] = useState(false);
   const [showPreCheck, setShowPreCheck] = useState(false);
   const [showQuestionPalette, setShowQuestionPalette] = useState(false);
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
   const [warningModalData, setWarningModalData] = useState<{
     open: boolean;
     strikeCount: number;
@@ -542,7 +544,7 @@ export default function QuizTakingPage() {
         quizTitle={quiz.title}
         durationMinutes={quiz.durationMinutes || 30}
         maxStrikes={quiz.maxStrikes || 3}
-        enableCamera={quiz.enableCameraProctor ?? true}
+        enableCamera={Boolean(quiz.enableCameraProctor)}
         enableFullscreen={quiz.enableFullscreenLock ?? true}
         hasExamToken={quiz.hasExamToken}
         examTokenInput={examTokenInput}
@@ -722,12 +724,23 @@ export default function QuizTakingPage() {
 
               {/* Question Image Attachment (if any) */}
               {currentQuestion.imageUrl && (
-                <div className="my-4 max-w-lg rounded-2xl overflow-hidden border border-slate-700 bg-slate-900/60 p-2 shadow-inner">
+                <div className="my-4 max-w-xl rounded-2xl overflow-hidden border border-slate-700 bg-slate-950/60 p-2 shadow-inner group relative">
                   <img
                     src={currentQuestion.imageUrl}
                     alt={`Gambar Soal #${currentIndex + 1}`}
-                    className="w-full max-h-72 object-contain rounded-xl mx-auto"
+                    onClick={() => setZoomImageUrl(currentQuestion.imageUrl)}
+                    className="w-full max-h-80 object-contain rounded-xl mx-auto cursor-zoom-in hover:brightness-105 transition-all"
                   />
+                  <div className="flex items-center justify-between px-2 pt-2 text-[10px] text-slate-400">
+                    <span>Klik / sentuh gambar untuk memperbesar</span>
+                    <button
+                      type="button"
+                      onClick={() => setZoomImageUrl(currentQuestion.imageUrl)}
+                      className="px-2.5 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition-colors cursor-pointer"
+                    >
+                      Perbesar
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1041,9 +1054,9 @@ export default function QuizTakingPage() {
         </aside>
       </main>
 
-      {/* 3. AI FACE PROCTORING WIDGET (PIP Thumbnail at Bottom Right) */}
+      {/* 3. AI FACE PROCTORING WIDGET (PIP Thumbnail at Bottom Right - Only if enabled) */}
       <FaceProctorWidget
-        enabled={quiz.enableCameraProctor ?? true}
+        enabled={Boolean(quiz.enableCameraProctor)}
         onViolation={handleViolation}
       />
 
@@ -1103,7 +1116,29 @@ export default function QuizTakingPage() {
         </div>
       )}
 
-      {/* 5. FLOATING SUPERVISOR TOOLBAR (ADMIN PREVIEW ONLY) */}
+      {/* 5. IMAGE ZOOM MODAL */}
+      {zoomImageUrl && (
+        <div
+          onClick={() => setZoomImageUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md cursor-zoom-out animate-in fade-in duration-200"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center">
+            <button
+              onClick={() => setZoomImageUrl(null)}
+              className="absolute -top-10 right-0 text-slate-300 hover:text-white p-1 rounded-full bg-slate-800/80 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={zoomImageUrl}
+              alt="Gambar Soal Diperbesar"
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl border border-slate-700 shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 6. FLOATING SUPERVISOR TOOLBAR (ADMIN PREVIEW ONLY) */}
       {isPreview && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-2xl w-full px-4">
           <div className="p-3 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-md flex flex-wrap items-center justify-between gap-2">

@@ -78,7 +78,7 @@ export async function GET(
       enableFullscreenLock: quiz.enableFullscreenLock ?? true,
       enableTabSwitchDetect: quiz.enableTabSwitchDetect ?? true,
       maxStrikes: quiz.maxStrikes || 3,
-      enableCameraProctor: quiz.enableCameraProctor ?? true,
+      enableCameraProctor: quiz.enableCameraProctor ?? false,
       hasExamToken: Boolean(quiz.examToken),
       examToken: admin ? quiz.examToken : undefined, // Only admin can see the actual token
       showScoreImmediately: quiz.showScoreImmediately ?? true,

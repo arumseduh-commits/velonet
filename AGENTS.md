@@ -25,3 +25,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **MANDATORY**: Setiap kali selesai membuat, memperbaiki, atau memodifikasi fitur/kode dan verifikasi (`build` / `type-check`) telah sukses, SELALU lakukan commit dan push perubahan ke GitHub (`git add .`, `git commit -m "..."`, `git push origin main`).
 - **INTEGRITY**: Pastikan pesan commit jelas dan deskriptif sesuai perubahan yang dilakukan.
 
+# Runtime Uploads & Media Serving Standard (ATURAN SERVING MEDIA DINAMIS)
+- **MANDATORY**: Jangan mengandalkan file statis default `public/` Next.js untuk berkas yang diunggah saat aplikasi berjalan (runtime). Selalu sediakan Route Handler (`src/app/uploads/.../route.ts`) untuk streaming berkas dari filesystem dengan MIME type dan header caching yang valid.
+
+# CBT Anti-Cheat & Proctoring Standard (ATURAN CBT EXAMBRO & MOBILE PROCTORING)
+- **MOBILE PRIORITY**: Anti-kecurangan CBT difokuskan pada event `visibilitychange`, `pagehide`, dan `fullscreenchange`. Fitur webcam proctoring harus selalu berstatus **non-aktif secara default** (`@default(false)`) untuk mencegah gangguan floating video dan deteksi wajah palsu di smartphone.
+
+

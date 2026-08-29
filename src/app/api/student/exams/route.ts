@@ -51,7 +51,7 @@ export async function GET() {
         totalPoints,
         enableFullscreenLock: q.enableFullscreenLock ?? true,
         enableTabSwitchDetect: q.enableTabSwitchDetect ?? true,
-        enableCameraProctor: q.enableCameraProctor ?? true,
+        enableCameraProctor: q.enableCameraProctor ?? false,
         maxStrikes: q.maxStrikes || 3,
         hasExamToken: Boolean(q.examToken),
         showScoreImmediately: q.showScoreImmediately ?? true,

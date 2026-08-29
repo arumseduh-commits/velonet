@@ -53,39 +53,50 @@ export async function compressImageToWebP(
   quality = 0.82
 ): Promise<File> {
   return new Promise((resolve) => {
+    // If already SVG or GIF, don't re-encode
+    if (file.type === "image/svg+xml" || file.type === "image/gif") {
+      return resolve(file);
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let { width, height } = img;
-        if (width > maxWidth || height > maxWidth) {
-          if (width > height) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          } else {
-            width = Math.round((width * maxWidth) / height);
-            height = maxWidth;
+        try {
+          const canvas = document.createElement("canvas");
+          let { width, height } = img;
+          if (width > maxWidth || height > maxWidth) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxWidth) / height);
+              height = maxWidth;
+            }
           }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(file);
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return resolve(file);
+              const baseName = file.name.substring(0, file.name.lastIndexOf(".")) || file.name;
+              const webpFile = new File(
+                [blob],
+                `${baseName}.webp`,
+                { type: "image/webp" }
+              );
+              resolve(webpFile);
+            },
+            "image/webp",
+            quality
+          );
+        } catch (canvasErr) {
+          console.warn("WebP compression failed, using original file:", canvasErr);
+          resolve(file);
         }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return resolve(file);
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) return resolve(file);
-            const webpFile = new File(
-              [blob],
-              file.name.replace(/\.[^/.]+$/, "") + ".webp",
-              { type: "image/webp" }
-            );
-            resolve(webpFile);
-          },
-          "image/webp",
-          quality
-        );
       };
       img.onerror = () => resolve(file);
       img.src = e.target?.result as string;
@@ -95,11 +106,12 @@ export async function compressImageToWebP(
   });
 }
 
-export default function AdminCreateExamPage() {
+export default function CreateExamPage() {
   const router = useRouter();
   const { confirm, toast } = useDialog();
 
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<"questions" | "settings">("questions");
   const [uploadingImgIdx, setUploadingImgIdx] = useState<number | null>(null);
 
   // Exam Meta & Security Settings
@@ -109,7 +121,7 @@ export default function AdminCreateExamPage() {
   const [enableFullscreenLock, setEnableFullscreenLock] = useState(true);
   const [enableTabSwitchDetect, setEnableTabSwitchDetect] = useState(true);
   const [maxStrikes, setMaxStrikes] = useState(3);
-  const [enableCameraProctor, setEnableCameraProctor] = useState(true);
+  const [enableCameraProctor, setEnableCameraProctor] = useState(false);
   const [supervisorPin, setSupervisorPin] = useState("123456");
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleOptions, setShuffleOptions] = useState(true);

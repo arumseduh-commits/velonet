@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       enableFullscreenLock = true,
       enableTabSwitchDetect = true,
       maxStrikes = 3,
-      enableCameraProctor = true,
+      enableCameraProctor = false,
       supervisorPin = "123456",
       shuffleQuestions = true,
       shuffleOptions = true,

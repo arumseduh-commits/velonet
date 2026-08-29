@@ -305,7 +305,7 @@ model Quiz {
   enableFullscreenLock   Boolean  @default(true)
   enableTabSwitchDetect  Boolean  @default(true)
   maxStrikes             Int      @default(3)
-  enableCameraProctor    Boolean  @default(true)
+  enableCameraProctor    Boolean  @default(false)
   supervisorPin          String   @default("123456")
   shuffleQuestions       Boolean  @default(true)
   shuffleOptions         Boolean  @default(true)
