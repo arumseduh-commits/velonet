@@ -41,6 +41,7 @@ export interface QuestionItem {
   imageUrl?: string | null;
   points: number;
   order: number;
+  explanation?: string | null;
   sampleAnswer?: string | null;
   gradingRubric?: string | null;
   caseSensitive?: boolean;
@@ -1095,6 +1096,24 @@ export default function CreateExamPage() {
                   </div>
                 </div>
               )}
+
+              {/* Question Discussion / Explanation (For Student Review) */}
+              <div className="space-y-1.5 p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80">
+                <label className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Pembahasan & Penjelasan Soal (Opsional):</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Tuliskan pembahasan, rumus, alasan kunci jawaban, atau teori untuk membantu siswa memahami materi saat review..."
+                  value={q.explanation || ""}
+                  onChange={(e) => updateQuestion(qIdx, { explanation: e.target.value })}
+                  className="w-full p-3 text-xs rounded-xl bg-white border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 leading-relaxed font-medium"
+                />
+                <p className="text-[10px] text-indigo-700">
+                  Pembahasan ini akan muncul kepada siswa saat membuka fitur &quot;Lihat Pembahasan & Kunci Jawaban&quot;.
+                </p>
+              </div>
             </div>
           ))}
         </div>

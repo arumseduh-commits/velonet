@@ -333,7 +333,8 @@ model Question {
   points        Int          @default(10)
   order         Int          @default(0)
   
-  // Rubrik & Panduan Penilaian untuk Soal Uraian / Isian
+  // Rubrik & Panduan Penilaian untuk Soal Uraian / Isian & Pembahasan
+  explanation   String?      // Pembahasan & penjelasan rinci butir soal untuk siswa
   sampleAnswer  String?      // Contoh jawaban ideal
   gradingRubric String?      // Kriteria rubrik & kata kunci penilaian
   caseSensitive Boolean      @default(false)

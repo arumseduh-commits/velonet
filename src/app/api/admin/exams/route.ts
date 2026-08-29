@@ -114,6 +114,7 @@ export async function POST(req: Request) {
             imageUrl: q.imageUrl || null,
             points: Number(q.points) || 10,
             order: q.order !== undefined ? q.order : idx,
+            explanation: q.explanation?.trim() || null,
             sampleAnswer: q.sampleAnswer || null,
             gradingRubric: q.gradingRubric || null,
             caseSensitive: Boolean(q.caseSensitive),

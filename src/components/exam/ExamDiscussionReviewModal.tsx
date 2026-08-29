@@ -28,6 +28,7 @@ interface QuestionReview {
   points: number;
   sampleAnswer?: string | null;
   gradingRubric?: string | null;
+  explanation?: string | null;
   options?: OptionReview[];
   studentAnswer?: {
     optionId?: string | null;
@@ -268,12 +269,20 @@ export default function ExamDiscussionReviewModal({
                   )}
 
                   {/* Sample Answer / Grading Rubric / Explanation */}
-                  {(q.sampleAnswer || q.gradingRubric) && (
-                    <div className="mt-4 p-4 rounded-2xl bg-indigo-950/40 border border-indigo-700/60 space-y-2 text-xs">
+                  {(q.explanation || q.sampleAnswer || q.gradingRubric) && (
+                    <div className="mt-4 p-4 rounded-2xl bg-indigo-950/40 border border-indigo-700/60 space-y-2.5 text-xs">
                       <div className="flex items-center gap-1.5 text-indigo-300 font-extrabold">
                         <Sparkles className="w-4 h-4 text-indigo-400" />
-                        <span>Pembahasan & Kriteria Penilaian Guru:</span>
+                        <span>Pembahasan & Penjelasan Soal:</span>
                       </div>
+
+                      {q.explanation && (
+                        <div>
+                          <p className="text-slate-200 mt-0.5 leading-relaxed font-medium whitespace-pre-line bg-indigo-950/60 p-3 rounded-xl border border-indigo-800/60">
+                            {q.explanation}
+                          </p>
+                        </div>
+                      )}
 
                       {q.sampleAnswer && (
                         <div>

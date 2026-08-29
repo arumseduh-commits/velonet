@@ -108,6 +108,7 @@ export async function GET(
         })),
         sampleAnswer: Boolean(admin) || isDiscussionVisible ? q.sampleAnswer : null,
         gradingRubric: Boolean(admin) || isDiscussionVisible ? q.gradingRubric : null,
+        explanation: Boolean(admin) || isDiscussionVisible ? q.explanation : null,
         studentAnswer: isDiscussionVisible && studentAnsRecord
           ? {
               optionId: selectedOptionId,
