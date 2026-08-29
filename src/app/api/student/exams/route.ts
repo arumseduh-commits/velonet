@@ -42,6 +42,11 @@ export async function GET() {
       const latestAttempt = q.attempts[0] || null;
       const totalPoints = q.questions.reduce((acc, item) => acc + (item.points || 0), 0);
 
+      const isScoreVisible =
+        q.showScoreImmediately ||
+        (q.scoreReleaseAt && new Date() >= new Date(q.scoreReleaseAt));
+      const isDiscussionVisible = Boolean(q.showDiscussion) && isScoreVisible;
+
       return {
         id: q.id,
         title: q.title,
@@ -55,13 +60,16 @@ export async function GET() {
         maxStrikes: q.maxStrikes || 3,
         hasExamToken: Boolean(q.examToken),
         showScoreImmediately: q.showScoreImmediately ?? true,
+        scoreReleaseAt: q.scoreReleaseAt ? q.scoreReleaseAt.toISOString() : null,
         showDiscussion: q.showDiscussion ?? false,
+        isScoreVisible,
+        isDiscussionVisible,
         createdAt: q.createdAt,
         attempt: latestAttempt
           ? {
               id: latestAttempt.id,
               status: latestAttempt.status,
-              score: latestAttempt.score,
+              score: isScoreVisible ? latestAttempt.score : null,
               totalScore: latestAttempt.totalScore ?? totalPoints,
               isFullyGraded: latestAttempt.isFullyGraded,
               strikeCount: latestAttempt.strikeCount,

@@ -81,6 +81,7 @@ export async function POST(req: Request) {
       shuffleOptions = true,
       examToken = null,
       showScoreImmediately = true,
+      scoreReleaseAt = null,
       showDiscussion = false,
       questions = [],
     } = body;
@@ -104,6 +105,7 @@ export async function POST(req: Request) {
         shuffleOptions: Boolean(shuffleOptions),
         examToken: examToken && examToken.trim() ? examToken.trim().toUpperCase() : null,
         showScoreImmediately: Boolean(showScoreImmediately),
+        scoreReleaseAt: scoreReleaseAt ? new Date(scoreReleaseAt) : null,
         showDiscussion: Boolean(showDiscussion),
         questions: {
           create: questions.map((q: any, idx: number) => ({

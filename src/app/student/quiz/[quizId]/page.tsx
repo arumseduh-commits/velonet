@@ -30,12 +30,16 @@ import {
   Edit,
   Zap,
   X,
+  BookOpen,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { useExamSecurity } from "@/hooks/useExamSecurity";
 import FaceProctorWidget from "@/components/exam/FaceProctorWidget";
 import ExamPreCheckModal from "@/components/exam/ExamPreCheckModal";
 import ExamLockedScreen from "@/components/exam/ExamLockedScreen";
+import ExamTutorialModal from "@/components/exam/ExamTutorialModal";
+import ExamDiscussionReviewModal from "@/components/exam/ExamDiscussionReviewModal";
+import ExamLeaderboardModal from "@/components/exam/ExamLeaderboardModal";
 
 interface StudentAnswerState {
   optionId?: string;
@@ -73,6 +77,9 @@ export default function QuizTakingPage() {
   const [showPreCheck, setShowPreCheck] = useState(false);
   const [showQuestionPalette, setShowQuestionPalette] = useState(false);
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [showDiscussionModal, setShowDiscussionModal] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [warningModalData, setWarningModalData] = useState<{
     open: boolean;
     strikeCount: number;
@@ -134,6 +141,14 @@ export default function QuizTakingPage() {
           // New attempt needed or Admin preview -> show precheck modal
           setShowPreCheck(true);
           if (localDraft) setAnswers(localDraft);
+
+          // Check if tutorial seen
+          if (typeof window !== "undefined") {
+            const hasSeen = localStorage.getItem("velonet_cbt_tutorial_seen");
+            if (!hasSeen) {
+              setShowTutorialModal(true);
+            }
+          }
         }
 
         // Initialize duration timer
@@ -158,7 +173,7 @@ export default function QuizTakingPage() {
     }
   }, [answers, hasStarted, isDisqualified, quizId]);
 
-  // 2. Violation Handler (Triggered by Fullscreen exit, Tab switch, Face anomality, Devtools)
+  // 2. Violation Handler (Triggered by Fullscreen exit, Tab switch, Split screen, Devtools)
   const handleViolation = useCallback(
     async (type: string, description: string) => {
       if (isCompleted || isDisqualified || !hasStarted) return;
@@ -196,16 +211,17 @@ export default function QuizTakingPage() {
             try {
               localStorage.removeItem(`velonet_cbt_draft_${quizId}`);
             } catch (e) {}
+
             setWarningModalData({
               open: true,
               strikeCount: newStrikes,
               maxStrikes: json.data.maxStrikes || 3,
-              description: description || "Peserta terdeteksi beralih tab atau membuka aplikasi lain.",
+              description: description || "Terdeteksi beralih tab browser atau membuka aplikasi lain.",
             });
           }
         }
-      } catch (err) {
-        console.error("Violation logging failed:", err);
+      } catch (e) {
+        console.error("Failed to record violation:", e);
       }
     },
     [isCompleted, isDisqualified, hasStarted, quizId, quiz?.questions, toast]
@@ -241,191 +257,195 @@ export default function QuizTakingPage() {
   }, [hasStarted, isLocked, isCompleted]);
 
   const handleAutoSubmitOnTimeout = async () => {
-    toast.info("Waktu ujian telah habis. Jawaban Anda sedang dikumpulkan secara otomatis...");
-    await executeSubmit();
+    toast.warning("Waktu ujian telah habis! Mengumpulkan jawaban secara otomatis...");
+    await doSubmitExam();
   };
 
-  // 5. Start Exam Process
-  const handleStartExam = async () => {
+  // 5. Start Exam (After pre-check & token verified)
+  const handleStartExam = async (token?: string) => {
     try {
+      if (!isPreview) {
+        const res = await fetch(`/api/quiz/${quizId}/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ examToken: token }),
+        });
+        const json = await res.json();
+        if (!json.success) {
+          toast.error(json.error || "Gagal memulai ujian.");
+          return;
+        }
+      }
+
+      setShowPreCheck(false);
+      setHasStarted(true);
+
       if (quiz?.enableFullscreenLock && !isPreview) {
         await enterFullscreen();
       }
-
-      const res = await fetch(`/api/quiz/${quizId}/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: examTokenInput }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        setShowPreCheck(false);
-        setHasStarted(true);
-        if (isPreview) {
-          toast.success("Mode pratinjau aktif. Anda dapat menguji soal dan fitur keamanan pengawas.");
-        } else {
-          toast.success("Ujian dimulai. Harap patuhi seluruh tata tertib VeloExambro.");
-        }
-      } else {
-        toast.error(json.error || "Gagal memulai sesi ujian.");
-      }
-    } catch (err) {
+      toast.success("Ujian dimulai. Selamat mengerjakan!");
+    } catch (e) {
       toast.error("Terjadi kesalahan saat memulai ujian.");
     }
   };
 
-  // 6. Multi-Format Answer Handlers
-  const handleSelectSingleChoice = (questionId: string, optionId: string) => {
+  // 6. Answer selection handlers
+  const handleSelectOption = (questionId: string, optionId: string) => {
     setAnswers((prev) => ({
       ...prev,
-      [questionId]: { optionId },
+      [questionId]: {
+        ...prev[questionId],
+        optionId,
+      },
     }));
   };
 
-  const handleToggleCheckbox = (questionId: string, optionId: string) => {
-    const current = answers[questionId]?.selectedOptionIds || [];
-    const exists = current.includes(optionId);
-    const updated = exists ? current.filter((id) => id !== optionId) : [...current, optionId];
-
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: { selectedOptionIds: updated },
-    }));
+  const handleToggleMultipleOption = (questionId: string, optionId: string) => {
+    setAnswers((prev) => {
+      const current = prev[questionId]?.selectedOptionIds || [];
+      const exists = current.includes(optionId);
+      const updated = exists ? current.filter((id) => id !== optionId) : [...current, optionId];
+      return {
+        ...prev,
+        [questionId]: {
+          ...prev[questionId],
+          selectedOptionIds: updated,
+        },
+      };
+    });
   };
 
   const handleTextResponseChange = (questionId: string, text: string) => {
     setAnswers((prev) => ({
       ...prev,
-      [questionId]: { textResponse: text },
+      [questionId]: {
+        ...prev[questionId],
+        textResponse: text,
+      },
     }));
   };
 
-  // 7. Toggle Flag / Ragu-ragu
-  const toggleFlag = (index: number) => {
+  const handleToggleFlag = (index: number) => {
     setFlagged((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
-  // 8. Submit Final Confirmation
+  // 7. Submit Confirmation Dialog & Execution
   const handleSubmitConfirmation = async () => {
+    const totalQuestions = quiz.questions.length;
     const answeredCount = Object.keys(answers).filter((k) => {
       const a = answers[k];
-      return a.optionId || (a.selectedOptionIds && a.selectedOptionIds.length > 0) || (a.textResponse && a.textResponse.trim().length > 0);
+      return (
+        a.optionId ||
+        (a.selectedOptionIds && a.selectedOptionIds.length > 0) ||
+        (a.textResponse && a.textResponse.trim().length > 0)
+      );
     }).length;
 
-    const totalCount = quiz.questions.length;
+    const unansweredCount = totalQuestions - answeredCount;
 
-    if (answeredCount < totalCount) {
-      const ok = await confirm({
-        title: "Perhatian: Soal Belum Lengkap",
-        message: `Anda baru menjawab ${answeredCount} dari ${totalCount} soal. Yakin ingin mengumpulkan sekarang?`,
-        variant: "warning",
-        confirmText: "Kumpulkan Saja",
-        cancelText: "Periksa Lagi",
-        icon: "warning",
-      });
-      if (ok) executeSubmit();
-    } else {
-      const ok = await confirm({
-        title: "Konfirmasi Pengumpulan Ujian",
-        message: "Apakah Anda yakin ingin menyelesaikan dan mengumpulkan ujian ini?",
-        variant: "info",
-        confirmText: "Ya, Selesaikan Ujian",
-        cancelText: "Batal",
-        icon: "shield",
-      });
-      if (ok) executeSubmit();
+    const confirmed = await confirm({
+      title: "Kumpulkan Ujian Sekarang?",
+      message:
+        unansweredCount > 0
+          ? `Perhatian: Masih terdapat ${unansweredCount} soal yang belum Anda jawab dari total ${totalQuestions} soal. Apakah Anda yakin ingin mengumpulkan?`
+          : `Seluruh ${totalQuestions} soal telah dijawab. Apakah Anda yakin ingin mengakhiri dan mengumpulkan hasil ujian?`,
+      confirmText: "Ya, Kumpulkan Ujian",
+      cancelText: "Kembali Periksa",
+      variant: unansweredCount > 0 ? "warning" : "info",
+    });
+
+    if (confirmed) {
+      await doSubmitExam();
     }
   };
 
-  // 9. Execute Final Submit
-  const executeSubmit = async () => {
+  const doSubmitExam = async () => {
     setSubmitting(true);
     try {
-      const formattedAnswers = quiz.questions.map((q: any) => {
-        const a = answers[q.id] || {};
-        return {
-          questionId: q.id,
-          optionId: a.optionId || null,
-          selectedOptionIds: a.selectedOptionIds || [],
-          textResponse: a.textResponse || null,
-        };
-      });
+      if (isPreview) {
+        // In preview mode, simulate submit locally
+        setIsCompleted(true);
+        const totalPoints = quiz.questions.reduce((acc: number, q: any) => acc + (q.points || 0), 0);
+        setResultData({
+          score: Math.round(totalPoints * 0.85),
+          totalScore: totalPoints,
+          hasPendingEssays: quiz.questions.some((q: any) => q.type === "ESSAY" || q.type === "SHORT_ANSWER"),
+        });
+        toast.success("Pratinjau: Ujian berhasil disimulasikan selesai!");
+        return;
+      }
 
       const res = await fetch("/api/quiz/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quizId, answers: formattedAnswers }),
+        body: JSON.stringify({
+          quizId,
+          answers,
+        }),
       });
 
       const json = await res.json();
       if (json.success) {
+        setIsCompleted(true);
+        setResultData(json.data);
         try {
           localStorage.removeItem(`velonet_cbt_draft_${quizId}`);
         } catch (e) {}
-
-        setIsCompleted(true);
-        setResultData(json.data);
         toast.success("Ujian berhasil dikumpulkan!");
       } else {
-        toast.error(json.error || "Gagal mengumpulkan kuis.");
+        toast.error(json.error || "Gagal mengumpulkan jawaban.");
       }
     } catch (err) {
-      toast.error("Terjadi kesalahan server saat mengumpulkan.");
+      toast.error("Terjadi gangguan saat mengumpulkan jawaban.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Format time display (MM:SS)
+  // Helper Timer Formatter
   const formatTimer = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
-
-  // -------------------------------------------------------------
-  // RENDER STATES
-  // -------------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-sm font-semibold text-slate-300">Menyiapkan Sistem VeloExambro...</p>
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-4">
+        <BrainCircuit className="w-12 h-12 text-blue-500 animate-pulse mb-4" />
+        <span className="text-sm font-semibold text-slate-300">Menyiapkan Ruang Ujian CBT...</span>
       </div>
     );
   }
 
   if (!quiz) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center text-slate-700">
-        <div className="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
-          <AlertTriangle className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900">Kuis Tidak Tersedia</h2>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm">
-          Kuis yang Anda tuju tidak ditemukan atau belum dipublikasikan oleh Mentor.
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-4 text-center">
+        <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
+        <h2 className="text-lg font-bold text-white">Ujian Tidak Tersedia</h2>
+        <p className="text-xs text-slate-400 mt-1 max-w-sm">
+          Modul ujian yang Anda tuju mungkin telah dihapus atau Anda belum memiliki izin akses.
         </p>
         <button
-          onClick={() => router.push("/student/learning")}
-          className="mt-6 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer shadow-md"
+          onClick={() => router.push("/student/exams")}
+          className="mt-6 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
         >
-          Kembali ke Dashboard
+          Kembali ke Pusat Ujian
         </button>
       </div>
     );
   }
 
-  // Disqualified State View (Permanent 0 Score)
-  if (isDisqualified || resultData?.status === "DISQUALIFIED") {
-    const totalPossiblePoints = quiz?.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 100;
+  // Fatal Strike 3: Disqualified Screen View (Permanent Red Lockout)
+  if (isDisqualified) {
+    const totalPossiblePoints =
+      quiz?.questions?.reduce((acc: number, q: any) => acc + (q.points || 0), 0) || 100;
 
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100 select-none">
-        <div className="w-full max-w-lg bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-rose-600/60 text-center space-y-6 animate-in fade-in zoom-in duration-200">
-          <div className="w-20 h-20 rounded-3xl bg-rose-600/20 border border-rose-500/50 flex items-center justify-center mx-auto text-rose-500 shadow-lg shadow-rose-500/25">
-            <ShieldAlert className="w-10 h-10 animate-pulse" />
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100">
+        <div className="w-full max-w-lg bg-slate-900 border-2 border-rose-600 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-200">
+          <div className="w-20 h-20 rounded-3xl bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-500 mx-auto animate-pulse shadow-lg shadow-rose-600/20">
+            <ShieldAlert className="w-10 h-10" />
           </div>
 
           <div className="space-y-2">
@@ -436,7 +456,7 @@ export default function QuizTakingPage() {
               Ujian Ditutup Karena Kecurangan
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-              Anda telah mencapai batas <b>3 kali pelanggaran</b> (berpindah tab browser atau membuka aplikasi lain). Sesi ujian Anda telah dihentikan secara permanen oleh sistem ExamBro.
+              Anda telah mencapai batas <b>3 kali pelanggaran</b> (berpindah tab browser, split screen, atau membuka aplikasi lain). Sesi ujian Anda telah dihentikan secara permanen oleh sistem ExamBro.
             </p>
           </div>
 
@@ -469,70 +489,157 @@ export default function QuizTakingPage() {
     );
   }
 
-  // Normal Completed State View (Result & Gamification)
+  // Normal Completed State View (Result & Gamification & Delayed Score)
   if (isCompleted) {
+    const isScoreVisible =
+      quiz?.isScoreVisible ??
+      (resultData?.scoreReleased !== false && resultData?.score !== null && resultData?.score !== undefined);
+    const isDiscussionVisible = Boolean(quiz?.isDiscussionVisible);
     const score = resultData?.score ?? 0;
-    const totalScore = resultData?.totalScore ?? quiz.questions.reduce((acc: number, q: any) => acc + q.points, 0);
+    const totalScore =
+      resultData?.totalScore ?? quiz.questions.reduce((acc: number, q: any) => acc + (q.points || 0), 0);
     const percentage = totalScore > 0 ? Math.round((score / totalScore) * 100) : 0;
     const isPassed = percentage >= 70;
     const hasPendingEssays = resultData?.hasPendingEssays;
 
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 text-slate-900">
-        <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 text-center space-y-6">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100">
+        <div className="w-full max-w-lg bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 text-center space-y-6 animate-in fade-in zoom-in duration-200">
           <div
             className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto shadow-lg ${
-              isPassed ? "bg-emerald-500 text-white shadow-emerald-500/30" : "bg-amber-500 text-white shadow-amber-500/30"
+              !isScoreVisible
+                ? "bg-blue-600 text-white shadow-blue-500/30"
+                : isPassed
+                ? "bg-emerald-500 text-white shadow-emerald-500/30"
+                : "bg-amber-500 text-white shadow-amber-500/30"
             }`}
           >
-            {isPassed ? <Trophy className="w-10 h-10" /> : <Sparkles className="w-10 h-10" />}
+            {!isScoreVisible ? (
+              <CheckCircle2 className="w-10 h-10" />
+            ) : isPassed ? (
+              <Trophy className="w-10 h-10" />
+            ) : (
+              <Sparkles className="w-10 h-10" />
+            )}
           </div>
 
           <div>
             <span
               className={`text-xs font-extrabold uppercase px-3 py-1 rounded-full ${
-                hasPendingEssays
-                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                !isScoreVisible
+                  ? "bg-blue-950 text-blue-300 border border-blue-700"
+                  : hasPendingEssays
+                  ? "bg-blue-950 text-blue-300 border border-blue-700"
                   : isPassed
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                  ? "bg-emerald-950 text-emerald-300 border border-emerald-700"
+                  : "bg-amber-950 text-amber-300 border border-amber-700"
               }`}
             >
-              {hasPendingEssays ? "Terkumpul (Menunggu Review Essay)" : isPassed ? "Lulus dengan Baik" : "Hasil Ujian"}
+              {!isScoreVisible
+                ? "Ujian Telah Dikumpulkan"
+                : hasPendingEssays
+                ? "Terkumpul (Menunggu Review Essay)"
+                : isPassed
+                ? "Lulus dengan Baik"
+                : "Hasil Ujian"}
             </span>
-            <h2 className="text-2xl font-black text-slate-900 mt-2">{quiz.title}</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              {hasPendingEssays
+            <h2 className="text-xl sm:text-2xl font-black text-white mt-2">{quiz.title}</h2>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              {!isScoreVisible
+                ? "Seluruh jawaban Anda telah berhasil dikirim dan tersimpan di sistem."
+                : hasPendingEssays
                 ? "Soal pilihan ganda dinilai otomatis. Bagian uraian sedang ditinjau oleh Guru & AI."
                 : "Ujian Anda telah selesai dan dinilai secara otomatis."}
             </p>
           </div>
 
-          {/* Score Box */}
-          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-around">
-            <div>
-              <span className="text-xs text-slate-500 font-medium">Nilai Diperoleh</span>
-              <div className="text-3xl font-black text-slate-900 mt-0.5">
-                {score} <span className="text-xs text-slate-400 font-normal">/ {totalScore}</span>
+          {/* If Score is Delayed / Hidden */}
+          {!isScoreVisible ? (
+            <div className="p-5 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-2 text-left">
+              <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                <Clock className="w-4 h-4" />
+                <span>Pengumuman Nilai Ditunda oleh Guru</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Nilai dan papan peringkat akan diumumkan oleh Guru setelah seluruh sesi ujian berakhir.
+              </p>
+              {quiz.scoreReleaseAt && (
+                <div className="pt-2 border-t border-slate-700 text-[11px] text-amber-300 font-mono">
+                  📅 Jadwal Rilis Nilai:{" "}
+                  {new Date(quiz.scoreReleaseAt).toLocaleString("id-ID", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Score Box if Score is Released */
+            <div className="p-5 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-around">
+              <div>
+                <span className="text-xs text-slate-400 font-medium">Nilai Diperoleh</span>
+                <div className="text-3xl font-black text-white mt-0.5">
+                  {score} <span className="text-xs text-slate-400 font-normal">/ {totalScore}</span>
+                </div>
+              </div>
+              <div className="w-px h-10 bg-slate-700"></div>
+              <div>
+                <span className="text-xs text-slate-400 font-medium">Persentase</span>
+                <div className={`text-3xl font-black mt-0.5 ${isPassed ? "text-emerald-400" : "text-amber-400"}`}>
+                  {percentage}%
+                </div>
               </div>
             </div>
-            <div className="w-px h-10 bg-slate-200"></div>
-            <div>
-              <span className="text-xs text-slate-500 font-medium">Persentase</span>
-              <div className={`text-3xl font-black mt-0.5 ${isPassed ? "text-emerald-600" : "text-amber-600"}`}>
-                {percentage}%
-              </div>
-            </div>
-          </div>
+          )}
 
-          <button
-            onClick={() => router.push(isPreview ? `/admin/exams/${quizId}/edit` : "/student/exams")}
-            className="w-full py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-blue-500/25 transition-all"
-          >
-            <span>{isPreview ? "Kembali ke Editor Ujian Admin" : "Kembali ke Pusat Ujian CBT"}</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {/* Action Buttons: Discussion, Leaderboard & Return */}
+          <div className="space-y-2.5 pt-2">
+            {isDiscussionVisible && (
+              <button
+                onClick={() => setShowDiscussionModal(true)}
+                className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-indigo-500/25 transition-all"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Lihat Pembahasan & Kunci Jawaban</span>
+              </button>
+            )}
+
+            {isScoreVisible && (
+              <button
+                onClick={() => setShowLeaderboardModal(true)}
+                className="w-full py-3 px-5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-500/25 transition-all"
+              >
+                <Trophy className="w-4 h-4" />
+                <span>Lihat Papan Peringkat / Leaderboard</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => router.push(isPreview ? `/admin/exams/${quizId}/edit` : "/student/exams")}
+              className="w-full py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer border border-slate-700 transition-all"
+            >
+              <span>{isPreview ? "Kembali ke Editor Ujian Admin" : "Kembali ke Pusat Ujian CBT"}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* Modals for completed view */}
+        <ExamDiscussionReviewModal
+          isOpen={showDiscussionModal}
+          onClose={() => setShowDiscussionModal(false)}
+          quizTitle={quiz.title}
+          score={score}
+          totalScore={totalScore}
+          questions={quiz.questions}
+        />
+
+        <ExamLeaderboardModal
+          isOpen={showLeaderboardModal}
+          onClose={() => setShowLeaderboardModal(false)}
+          quizId={quizId}
+          quizTitle={quiz.title}
+        />
       </div>
     );
   }
@@ -540,18 +647,25 @@ export default function QuizTakingPage() {
   // Pre-Check Modal
   if (showPreCheck) {
     return (
-      <ExamPreCheckModal
-        quizTitle={quiz.title}
-        durationMinutes={quiz.durationMinutes || 30}
-        maxStrikes={quiz.maxStrikes || 3}
-        enableCamera={Boolean(quiz.enableCameraProctor)}
-        enableFullscreen={quiz.enableFullscreenLock ?? true}
-        hasExamToken={quiz.hasExamToken}
-        examTokenInput={examTokenInput}
-        onTokenChange={setExamTokenInput}
-        isPreview={isPreview}
-        onStartExam={handleStartExam}
-      />
+      <>
+        <ExamPreCheckModal
+          quizTitle={quiz.title}
+          durationMinutes={quiz.durationMinutes || 30}
+          maxStrikes={quiz.maxStrikes || 3}
+          enableCamera={Boolean(quiz.enableCameraProctor)}
+          enableFullscreen={quiz.enableFullscreenLock ?? true}
+          hasExamToken={quiz.hasExamToken}
+          examTokenInput={examTokenInput}
+          onTokenChange={setExamTokenInput}
+          isPreview={isPreview}
+          onStartExam={handleStartExam}
+        />
+
+        <ExamTutorialModal
+          isOpen={showTutorialModal}
+          onClose={() => setShowTutorialModal(false)}
+        />
+      </>
     );
   }
 
@@ -577,14 +691,18 @@ export default function QuizTakingPage() {
   const isLastQuestion = currentIndex === quiz.questions.length - 1;
   const answeredTotal = Object.keys(answers).filter((k) => {
     const a = answers[k];
-    return a.optionId || (a.selectedOptionIds && a.selectedOptionIds.length > 0) || (a.textResponse && a.textResponse.trim().length > 0);
+    return (
+      a.optionId ||
+      (a.selectedOptionIds && a.selectedOptionIds.length > 0) ||
+      (a.textResponse && a.textResponse.trim().length > 0)
+    );
   }).length;
 
   const qType = currentQuestion?.type || "SINGLE_CHOICE";
   const currentAnswer = answers[currentQuestion?.id] || {};
 
   return (
-    <div className="min-h-screen h-dvh bg-slate-900 text-slate-100 flex flex-col select-none relative overflow-y-auto overscroll-none touch-manipulation">
+    <div className="min-h-screen bg-slate-950 flex flex-col text-slate-100 selection:bg-blue-600 selection:text-white select-none">
       {/* 0. ADMIN PREVIEW TOP BANNER */}
       {isPreview && (
         <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between gap-3 shadow-md z-40">
@@ -646,8 +764,8 @@ export default function QuizTakingPage() {
             </div>
           </div>
 
-          {/* Center/Right: Timer, Strikes, Palette Toggle */}
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          {/* Center/Right: Timer, Strikes, Tutorial Help, Palette */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Timer Badge */}
             <div
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-mono font-bold shadow-xs transition-colors ${
@@ -679,56 +797,50 @@ export default function QuizTakingPage() {
               </span>
             </div>
 
-            {/* Question Palette Toggle */}
+            {/* Tutorial Help Button */}
             <button
-              onClick={() => setShowQuestionPalette(!showQuestionPalette)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
-              title="Daftar Soal"
+              onClick={() => setShowTutorialModal(true)}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 border border-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+              title="Panduan Ujian"
             >
-              <Grid className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {answeredTotal}/{quiz.questions.length}
-              </span>
+              <HelpCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">Panduan</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* 2. MAIN EXAM WORKSPACE */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 pb-28">
-        {/* Question Area (8 Cols on Desktop) */}
-        <section className="lg:col-span-8 flex flex-col space-y-6">
+      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 pb-32">
+        <section className="flex flex-col space-y-6">
           {/* Question Card */}
-          <div className="bg-slate-800/90 rounded-3xl p-5 sm:p-7 border border-slate-700/80 shadow-xl flex-1 flex flex-col justify-between">
+          <div className="bg-slate-800/90 rounded-3xl p-5 sm:p-8 border border-slate-700/80 shadow-2xl flex-1 flex flex-col justify-between">
             <div>
               {/* Question Header Meta */}
               <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-700/60">
-                <div className="flex items-center gap-2">
-                  <span className="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="w-9 h-9 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-mono font-black text-sm text-blue-400">
                     {currentIndex + 1}
                   </span>
-                  <span className="text-xs font-semibold text-slate-400">
-                    dari {quiz.questions.length} Soal
-                  </span>
-                  <span className="text-[10px] font-bold uppercase text-slate-300 bg-slate-700/70 px-2 py-0.5 rounded-md">
-                    {qType}
-                  </span>
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Tipe: {qType.replace("_", " ")}
+                    </span>
+                    <span className="text-[10px] text-slate-500">Bobot: {currentQuestion.points} Poin</span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-semibold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-800/40">
-                    {currentQuestion.points} Poin
-                  </span>
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => toggleFlag(currentIndex)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-colors cursor-pointer border ${
+                    onClick={() => handleToggleFlag(currentIndex)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
                       flagged[currentIndex]
-                        ? "bg-amber-950/90 border-amber-500 text-amber-300"
+                        ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-xs"
                         : "bg-slate-900/60 border-slate-700 text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <Flag className="w-3.5 h-3.5" />
-                    <span>{flagged[currentIndex] ? "Ragu-ragu" : "Tandai Ragu"}</span>
+                    <Flag className={`w-3.5 h-3.5 ${flagged[currentIndex] ? "text-amber-400 fill-amber-400" : ""}`} />
+                    <span>{flagged[currentIndex] ? "Ragu-Ragu" : "Tandai Ragu"}</span>
                   </button>
                 </div>
               </div>
@@ -766,86 +878,80 @@ export default function QuizTakingPage() {
                 {qType === "SINGLE_CHOICE" && (
                   <div className="space-y-3">
                     {currentQuestion.options?.map((opt: any, optIdx: number) => {
-                      const isSelected = currentAnswer.optionId === opt.id;
                       const letter = String.fromCharCode(65 + optIdx);
-                      const isCorrectKey = isPreview && showAnswerKeys && opt.isCorrect;
+                      const isSelected = currentAnswer.optionId === opt.id;
+                      const isCorrectAnswer = opt.isCorrect;
 
                       return (
-                        <button
+                        <div
                           key={opt.id}
-                          onClick={() => handleSelectSingleChoice(currentQuestion.id, opt.id)}
-                          className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center gap-3.5 cursor-pointer text-sm relative ${
-                            isCorrectKey
-                              ? "bg-emerald-950/40 border-emerald-500 text-white ring-2 ring-emerald-500/50 shadow-md"
-                              : isSelected
-                              ? "bg-blue-600/20 border-blue-500 text-white font-semibold ring-1 ring-blue-500/50 shadow-md"
-                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/50 hover:border-slate-600"
+                          onClick={() => handleSelectOption(currentQuestion.id, opt.id)}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected
+                              ? "bg-blue-600/20 border-blue-500 text-white shadow-md shadow-blue-500/10"
+                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:border-slate-600 hover:bg-slate-900"
                           }`}
                         >
-                          <span
-                            className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
-                              isCorrectKey
-                                ? "bg-emerald-600 text-white"
-                                : isSelected
-                                ? "bg-blue-600 text-white"
-                                : "bg-slate-800 border border-slate-700 text-slate-400"
-                            }`}
-                          >
-                            {letter}
-                          </span>
-                          <span className="flex-1 leading-snug">{opt.text}</span>
-                          {isCorrectKey && (
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950 text-[10px] font-extrabold flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> KUNCI BENAR
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs transition-colors ${
+                                isSelected ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-400 border border-slate-700"
+                              }`}
+                            >
+                              {letter}
+                            </span>
+                            <span className="text-xs sm:text-sm font-medium leading-snug">{opt.text}</span>
+                          </div>
+
+                          {/* Supervisor Answer Key Peek (Admin Preview Only) */}
+                          {isPreview && showAnswerKeys && isCorrectAnswer && (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-950 border border-emerald-600 text-emerald-400 text-[10px] font-bold shrink-0">
+                              Kunci Benar ✓
                             </span>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
                 )}
 
-                {/* 2. CHECKBOXES (Multi-Select) */}
-                {qType === "CHECKBOXES" && (
+                {/* 2. MULTIPLE CHOICE */}
+                {qType === "MULTIPLE_CHOICE" && (
                   <div className="space-y-3">
-                    <p className="text-xs text-amber-300/80 mb-2 italic">
-                      * Pilih satu atau lebih jawaban yang benar.
+                    <p className="text-xs text-blue-400 font-semibold mb-2">
+                      * Pilih satu atau lebih jawaban yang menurut Anda benar.
                     </p>
                     {currentQuestion.options?.map((opt: any, optIdx: number) => {
                       const isSelected = (currentAnswer.selectedOptionIds || []).includes(opt.id);
-                      const letter = String.fromCharCode(65 + optIdx);
-                      const isCorrectKey = isPreview && showAnswerKeys && opt.isCorrect;
+                      const isCorrectAnswer = opt.isCorrect;
 
                       return (
-                        <button
+                        <div
                           key={opt.id}
-                          onClick={() => handleToggleCheckbox(currentQuestion.id, opt.id)}
-                          className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center gap-3.5 cursor-pointer text-sm ${
-                            isCorrectKey
-                              ? "bg-emerald-950/40 border-emerald-500 text-white ring-2 ring-emerald-500/50 shadow-md"
-                              : isSelected
-                              ? "bg-blue-600/20 border-blue-500 text-white font-semibold ring-1 ring-blue-500/50 shadow-md"
-                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/50 hover:border-slate-600"
+                          onClick={() => handleToggleMultipleOption(currentQuestion.id, opt.id)}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected
+                              ? "bg-blue-600/20 border-blue-500 text-white shadow-md shadow-blue-500/10"
+                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:border-slate-600 hover:bg-slate-900"
                           }`}
                         >
-                          <div
-                            className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
-                              isCorrectKey
-                                ? "bg-emerald-600 text-white"
-                                : isSelected
-                                ? "bg-blue-600 text-white"
-                                : "bg-slate-800 border border-slate-700 text-slate-400"
-                            }`}
-                          >
-                            {isSelected ? <CheckSquare className="w-4 h-4" /> : letter}
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
+                                isSelected ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-500 border border-slate-700"
+                              }`}
+                            >
+                              {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                            </div>
+                            <span className="text-xs sm:text-sm font-medium leading-snug">{opt.text}</span>
                           </div>
-                          <span className="flex-1 leading-snug">{opt.text}</span>
-                          {isCorrectKey && (
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950 text-[10px] font-extrabold flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> KUNCI BENAR
+
+                          {isPreview && showAnswerKeys && isCorrectAnswer && (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-950 border border-emerald-600 text-emerald-400 text-[10px] font-bold shrink-0">
+                              Kunci Benar ✓
                             </span>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -853,30 +959,26 @@ export default function QuizTakingPage() {
 
                 {/* 3. TRUE / FALSE */}
                 {qType === "TRUE_FALSE" && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {currentQuestion.options?.map((opt: any) => {
                       const isSelected = currentAnswer.optionId === opt.id;
-                      const isTrue = opt.text.toUpperCase() === "BENAR";
-                      const isCorrectKey = isPreview && showAnswerKeys && opt.isCorrect;
+                      const isCorrectAnswer = opt.isCorrect;
 
                       return (
                         <button
                           key={opt.id}
-                          onClick={() => handleSelectSingleChoice(currentQuestion.id, opt.id)}
-                          className={`p-6 rounded-3xl border text-center transition-all cursor-pointer font-black text-lg sm:text-xl flex flex-col items-center justify-center gap-2 relative ${
-                            isCorrectKey
-                              ? "bg-emerald-600/40 border-emerald-400 text-emerald-200 ring-2 ring-emerald-400 shadow-lg"
-                              : isSelected
-                              ? isTrue
-                                ? "bg-emerald-600/30 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/50 shadow-lg"
-                                : "bg-rose-600/30 border-rose-500 text-rose-300 ring-2 ring-rose-500/50 shadow-lg"
-                              : "bg-slate-900/60 border-slate-700/80 text-slate-300 hover:bg-slate-700/50"
+                          type="button"
+                          onClick={() => handleSelectOption(currentQuestion.id, opt.id)}
+                          className={`p-5 rounded-2xl border text-center transition-all cursor-pointer font-bold text-sm ${
+                            isSelected
+                              ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20"
+                              : "bg-slate-900/60 border-slate-700 text-slate-300 hover:bg-slate-900 hover:border-slate-600"
                           }`}
                         >
-                          <span>{opt.text}</span>
-                          {isCorrectKey && (
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[10px] font-extrabold">
-                              ✓ KUNCI BENAR
+                          {opt.text}
+                          {isPreview && showAnswerKeys && isCorrectAnswer && (
+                            <span className="block mt-1 text-[10px] text-emerald-400 font-normal">
+                              (Kunci Benar ✓)
                             </span>
                           )}
                         </button>
@@ -888,120 +990,151 @@ export default function QuizTakingPage() {
                 {/* 4. SHORT ANSWER */}
                 {qType === "SHORT_ANSWER" && (
                   <div className="space-y-3">
-                    <label className="text-xs font-bold text-slate-400 block">
-                      Tuliskan Jawaban Singkat Anda:
+                    <label className="text-xs font-semibold text-slate-400 block">
+                      Ketik jawaban singkat Anda di bawah ini:
                     </label>
                     <input
                       type="text"
                       value={currentAnswer.textResponse || ""}
                       onChange={(e) => handleTextResponseChange(currentQuestion.id, e.target.value)}
-                      placeholder="Ketik jawaban di sini..."
-                      className="w-full p-4 rounded-2xl bg-slate-900/90 border border-slate-700 text-white font-medium text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                      placeholder="Tuliskan jawaban singkat..."
+                      className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    {isPreview && showAnswerKeys && currentQuestion.sampleAnswer && (
-                      <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800 text-emerald-300 text-xs space-y-1">
-                        <strong className="text-emerald-400 block font-bold">Kunci Jawaban Contoh:</strong>
-                        <p>{currentQuestion.sampleAnswer}</p>
+
+                    {isPreview && showAnswerKeys && (
+                      <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs space-y-1">
+                        <span className="font-bold block">Kunci / Contoh Jawaban Ideal:</span>
+                        <p>{currentQuestion.sampleAnswer || "Tidak ada contoh jawaban khusus."}</p>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* 5. ESSAY / URAIAN */}
+                {/* 5. ESSAY */}
                 {qType === "ESSAY" && (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-400 block">
-                        Tuliskan Uraian Lengkap Anda:
-                      </label>
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        {(currentAnswer.textResponse || "").trim().split(/\s+/).filter(Boolean).length} Kata
-                      </span>
-                    </div>
+                    <label className="text-xs font-semibold text-slate-400 block">
+                      Tuliskan penjelasan dan argumen lengkap Anda:
+                    </label>
                     <textarea
-                      rows={6}
+                      rows={5}
                       value={currentAnswer.textResponse || ""}
                       onChange={(e) => handleTextResponseChange(currentQuestion.id, e.target.value)}
-                      placeholder="Ketik uraian jawaban secara jelas dan lengkap..."
-                      className="w-full p-4 rounded-2xl bg-slate-900/90 border border-slate-700 text-white font-normal text-sm leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                      placeholder="Uraikan jawaban Anda di sini..."
+                      className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y leading-relaxed font-sans"
                     />
+
                     {isPreview && showAnswerKeys && (
-                      <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800 text-emerald-300 text-xs space-y-2">
-                        {currentQuestion.sampleAnswer && (
-                          <div>
-                            <strong className="text-emerald-400 block font-bold">Contoh Uraian Jawaban Ideal:</strong>
-                            <p className="mt-0.5 text-slate-200">{currentQuestion.sampleAnswer}</p>
-                          </div>
-                        )}
-                        {currentQuestion.gradingRubric && (
-                          <div>
-                            <strong className="text-emerald-400 block font-bold">Rubrik Penilaian AI / Guru:</strong>
-                            <p className="mt-0.5 text-slate-200">{currentQuestion.gradingRubric}</p>
-                          </div>
-                        )}
+                      <div className="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs space-y-2">
+                        <span className="font-bold block">Rubrik / Kriteria Penilaian Guru:</span>
+                        <p className="whitespace-pre-line text-slate-300">
+                          {currentQuestion.gradingRubric || currentQuestion.sampleAnswer || "Belum ada rubrik terpasang."}
+                        </p>
                       </div>
                     )}
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Bottom Nav inside card */}
-            <div className="pt-6 mt-8 border-t border-slate-700/60 flex items-center justify-between gap-3">
-              <button
-                onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
-                disabled={currentIndex === 0}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Sebelumnya</span>
-              </button>
-
-              {isLastQuestion ? (
-                <button
-                  onClick={handleSubmitConfirmation}
-                  disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-500/25 transition-all"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>{submitting ? "Mengumpulkan..." : "Kumpulkan Ujian"}</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setCurrentIndex((p) => Math.min(quiz.questions.length - 1, p + 1))}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md shadow-blue-500/25 transition-all"
-                >
-                  <span>Selanjutnya</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
             </div>
           </div>
         </section>
+      </main>
 
-        {/* Sidebar Question Palette (Desktop 4 Cols, or Mobile Drawer) */}
-        <aside
-          className={`lg:col-span-4 ${
-            showQuestionPalette
-              ? "fixed inset-x-0 bottom-0 top-16 z-40 bg-slate-900/95 backdrop-blur-md p-6 overflow-y-auto block lg:static lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
-              : "hidden lg:block"
-          }`}
+      {/* 2. FLOATING DOCK NAVIGATION (MOBILE & DESKTOP) */}
+      <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94%] sm:w-auto max-w-xl">
+        <div className="p-2 sm:p-2.5 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-2 sm:gap-3">
+          {/* Previous Question Button */}
+          <button
+            onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
+            disabled={currentIndex === 0}
+            className="px-3 sm:px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Sebelumnya</span>
+          </button>
+
+          {/* Middle Pill: Number & Palette Trigger */}
+          <button
+            onClick={() => setShowQuestionPalette(true)}
+            className="px-3 sm:px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer text-slate-200 transition-colors shadow-inner"
+            title="Buka Kisi Palet Soal"
+          >
+            <Grid className="w-4 h-4 text-blue-400" />
+            <span className="font-mono text-xs sm:text-sm">
+              No. <b className="text-white">{currentIndex + 1}</b> / {quiz.questions.length}
+            </span>
+          </button>
+
+          {/* Flag / Ragu-ragu Button */}
+          <button
+            onClick={() => handleToggleFlag(currentIndex)}
+            className={`px-3 sm:px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 border ${
+              flagged[currentIndex]
+                ? "bg-amber-500/25 border-amber-500 text-amber-300 shadow-xs"
+                : "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border-slate-700"
+            }`}
+            title="Tandai Ragu-ragu"
+          >
+            <Flag className={`w-4 h-4 ${flagged[currentIndex] ? "text-amber-400 fill-amber-400" : ""}`} />
+            <span className="hidden sm:inline">
+              {flagged[currentIndex] ? "Ragu-Ragu" : "Tandai"}
+            </span>
+          </button>
+
+          {/* Next Question / Submit Button */}
+          {isLastQuestion ? (
+            <button
+              onClick={handleSubmitConfirmation}
+              disabled={submitting}
+              className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <Send className="w-4 h-4" />
+              <span>{submitting ? "Mengirim..." : "Kumpulkan"}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setCurrentIndex((p) => Math.min(quiz.questions.length - 1, p + 1))}
+              className="px-3 sm:px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/25 transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <span className="hidden sm:inline">Selanjutnya</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2.5 FLOATING QUESTION PALETTE MODAL */}
+      {showQuestionPalette && (
+        <div
+          onClick={() => setShowQuestionPalette(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150"
         >
-          <div className="bg-slate-800/90 rounded-3xl p-5 border border-slate-700/80 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-700/60">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-2">
                 <Grid className="w-4 h-4 text-blue-400" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                  Navigasi Soal
+                  Palet Kisi Soal
                 </h3>
               </div>
-              <span className="text-xs text-slate-400 font-medium">
-                {answeredTotal} / {quiz.questions.length} Terjawab
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-medium">
+                  {answeredTotal} / {quiz.questions.length} Terjawab
+                </span>
+                <button
+                  onClick={() => setShowQuestionPalette(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Color Legend */}
-            <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 pt-1">
+            <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 pt-1 shrink-0">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-md bg-blue-600"></span>
                 <span>Dijawab</span>
@@ -1017,7 +1150,7 @@ export default function QuizTakingPage() {
             </div>
 
             {/* Question Buttons Grid */}
-            <div className="grid grid-cols-5 gap-2.5 max-h-72 overflow-y-auto pr-1">
+            <div className="grid grid-cols-5 gap-2.5 overflow-y-auto py-2 pr-1 flex-1">
               {quiz.questions.map((q: any, idx: number) => {
                 const a = answers[q.id];
                 const isAnswered =
@@ -1029,7 +1162,7 @@ export default function QuizTakingPage() {
                 const isFlagged = !!flagged[idx];
                 const isCurrent = currentIndex === idx;
 
-                let btnClass = "bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500";
+                let btnClass = "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500";
                 if (isFlagged) {
                   btnClass = "bg-amber-600/30 border-amber-500 text-amber-300 font-bold";
                 } else if (isAnswered) {
@@ -1047,7 +1180,7 @@ export default function QuizTakingPage() {
                       setCurrentIndex(idx);
                       setShowQuestionPalette(false);
                     }}
-                    className={`h-10 rounded-xl border text-xs font-mono transition-all flex items-center justify-center cursor-pointer ${btnClass}`}
+                    className={`h-11 rounded-xl border text-xs font-mono font-bold transition-all flex items-center justify-center cursor-pointer ${btnClass}`}
                   >
                     {idx + 1}
                   </button>
@@ -1056,19 +1189,22 @@ export default function QuizTakingPage() {
             </div>
 
             {/* Action inside palette */}
-            <div className="pt-3 border-t border-slate-700/60">
+            <div className="pt-3 border-t border-slate-800 shrink-0">
               <button
-                onClick={handleSubmitConfirmation}
+                onClick={() => {
+                  setShowQuestionPalette(false);
+                  handleSubmitConfirmation();
+                }}
                 disabled={submitting}
-                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-500/25 transition-all"
+                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-500/25 transition-all"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Kumpulkan Ujian Sekarang</span>
               </button>
             </div>
           </div>
-        </aside>
-      </main>
+        </div>
+      )}
 
       {/* 3. AI FACE PROCTORING WIDGET (PIP Thumbnail at Bottom Right - Only if enabled) */}
       <FaceProctorWidget
@@ -1154,9 +1290,15 @@ export default function QuizTakingPage() {
         </div>
       )}
 
-      {/* 6. FLOATING SUPERVISOR TOOLBAR (ADMIN PREVIEW ONLY) */}
+      {/* 6. TUTORIAL MODAL */}
+      <ExamTutorialModal
+        isOpen={showTutorialModal}
+        onClose={() => setShowTutorialModal(false)}
+      />
+
+      {/* 7. FLOATING SUPERVISOR TOOLBAR (ADMIN PREVIEW ONLY) */}
       {isPreview && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-2xl w-full px-4">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-2xl w-full px-4">
           <div className="p-3 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-md flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>

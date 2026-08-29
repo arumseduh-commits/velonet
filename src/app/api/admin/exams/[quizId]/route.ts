@@ -74,6 +74,7 @@ export async function PATCH(
       shuffleOptions,
       examToken,
       showScoreImmediately,
+      scoreReleaseAt,
       showDiscussion,
       questions, // if provided, sync questions
     } = body;
@@ -101,6 +102,9 @@ export async function PATCH(
           examToken: examToken && examToken.trim() ? examToken.trim().toUpperCase() : null,
         }),
         ...(showScoreImmediately !== undefined && { showScoreImmediately: Boolean(showScoreImmediately) }),
+        ...(scoreReleaseAt !== undefined && {
+          scoreReleaseAt: scoreReleaseAt ? new Date(scoreReleaseAt) : null,
+        }),
         ...(showDiscussion !== undefined && { showDiscussion: Boolean(showDiscussion) }),
       },
     });

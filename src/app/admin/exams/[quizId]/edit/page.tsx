@@ -135,6 +135,7 @@ export default function AdminEditExamPage({
   const [shuffleOptions, setShuffleOptions] = useState(true);
   const [examToken, setExamToken] = useState("");
   const [showScoreImmediately, setShowScoreImmediately] = useState(true);
+  const [scoreReleaseAt, setScoreReleaseAt] = useState("");
   const [showDiscussion, setShowDiscussion] = useState(false);
 
   // Questions List
@@ -159,6 +160,7 @@ export default function AdminEditExamPage({
           setShuffleOptions(Boolean(q.shuffleOptions));
           setExamToken(q.examToken || "");
           setShowScoreImmediately(q.showScoreImmediately ?? true);
+          setScoreReleaseAt(q.scoreReleaseAt ? q.scoreReleaseAt.substring(0, 16) : "");
           setShowDiscussion(q.showDiscussion ?? false);
 
           if (q.questions && q.questions.length > 0) {
@@ -443,6 +445,7 @@ export default function AdminEditExamPage({
         shuffleOptions,
         examToken: examToken.trim() ? examToken.trim().toUpperCase() : null,
         showScoreImmediately,
+        scoreReleaseAt: scoreReleaseAt ? new Date(scoreReleaseAt).toISOString() : null,
         showDiscussion,
         questions: questions.map((q, idx) => ({
           ...q,
@@ -743,6 +746,23 @@ export default function AdminEditExamPage({
                 <span className="text-[11px] text-slate-500">Skor muncul seketika setelah kirim</span>
               </div>
             </label>
+
+            {!showScoreImmediately && (
+              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-amber-900 block">
+                  Jadwal Rilis Nilai Otomatis (Opsional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={scoreReleaseAt}
+                  onChange={(e) => setScoreReleaseAt(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs rounded-xl bg-white border border-amber-300 font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <p className="text-[10px] text-amber-700">
+                  Jika diisi, nilai dan papan peringkat akan otomatis dibuka untuk siswa pada tanggal & jam di atas. Jika dikosongkan, nilai ditunda sampai guru merilisnya manual.
+                </p>
+              </div>
+            )}
 
             <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3 cursor-pointer hover:bg-slate-100/80 transition-colors">
               <input

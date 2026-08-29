@@ -27,7 +27,7 @@ export async function GET(
               select: {
                 id: true,
                 text: true,
-                isCorrect: Boolean(admin), // Only expose isCorrect to admin preview!
+                isCorrect: true, // we will sanitize per student/admin below
               },
             },
           },
@@ -58,17 +58,67 @@ export async function GET(
       });
     }
 
+    const isScoreVisible =
+      Boolean(admin) ||
+      quiz.showScoreImmediately ||
+      (quiz.scoreReleaseAt && new Date() >= new Date(quiz.scoreReleaseAt));
+
+    const isDiscussionVisible =
+      Boolean(admin) ||
+      (Boolean(quiz.showDiscussion) && isScoreVisible && attempt && (attempt.status === "SUBMITTED" || attempt.status === "GRADED"));
+
     // Structure questions for student player / admin preview
-    const formattedQuestions = quiz.questions.map((q) => ({
-      id: q.id,
-      type: q.type,
-      text: q.text,
-      imageUrl: q.imageUrl || null,
-      points: q.points,
-      options: q.options,
-      sampleAnswer: admin ? q.sampleAnswer : null,
-      gradingRubric: admin ? q.gradingRubric : null,
-    }));
+    const formattedQuestions = quiz.questions.map((q) => {
+      // Find student answer for this question
+      const studentAnsRecord = attempt?.detailedAnswers?.find((da: any) => da.questionId === q.id);
+
+      // Check if student answer is correct
+      let studentIsCorrect: boolean | undefined = undefined;
+      let selectedOptionId: string | null = null;
+      let selectedOptionIds: string[] | null = null;
+
+      if (studentAnsRecord) {
+        if (studentAnsRecord.selectedOptionIds) {
+          try {
+            selectedOptionIds = JSON.parse(studentAnsRecord.selectedOptionIds);
+          } catch (e) {}
+        }
+        if (selectedOptionIds && selectedOptionIds.length === 1) {
+          selectedOptionId = selectedOptionIds[0];
+        }
+
+        if (q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE") {
+          const correctOpt = q.options.find((o) => o.isCorrect);
+          if (correctOpt && selectedOptionId) {
+            studentIsCorrect = correctOpt.id === selectedOptionId;
+          }
+        }
+      }
+
+      return {
+        id: q.id,
+        type: q.type,
+        text: q.text,
+        imageUrl: q.imageUrl || null,
+        points: q.points,
+        options: q.options.map((opt) => ({
+          id: opt.id,
+          text: opt.text,
+          isCorrect: Boolean(admin) || isDiscussionVisible ? opt.isCorrect : undefined,
+        })),
+        sampleAnswer: Boolean(admin) || isDiscussionVisible ? q.sampleAnswer : null,
+        gradingRubric: Boolean(admin) || isDiscussionVisible ? q.gradingRubric : null,
+        studentAnswer: isDiscussionVisible && studentAnsRecord
+          ? {
+              optionId: selectedOptionId,
+              selectedOptionIds,
+              textResponse: studentAnsRecord.textResponse,
+              isCorrect: studentIsCorrect,
+              earnedPoints: studentAnsRecord.earnedPoints,
+            }
+          : undefined,
+      };
+    });
 
     const sanitizedQuiz = {
       id: quiz.id,
@@ -80,9 +130,12 @@ export async function GET(
       maxStrikes: quiz.maxStrikes || 3,
       enableCameraProctor: quiz.enableCameraProctor ?? false,
       hasExamToken: Boolean(quiz.examToken),
-      examToken: admin ? quiz.examToken : undefined, // Only admin can see the actual token
+      examToken: admin ? quiz.examToken : undefined,
       showScoreImmediately: quiz.showScoreImmediately ?? true,
+      scoreReleaseAt: quiz.scoreReleaseAt ? quiz.scoreReleaseAt.toISOString() : null,
       showDiscussion: quiz.showDiscussion ?? false,
+      isScoreVisible,
+      isDiscussionVisible,
       questions: formattedQuestions,
     };
 
@@ -91,6 +144,8 @@ export async function GET(
       data: {
         quiz: sanitizedQuiz,
         isPreview: Boolean(admin),
+        isScoreVisible,
+        isDiscussionVisible,
         attempt: attempt
           ? {
               id: attempt.id,
@@ -98,9 +153,11 @@ export async function GET(
               strikeCount: attempt.strikeCount,
               startedAt: attempt.startedAt,
               submittedAt: attempt.submittedAt,
-              score: attempt.score,
+              score: isScoreVisible ? attempt.score : null,
               totalScore: attempt.totalScore,
               isFullyGraded: attempt.isFullyGraded,
+              scoreReleased: isScoreVisible,
+              scoreReleaseAt: quiz.scoreReleaseAt ? quiz.scoreReleaseAt.toISOString() : null,
               answers: attempt.answers ? JSON.parse(attempt.answers) : {},
               detailedAnswers: attempt.detailedAnswers,
               violations: attempt.violations,

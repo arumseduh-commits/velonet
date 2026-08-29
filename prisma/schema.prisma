@@ -312,8 +312,9 @@ model Quiz {
 
   // Token Masuk & Pengaturan Hasil Ujian
   examToken              String?
-  showScoreImmediately   Boolean  @default(true)
-  showDiscussion         Boolean  @default(false)
+  showScoreImmediately   Boolean   @default(true)
+  scoreReleaseAt         DateTime?
+  showDiscussion         Boolean   @default(false)
 
   questions   Question[]
   attempts    QuizAttempt[]
