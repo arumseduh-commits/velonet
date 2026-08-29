@@ -96,37 +96,6 @@ export async function processIncomingMessage(
     });
   }
 
-  // 3. Fallback: If not found and incoming JID is LID or unknown, search by pushName
-  if (!participant && (rawSenderJid.endsWith("@lid") || incomingNum.length > 13)) {
-    if (pushName && pushName.trim().length >= 2) {
-      const cleanPush = pushName.replace(/[^\w\s]/gi, "").trim();
-      if (cleanPush.length >= 2) {
-        // Try matching full pushName
-        participant = await prisma.user.findFirst({
-          where: {
-            name: { contains: cleanPush, mode: "insensitive" },
-            isExcluded: false,
-          },
-          orderBy: { updatedAt: "desc" },
-        });
-
-        // If not found and pushName contains multiple words, try first word (min 3 chars)
-        if (!participant && cleanPush.includes(" ")) {
-          const firstWord = cleanPush.split(/\s+/)[0];
-          if (firstWord.length >= 3) {
-            participant = await prisma.user.findFirst({
-              where: {
-                name: { startsWith: firstWord, mode: "insensitive" },
-                isExcluded: false,
-              },
-              orderBy: { updatedAt: "desc" },
-            });
-          }
-        }
-      }
-    }
-  }
-
   // Clean up dummy uncompleted LID user if real participant is found
   if (participant && normalizedRealPhone && incomingNum !== normalizedRealPhone) {
     try {
