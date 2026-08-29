@@ -42,6 +42,20 @@ export async function GET() {
       const latestAttempt = q.attempts[0] || null;
       const totalPoints = q.questions.reduce((acc, item) => acc + (item.points || 0), 0);
 
+      const now = new Date();
+      const isUpcoming = Boolean(q.openAt && now < new Date(q.openAt));
+      const isPastClose = Boolean(q.closeAt && now > new Date(q.closeAt));
+      const hasStarted = Boolean(latestAttempt && latestAttempt.startedAt);
+
+      let availability: "UPCOMING" | "OPEN" | "CLOSED" = "OPEN";
+      if (isUpcoming) {
+        availability = "UPCOMING";
+      } else if (isPastClose && !hasStarted) {
+        availability = "CLOSED";
+      } else {
+        availability = "OPEN";
+      }
+
       const isScoreVisible =
         q.showScoreImmediately ||
         (q.scoreReleaseAt && new Date() >= new Date(q.scoreReleaseAt));
@@ -51,6 +65,9 @@ export async function GET() {
         id: q.id,
         title: q.title,
         description: q.description,
+        openAt: q.openAt ? q.openAt.toISOString() : null,
+        closeAt: q.closeAt ? q.closeAt.toISOString() : null,
+        availability,
         durationMinutes: q.durationMinutes || 30,
         totalQuestions: q.questions.length,
         totalPoints,

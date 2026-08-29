@@ -256,6 +256,26 @@ export default function QuizTakingPage() {
     };
   }, [hasStarted, isLocked, isCompleted]);
 
+  // Background auto-sync progress for Live Proctor Leaderboard
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (!hasStarted || isCompleted || isPreview) return;
+    if (Object.keys(answers).length === 0) return;
+
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      fetch(`/api/quiz/${quizId}/progress`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers }),
+      }).catch(() => {});
+    }, 1200);
+
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, [answers, hasStarted, isCompleted, isPreview, quizId]);
+
   const handleAutoSubmitOnTimeout = async () => {
     toast.warning("Waktu ujian telah habis! Mengumpulkan jawaban secara otomatis...");
     await doSubmitExam();

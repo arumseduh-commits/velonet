@@ -43,9 +43,53 @@ export async function POST(
           status: "IN_PROGRESS",
           strikeCount: 0,
           startedAt: new Date().toISOString(),
+          remainingDurationSecs: (quiz.durationMinutes || 30) * 60,
           isPreview: true,
         },
       });
+    }
+
+    const now = new Date();
+
+    // 1. Check openAt (Window of Availability - Start)
+    if (quiz.openAt && now < new Date(quiz.openAt)) {
+      const openDateFormatted = new Date(quiz.openAt).toLocaleString("id-ID", {
+        dateStyle: "full",
+        timeStyle: "short",
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Ujian belum dibuka. Ujian akan dibuka pada ${openDateFormatted} WIB.`,
+          openAt: quiz.openAt,
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check existing attempt for student
+    let attempt = await prisma.quizAttempt.findFirst({
+      where: {
+        quizId,
+        userId: student!.id,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // 2. Check closeAt (Window of Availability - End)
+    if (quiz.closeAt && now > new Date(quiz.closeAt)) {
+      const hasActiveAttempt = attempt && (attempt.status === "IN_PROGRESS" || attempt.status === "LOCKED");
+      if (!hasActiveAttempt) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Waktu pengerjaan ujian telah berakhir / ditutup.",
+            closeAt: quiz.closeAt,
+          },
+          { status: 403 }
+        );
+      }
+      // If student already started before closeAt, allow them to finish remaining personal duration
     }
 
     // Validate Exam Token if required
@@ -64,15 +108,6 @@ export async function POST(
       }
     }
 
-    // Find or create attempt for student
-    let attempt = await prisma.quizAttempt.findFirst({
-      where: {
-        quizId,
-        userId: student!.id,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
     if (!attempt) {
       const totalPossibleScore = quiz.questions.reduce((acc, q) => acc + q.points, 0);
 
@@ -89,6 +124,10 @@ export async function POST(
       });
     }
 
+    // Calculate personal remaining duration
+    const elapsedSecs = Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000);
+    const remainingDurationSecs = Math.max(0, (quiz.durationMinutes * 60) - elapsedSecs);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -96,6 +135,7 @@ export async function POST(
         status: attempt.status,
         strikeCount: attempt.strikeCount,
         startedAt: attempt.startedAt,
+        remainingDurationSecs,
       },
     });
   } catch (err) {

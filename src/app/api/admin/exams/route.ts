@@ -36,6 +36,8 @@ export async function GET() {
         id: q.id,
         title: q.title,
         description: q.description,
+        openAt: q.openAt ? q.openAt.toISOString() : null,
+        closeAt: q.closeAt ? q.closeAt.toISOString() : null,
         durationMinutes: q.durationMinutes,
         enableFullscreenLock: q.enableFullscreenLock,
         enableTabSwitchDetect: q.enableTabSwitchDetect,
@@ -71,6 +73,8 @@ export async function POST(req: Request) {
     const {
       title,
       description,
+      openAt = null,
+      closeAt = null,
       durationMinutes = 30,
       enableFullscreenLock = true,
       enableTabSwitchDetect = true,
@@ -90,11 +94,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Judul ujian wajib diisi." }, { status: 400 });
     }
 
+    // Validate Window of Availability (openAt & closeAt)
+    const parsedOpenAt = openAt ? new Date(openAt) : null;
+    const parsedCloseAt = closeAt ? new Date(closeAt) : null;
+
+    if (parsedOpenAt && isNaN(parsedOpenAt.getTime())) {
+      return NextResponse.json({ success: false, error: "Format tanggal/waktu jadwal buka (openAt) tidak valid." }, { status: 400 });
+    }
+    if (parsedCloseAt && isNaN(parsedCloseAt.getTime())) {
+      return NextResponse.json({ success: false, error: "Format tanggal/waktu jadwal tutup (closeAt) tidak valid." }, { status: 400 });
+    }
+    if (parsedOpenAt && parsedCloseAt && parsedOpenAt >= parsedCloseAt) {
+      return NextResponse.json(
+        { success: false, error: "Jadwal tutup ujian (closeAt) harus lebih akhir dari jadwal buka ujian (openAt)." },
+        { status: 400 }
+      );
+    }
+
     // Create Quiz in Database
     const newQuiz = await prisma.quiz.create({
       data: {
         title: title.trim(),
         description: description?.trim() || null,
+        openAt: parsedOpenAt,
+        closeAt: parsedCloseAt,
         durationMinutes: Number(durationMinutes) || 30,
         enableFullscreenLock: Boolean(enableFullscreenLock),
         enableTabSwitchDetect: Boolean(enableTabSwitchDetect),

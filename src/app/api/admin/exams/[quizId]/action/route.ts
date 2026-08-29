@@ -96,6 +96,28 @@ export async function POST(
                   }
                 }
               });
+            } else if (typeof parsedAnswers === "object" && parsedAnswers !== null) {
+              attempt.quiz.questions.forEach((question) => {
+                totalScore += question.points;
+                const userAns = parsedAnswers[question.id];
+                if (userAns) {
+                  if (question.type === "SINGLE_CHOICE" || question.type === "TRUE_FALSE") {
+                    const selectedOption = question.options.find((opt) => opt.id === userAns.optionId);
+                    if (selectedOption && selectedOption.isCorrect) {
+                      score += question.points;
+                    }
+                  } else if (question.type === "CHECKBOXES") {
+                    const correctOptIds = question.options.filter((o) => o.isCorrect).map((o) => o.id);
+                    const selectedIds = userAns.selectedOptionIds || [];
+                    const isMatch =
+                      correctOptIds.length === selectedIds.length &&
+                      correctOptIds.every((id) => selectedIds.includes(id));
+                    if (isMatch) {
+                      score += question.points;
+                    }
+                  }
+                }
+              });
             }
           } catch (e) {
             console.error("Failed to parse answers on force submit:", e);

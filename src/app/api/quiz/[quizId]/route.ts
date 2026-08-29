@@ -125,6 +125,8 @@ export async function GET(
       id: quiz.id,
       title: quiz.title,
       description: quiz.description,
+      openAt: quiz.openAt ? quiz.openAt.toISOString() : null,
+      closeAt: quiz.closeAt ? quiz.closeAt.toISOString() : null,
       durationMinutes: quiz.durationMinutes || 30,
       enableFullscreenLock: quiz.enableFullscreenLock ?? true,
       enableTabSwitchDetect: quiz.enableTabSwitchDetect ?? true,
@@ -140,6 +142,12 @@ export async function GET(
       questions: formattedQuestions,
     };
 
+    let remainingDurationSecs: number | null = null;
+    if (attempt && attempt.startedAt) {
+      const elapsedSecs = Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000);
+      remainingDurationSecs = Math.max(0, (quiz.durationMinutes * 60) - elapsedSecs);
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -154,6 +162,7 @@ export async function GET(
               strikeCount: attempt.strikeCount,
               startedAt: attempt.startedAt,
               submittedAt: attempt.submittedAt,
+              remainingDurationSecs,
               score: isScoreVisible ? attempt.score : null,
               totalScore: attempt.totalScore,
               isFullyGraded: attempt.isFullyGraded,

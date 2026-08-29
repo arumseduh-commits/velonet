@@ -20,11 +20,49 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { quizId, answers } = body;
 
-    if (!quizId || !Array.isArray(answers)) {
+    if (!quizId || (!Array.isArray(answers) && (typeof answers !== "object" || answers === null))) {
       return NextResponse.json(
-        { success: false, error: "Invalid payload" },
+        { success: false, error: "Invalid payload: quizId and answers are required." },
         { status: 400 }
       );
+    }
+
+    // Normalize answers format (supports both Array and Object/Dictionary maps)
+    interface NormalizedUserAnswer {
+      questionId: string;
+      optionId?: string;
+      selectedOptionIds?: string[];
+      textResponse?: string;
+    }
+
+    let normalizedAnswers: NormalizedUserAnswer[] = [];
+
+    if (Array.isArray(answers)) {
+      normalizedAnswers = answers.map((a: any) => {
+        if (typeof a === "object" && a !== null) {
+          return {
+            questionId: a.questionId,
+            optionId: a.optionId,
+            selectedOptionIds: a.selectedOptionIds,
+            textResponse: a.textResponse,
+          };
+        }
+        return a;
+      });
+    } else if (answers && typeof answers === "object") {
+      normalizedAnswers = Object.entries(answers).map(([qId, val]: [string, any]) => {
+        if (typeof val === "string") {
+          return { questionId: qId, optionId: val, selectedOptionIds: [val] };
+        } else if (typeof val === "object" && val !== null) {
+          return {
+            questionId: qId,
+            optionId: val.optionId,
+            selectedOptionIds: val.selectedOptionIds,
+            textResponse: val.textResponse,
+          };
+        }
+        return { questionId: qId };
+      });
     }
 
     const quiz = await prisma.quiz.findUnique({
@@ -53,7 +91,7 @@ export async function POST(req: Request) {
     const gradedDetails: Array<{
       questionId: string;
       selectedOptionIds?: string[];
-      textResponse?: string;
+      textResponse?: string | null;
       isAutoGraded: boolean;
       earnedPoints: number;
       aiSuggestedScore?: number;
@@ -62,7 +100,7 @@ export async function POST(req: Request) {
 
     for (const q of quiz.questions) {
       totalScore += q.points;
-      const userAns = answers.find((a: any) => a.questionId === q.id) || {};
+      const userAns: NormalizedUserAnswer = normalizedAnswers.find((a) => a.questionId === q.id) || { questionId: q.id };
       const qType = q.type || "SINGLE_CHOICE";
 
       let pointsEarned = 0;

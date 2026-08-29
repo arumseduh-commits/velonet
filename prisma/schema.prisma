@@ -300,6 +300,10 @@ model Quiz {
   title       String
   description String?
   
+  // Penjadwalan Rentang Waktu Ujian (Window of Availability)
+  openAt      DateTime? // Waktu Mulai / Buka Ujian
+  closeAt     DateTime? // Waktu Selesai / Tutup Ujian
+
   // Konfigurasi Keamanan & CBT
   durationMinutes        Int      @default(30)
   enableFullscreenLock   Boolean  @default(true)

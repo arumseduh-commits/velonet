@@ -27,7 +27,7 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Ujian / Kuis tidak ditemukan." }, { status: 404 });
     }
 
-    // Fetch all attempts for this quiz with user info and recent violation logs
+    // Fetch all attempts for this quiz with user info, detailed answers and recent violation logs
     const attempts = await prisma.quizAttempt.findMany({
       where: { quizId },
       include: {
@@ -39,6 +39,14 @@ export async function GET(
             studentClass: true,
           },
         },
+        detailedAnswers: {
+          select: {
+            questionId: true,
+            selectedOptionIds: true,
+            textResponse: true,
+            earnedPoints: true,
+          },
+        },
         violations: {
           orderBy: { timestamp: "desc" },
           take: 5,
@@ -47,21 +55,62 @@ export async function GET(
       orderBy: { updatedAt: "desc" },
     });
 
-    const formattedAttempts = attempts.map((att) => ({
-      id: att.id,
-      userId: att.userId,
-      userName: att.user?.name || "Peserta Tanpa Nama",
-      phoneNumber: att.user?.phoneNumber || "-",
-      studentClass: att.user?.studentClass || "-",
-      status: att.status,
-      strikeCount: att.strikeCount,
-      score: att.score,
-      totalScore: att.totalScore,
-      startedAt: att.startedAt,
-      submittedAt: att.submittedAt,
-      updatedAt: att.updatedAt,
-      violations: att.violations,
-    }));
+    const totalQuestions = quiz.questions.length;
+
+    const formattedAttempts = attempts
+      .map((att) => {
+        let answeredCount = 0;
+        if (att.answers) {
+          try {
+            const parsed = JSON.parse(att.answers);
+            answeredCount = Object.keys(parsed).length;
+          } catch (e) {}
+        }
+        if (answeredCount === 0 && att.detailedAnswers.length > 0) {
+          answeredCount = att.detailedAnswers.filter((a) => {
+            let hasOptions = false;
+            if (a.selectedOptionIds) {
+              try {
+                const parsed = JSON.parse(a.selectedOptionIds);
+                hasOptions = Array.isArray(parsed) && parsed.length > 0;
+              } catch (e) {}
+            }
+            const hasText = Boolean(a.textResponse && a.textResponse.trim());
+            return hasOptions || hasText;
+          }).length;
+        }
+
+        const progressPercentage = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
+        return {
+          id: att.id,
+          userId: att.userId,
+          userName: att.user?.name || "Peserta Tanpa Nama",
+          phoneNumber: att.user?.phoneNumber || "-",
+          studentClass: att.user?.studentClass || "-",
+          status: att.status,
+          strikeCount: att.strikeCount,
+          score: att.score,
+          totalScore: att.totalScore,
+          answeredCount,
+          totalQuestions,
+          progressPercentage,
+          startedAt: att.startedAt,
+          submittedAt: att.submittedAt,
+          updatedAt: att.updatedAt,
+          violations: att.violations,
+        };
+      })
+      .sort((a, b) => {
+        // Disqualified always at the bottom
+        if (a.status === "DISQUALIFIED" && b.status !== "DISQUALIFIED") return 1;
+        if (b.status === "DISQUALIFIED" && a.status !== "DISQUALIFIED") return -1;
+        // Higher score first
+        if (b.score !== a.score) return b.score - a.score;
+        // Higher answered count first
+        if (b.answeredCount !== a.answeredCount) return b.answeredCount - a.answeredCount;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
 
     // Stats breakdown
     const stats = {

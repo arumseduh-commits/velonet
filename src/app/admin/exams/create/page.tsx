@@ -25,7 +25,8 @@ import {
   Sparkles,
   FileSpreadsheet,
   X,
-  RefreshCw,
+  Calendar,
+  AlertTriangle,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -126,6 +127,8 @@ export default function CreateExamPage() {
   const [supervisorPin, setSupervisorPin] = useState("123456");
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleOptions, setShuffleOptions] = useState(true);
+  const [openAt, setOpenAt] = useState("");
+  const [closeAt, setCloseAt] = useState("");
   const [examToken, setExamToken] = useState("");
   const [showScoreImmediately, setShowScoreImmediately] = useState(true);
   const [scoreReleaseAt, setScoreReleaseAt] = useState("");
@@ -392,6 +395,8 @@ export default function CreateExamPage() {
         title: title.trim(),
         description: description.trim(),
         durationMinutes: Number(durationMinutes) || 30,
+        openAt: openAt ? new Date(openAt).toISOString() : null,
+        closeAt: closeAt ? new Date(closeAt).toISOString() : null,
         enableFullscreenLock,
         enableTabSwitchDetect,
         maxStrikes: Number(maxStrikes) || 3,
@@ -576,6 +581,46 @@ export default function CreateExamPage() {
               placeholder="Contoh: VELO1 (Diberikan guru di kelas saat jam ujian)"
               className="w-full uppercase px-4 py-2.5 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 font-mono font-bold tracking-wider"
             />
+          </div>
+        </div>
+
+        {/* Window of Availability (Jadwal Buka & Tutup) */}
+        <div className="pt-4 border-t border-slate-100 space-y-3">
+          <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-indigo-600" />
+            <span>Jadwal Rentang Waktu Ujian Dibuka (Window of Availability)</span>
+          </span>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <label className="text-xs font-bold text-slate-700 block">
+                Tanggal & Jam Mulai Dibuka:
+              </label>
+              <input
+                type="datetime-local"
+                value={openAt}
+                onChange={(e) => setOpenAt(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <p className="text-[10px] text-slate-500">
+                Kosongkan jika siswa dapat langsung mengakses ujian kapan saja.
+              </p>
+            </div>
+
+            <div className="space-y-1.5 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <label className="text-xs font-bold text-slate-700 block">
+                Tanggal & Jam Ditutup (Selesai):
+              </label>
+              <input
+                type="datetime-local"
+                value={closeAt}
+                onChange={(e) => setCloseAt(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <p className="text-[10px] text-slate-500">
+                Kosongkan jika ujian tidak memiliki batas akhir tanggal pengerjaan.
+              </p>
+            </div>
           </div>
         </div>
 
