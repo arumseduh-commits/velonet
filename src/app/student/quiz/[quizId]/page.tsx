@@ -212,7 +212,7 @@ export default function QuizTakingPage() {
   );
 
   // 3. Exam Security Hook (Fullscreen & Tab Switch & Key Lock)
-  const { isFullscreen, enterFullscreen } = useExamSecurity({
+  const { isFullscreen, isIOS, isAndroid, enterFullscreen } = useExamSecurity({
     enabled: hasStarted && !isLocked && !isCompleted,
     enableFullscreenLock: quiz?.enableFullscreenLock ?? true,
     enableTabSwitchDetect: quiz?.enableTabSwitchDetect ?? true,
@@ -602,6 +602,22 @@ export default function QuizTakingPage() {
           >
             Edit Soal Ini ↗
           </Link>
+        </div>
+      )}
+
+      {/* FULLSCREEN ENFORCEMENT BANNER (DESKTOP/LAPTOP) */}
+      {hasStarted && !isFullscreen && !isIOS && !isPreview && (quiz?.enableFullscreenLock ?? true) && (
+        <div className="bg-rose-600 text-white px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-3 shadow-lg z-35 animate-pulse">
+          <div className="flex items-center gap-2">
+            <Maximize className="w-4 h-4 shrink-0" />
+            <span>Mode Layar Penuh Wajib: Anda terdeteksi keluar dari layar penuh / membagi layar (Split Screen). Klik tombol untuk kembali ke Layar Penuh.</span>
+          </div>
+          <button
+            onClick={() => enterFullscreen()}
+            className="px-3.5 py-1.5 rounded-xl bg-white text-rose-700 font-extrabold text-xs shrink-0 cursor-pointer hover:bg-rose-50 shadow-md transition-all active:scale-95"
+          >
+            Aktifkan Layar Penuh
+          </button>
         </div>
       )}
 
