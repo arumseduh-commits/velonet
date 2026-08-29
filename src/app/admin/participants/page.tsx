@@ -215,6 +215,51 @@ export default function ParticipantsPage() {
     }
   };
 
+  const handleBulkSendFaceReminder = async () => {
+    if (selectedIds.length === 0) return;
+    const confirmed = await confirm({
+      title: "Kirim Pengingat Face ID Massal",
+      message: `Kirim pesan template pengingat pendaftaran Face ID via WhatsApp ke ${selectedIds.length} siswa terpilih? Bot akan mengirim konfirmasi awal 2-langkah secara otomatis.`,
+      confirmText: `Ya, Kirim ke ${selectedIds.length} Siswa`,
+      cancelText: "Batal",
+      variant: "info",
+      icon: "send",
+    });
+
+    if (!confirmed) return;
+
+    setBulkActionLoading(true);
+    let successCount = 0;
+    try {
+      for (const id of selectedIds) {
+        const p = participants.find((item) => item.id === id);
+        if (!p) continue;
+        const msg = `Halo Kak ${p.name || "Peserta"}! 👋\n\nKami melihat kamu masih belum melengkapi pendaftaran wajah (Face ID) untuk keperluan absensi & verifikasi ujian di VeloNet.\n\n❓ Jawab *Y* untuk detail lebih lanjut dan menerima link pendaftaran wajah kamu.`;
+        try {
+          const res = await fetch("/api/bot/send-single", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phoneNumber: p.phoneNumber,
+              message: msg,
+              templateType: "FACE_REMINDER",
+              userId: p.id,
+            }),
+          });
+          const json = await res.json();
+          if (json.success) successCount++;
+        } catch (e) {}
+      }
+      toast.success(`Pengingat Face ID berhasil dikirim ke ${successCount} siswa.`);
+      setSelectedIds([]);
+      fetchParticipants();
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengirim pengingat massal.");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   const handleAddParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -419,6 +464,15 @@ export default function ParticipantsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleBulkSendFaceReminder}
+              disabled={bulkActionLoading}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Pengingat Face ID ({selectedIds.length})</span>
+            </button>
+
             <button
               onClick={handleBulkExclude}
               disabled={bulkActionLoading}

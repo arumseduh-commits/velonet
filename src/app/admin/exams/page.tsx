@@ -18,11 +18,13 @@ import {
   Maximize,
   CheckCircle2,
   Sparkles,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
 export default function AdminExamsListPage() {
-  const { toast } = useDialog();
+  const { confirm, toast } = useDialog();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,6 +41,32 @@ export default function AdminExamsListPage() {
       toast.error("Gagal memuat daftar ujian.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteExam = async (id: string, examTitle: string) => {
+    const confirmed = await confirm({
+      title: "Hapus Modul Ujian",
+      message: `Apakah Anda yakin ingin menghapus modul ujian "${examTitle}"? Seluruh butir soal dan data pengerjaan siswa akan terhapus.`,
+      confirmText: "Ya, Hapus Ujian",
+      cancelText: "Batal",
+      variant: "danger",
+      icon: "trash",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/exams/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Modul ujian berhasil dihapus.");
+        fetchExams();
+      } else {
+        toast.error(json.error || "Gagal menghapus modul ujian.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menghapus modul ujian.");
     }
   };
 
@@ -71,6 +99,14 @@ export default function AdminExamsListPage() {
         </div>
 
         <div className="relative z-10 flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/exams/create"
+            className="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Buat Ujian Baru</span>
+          </Link>
+
           <Link
             href="/admin/ai-assistant"
             className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md shadow-amber-500/25 transition-all flex items-center gap-2"
@@ -259,6 +295,14 @@ export default function AdminExamsListPage() {
                   </Link>
 
                   <Link
+                    href={`/admin/exams/${exam.id}/edit`}
+                    className="p-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors border border-indigo-200"
+                    title="Edit Ujian & Kelola Soal"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Link>
+
+                  <Link
                     href={`/student/quiz/${exam.id}`}
                     target="_blank"
                     className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors border border-slate-200"
@@ -266,6 +310,15 @@ export default function AdminExamsListPage() {
                   >
                     <ExternalLink className="w-4 h-4" />
                   </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteExam(exam.id, exam.title)}
+                    className="p-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors border border-rose-200 cursor-pointer"
+                    title="Hapus Modul Ujian"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             );

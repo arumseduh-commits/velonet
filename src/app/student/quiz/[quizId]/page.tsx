@@ -589,6 +589,17 @@ export default function QuizTakingPage() {
                 {currentQuestion.text}
               </div>
 
+              {/* Question Image Attachment (if any) */}
+              {currentQuestion.imageUrl && (
+                <div className="my-4 max-w-lg rounded-2xl overflow-hidden border border-slate-700 bg-slate-900/60 p-2 shadow-inner">
+                  <img
+                    src={currentQuestion.imageUrl}
+                    alt={`Gambar Soal #${currentIndex + 1}`}
+                    className="w-full max-h-72 object-contain rounded-xl mx-auto"
+                  />
+                </div>
+              )}
+
               {/* DYNAMIC QUESTION INPUT BASED ON TYPE */}
               <div className="mt-6">
                 {/* 1. SINGLE CHOICE */}

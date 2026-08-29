@@ -92,6 +92,7 @@ export default function ParticipantDetailPage({
 
   // Direct WA Message Modal State
   const [showDirectMsgModal, setShowDirectMsgModal] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("NAME_CONFIRMATION");
   const [directMsgText, setDirectMsgText] = useState("");
   const [sendingDirectMsg, setSendingDirectMsg] = useState(false);
 
@@ -201,6 +202,55 @@ export default function ParticipantDetailPage({
     return () => clearInterval(interval);
   }, [resolvedParams.slug]);
 
+  const getTemplateText = (templateKey: string, p: Participant | null) => {
+    const studentName = p?.name || "Peserta";
+    if (templateKey === "NAME_CONFIRMATION") {
+      return `Halo Kak ${studentName}! 👋
+
+Apakah ini merupakan nama lengkap Anda:
+👉 *${studentName}*
+
+Kami butuh nama lengkap Anda untuk pendataan dan keperluan nilai.
+
+Silakan balas pesan ini:
+👉 Ketik *YA* (jika sudah merupakan nama lengkap yang benar)
+👉 Ketik *TIDAK* (jika ingin memperbaiki nama lengkap Anda langsung via WhatsApp)`;
+    }
+
+    if (templateKey === "FACE_REMINDER") {
+      return `Halo Kak ${studentName}! 👋
+
+Kami melihat kamu masih belum melengkapi pendaftaran wajah (Face ID) untuk keperluan absensi & verifikasi ujian di VeloNet.
+
+❓ Jawab *Y* untuk detail lebih lanjut dan menerima link pendaftaran wajah kamu.`;
+    }
+
+    if (templateKey === "PORTAL_LINK") {
+      return `Halo Kak ${studentName}! 👋
+
+Berikut adalah akses Portal Siswa VeloNet Anda.
+Silakan klik link di bawah ini untuk membuka halaman profil dan materi belajar:
+🌐 https://velonet.onrender.com/student/login
+
+_Atau balas *LOGIN* pada chat ini untuk menerima link direct login 1-klik._ 🙏`;
+    }
+
+    return "";
+  };
+
+  const handleOpenDirectMsgModal = (defaultTemplate = "NAME_CONFIRMATION") => {
+    setSelectedTemplate(defaultTemplate);
+    setDirectMsgText(getTemplateText(defaultTemplate, participant));
+    setShowDirectMsgModal(true);
+  };
+
+  const handleSelectTemplate = (templateKey: string) => {
+    setSelectedTemplate(templateKey);
+    if (templateKey !== "CUSTOM") {
+      setDirectMsgText(getTemplateText(templateKey, participant));
+    }
+  };
+
   const handleSendDirectMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!participant || !directMsgText.trim()) return;
@@ -213,6 +263,8 @@ export default function ParticipantDetailPage({
         body: JSON.stringify({
           phoneNumber: participant.phoneNumber,
           message: directMsgText,
+          templateType: selectedTemplate,
+          userId: participant.id,
         }),
       });
 
@@ -416,7 +468,7 @@ export default function ParticipantDetailPage({
             </button>
 
             <button
-              onClick={() => setShowDirectMsgModal(true)}
+              onClick={() => handleOpenDirectMsgModal("NAME_CONFIRMATION")}
               className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
@@ -743,17 +795,17 @@ export default function ParticipantDetailPage({
         </div>
       </div>
 
-      {/* Modal: Direct WA Message */}
+      {/* Modal: Direct WA Message with Templates */}
       {showDirectMsgModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col space-y-4 p-5">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col space-y-4 p-6">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
-                  <MessageSquare className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200 shadow-xs">
+                  <MessageSquare className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm">Kirim Pesan WA Personal</h3>
+                  <h3 className="font-bold text-slate-900 text-sm">Kirim Pesan WhatsApp Personal</h3>
                   <p className="text-xs text-slate-500">
                     Ke: <strong className="text-blue-600">{participant.name || "Peserta"} (+{participant.phoneNumber})</strong>
                   </p>
@@ -763,23 +815,126 @@ export default function ParticipantDetailPage({
               <button
                 type="button"
                 onClick={() => setShowDirectMsgModal(false)}
-                className="text-slate-400 hover:text-slate-700 text-xl font-bold px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-xl font-bold px-2 py-0.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 &times;
               </button>
             </div>
 
             <form onSubmit={handleSendDirectMessage} className="space-y-4">
+              {/* Template Selector */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Pilih Template Pesan:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTemplate("NAME_CONFIRMATION")}
+                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
+                      selectedTemplate === "NAME_CONFIRMATION"
+                        ? "bg-blue-50 border-blue-400 text-blue-800 ring-2 ring-blue-500/20"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      <span>1. Konfirmasi Nama</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-normal">
+                      Interaktif YA / TIDAK (isi ulang via WA)
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTemplate("FACE_REMINDER")}
+                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
+                      selectedTemplate === "FACE_REMINDER"
+                        ? "bg-emerald-50 border-emerald-400 text-emerald-800 ring-2 ring-emerald-500/20"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>2. Pengingat Face ID</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-normal">
+                      2-Langkah: Balas Y &rarr; Kirim link
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTemplate("PORTAL_LINK")}
+                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
+                      selectedTemplate === "PORTAL_LINK"
+                        ? "bg-indigo-50 border-indigo-400 text-indigo-800 ring-2 ring-indigo-500/20"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>3. Link Portal Siswa</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-normal">
+                      Link akses langsung portal
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTemplate("CUSTOM")}
+                    className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
+                      selectedTemplate === "CUSTOM"
+                        ? "bg-amber-50 border-amber-400 text-amber-800 ring-2 ring-amber-500/20"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
+                      <span>4. Pesan Bebas / Kustom</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-normal">
+                      Tulis pesan mandiri
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Bot Handling Note */}
+              {selectedTemplate === "NAME_CONFIRMATION" && (
+                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900 leading-relaxed space-y-1">
+                  <p className="font-bold flex items-center gap-1 text-blue-700">
+                    <Sparkles className="w-3.5 h-3.5" /> Bot WhatsApp Otomatis:
+                  </p>
+                  <p>
+                    Jika siswa membalas <strong>YA</strong>, sistem mencatat konfirmasi. Jika membalas <strong>TIDAK</strong>, bot langsung meminta nama baru dan menyimpannya otomatis ke database!
+                  </p>
+                </div>
+              )}
+
+              {selectedTemplate === "FACE_REMINDER" && (
+                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-[11px] text-emerald-900 leading-relaxed space-y-1">
+                  <p className="font-bold flex items-center gap-1 text-emerald-700">
+                    <Camera className="w-3.5 h-3.5" /> Alur 2-Langkah Otomatis:
+                  </p>
+                  <p>
+                    Bot akan menanyakan konfirmasi pendaftaran wajah. Saat siswa membalas <strong>Y</strong>, bot secara otomatis membuat Magic Link 1-Klik dan mengirimkannya langsung ke siswa.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Isi Pesan WhatsApp Personal:
+                  Isi Pesan WhatsApp:
                 </label>
                 <textarea
-                  rows={4}
-                  placeholder="Ketik pesan yang ingin dikirimkan ke siswa ini via WhatsApp..."
+                  rows={5}
+                  placeholder="Ketik isi pesan WhatsApp..."
                   value={directMsgText}
                   onChange={(e) => setDirectMsgText(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors"
+                  className="w-full p-3.5 rounded-2xl bg-white border border-slate-300 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-colors font-mono leading-relaxed"
                 />
               </div>
 
@@ -787,22 +942,22 @@ export default function ParticipantDetailPage({
                 <button
                   type="button"
                   onClick={() => setShowDirectMsgModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer border border-slate-200"
+                  className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer border border-slate-200"
                 >
                   Batal
                 </button>
 
                 <button
                   type="submit"
-                  disabled={sendingDirectMsg}
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                  disabled={sendingDirectMsg || !directMsgText.trim()}
+                  className="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
                   {sendingDirectMsg ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  <span>Kirim Pesan WA</span>
+                  <span>Kirim Pesan WhatsApp</span>
                 </button>
               </div>
             </form>

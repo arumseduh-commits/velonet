@@ -60,9 +60,15 @@ export async function GET(req: Request) {
       }).catch(() => {});
     }
 
-    const destination = isCompleted
+    const redirectParam = url.searchParams.get("redirect");
+
+    let destination = isCompleted
       ? `${origin}/student`
       : `${origin}/student/complete-profile`;
+
+    if (redirectParam && redirectParam.startsWith("/")) {
+      destination = `${origin}${redirectParam}`;
+    }
 
     const response = NextResponse.redirect(destination);
     response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {

@@ -57,6 +57,7 @@ export async function GET(
       id: q.id,
       type: q.type,
       text: q.text,
+      imageUrl: q.imageUrl || null,
       points: q.points,
       options: q.options,
     }));

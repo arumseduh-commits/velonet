@@ -323,6 +323,7 @@ model Question {
   quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
   type          QuestionType @default(SINGLE_CHOICE)
   text          String
+  imageUrl      String?      // URL atau path gambar ilustrasi soal
   points        Int          @default(10)
   order         Int          @default(0)
   

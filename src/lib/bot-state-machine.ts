@@ -272,6 +272,197 @@ export async function processIncomingMessage(
     console.error("Error processing pending leave choice:", e);
   }
 
+  // 1. Check if participant is in WAITING_NAME_INPUT (typing new name)
+  try {
+    const waitingNameSetting = await prisma.systemSetting.findUnique({
+      where: { key: `waiting_name_input:${participant.id}` },
+    });
+
+    if (waitingNameSetting) {
+      // If setting is less than 24 hours old
+      const settingData = JSON.parse(waitingNameSetting.value);
+      if (settingData && Date.now() - settingData.timestamp < 86400000) {
+        // Sanitize name: words title case, remove unwanted characters
+        const cleanedName = text
+          .replace(/[^\w\s.,'-]/gi, "")
+          .trim()
+          .split(/\s+/)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(" ");
+
+        if (cleanedName.length >= 2) {
+          await prisma.systemSetting.delete({
+            where: { key: `waiting_name_input:${participant.id}` },
+          });
+
+          await prisma.user.update({
+            where: { id: participant.id },
+            data: { name: cleanedName },
+          });
+
+          return {
+            newStatus: participant.status as RegistrationStatusType,
+            replyMessage: `✅ *NAMA LENGKAP BERHASIL DIPERBARUI*\n\nTerima kasih Kak! Nama lengkap Anda telah diperbarui menjadi:\n👉 *${cleanedName}*\n\nData Anda telah tersimpan di sistem VeloNet. 🙏✨`,
+          };
+        }
+      } else {
+        await prisma.systemSetting.delete({
+          where: { key: `waiting_name_input:${participant.id}` },
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error processing waiting name input:", e);
+  }
+
+  // 2. Check if participant has PENDING_NAME_CONFIRMATION
+  try {
+    const nameConfirmSetting = await prisma.systemSetting.findUnique({
+      where: { key: `name_confirm_pending:${participant.id}` },
+    });
+
+    if (nameConfirmSetting) {
+      const settingData = JSON.parse(nameConfirmSetting.value);
+      if (settingData && Date.now() - settingData.timestamp < 86400000) {
+        const isYes =
+          lowerText === "ya" ||
+          lowerText === "y" ||
+          lowerText === "benar" ||
+          lowerText === "betul" ||
+          lowerText === "sudah" ||
+          lowerText === "sudah benar" ||
+          lowerText === "ok" ||
+          lowerText === "iya";
+
+        const isNo =
+          lowerText === "tidak" ||
+          lowerText === "t" ||
+          lowerText === "salah" ||
+          lowerText === "bukan" ||
+          lowerText === "ubah" ||
+          lowerText === "ganti" ||
+          lowerText === "bukan nama saya";
+
+        if (isYes) {
+          await prisma.systemSetting.delete({
+            where: { key: `name_confirm_pending:${participant.id}` },
+          });
+
+          return {
+            newStatus: participant.status as RegistrationStatusType,
+            replyMessage: `✅ *KONFIRMASI NAMA DITERIMA*\n\nTerima kasih Kak *${
+              participant.name || "Peserta"
+            }*! Data nama lengkap Anda telah terkonfirmasi sesuai di sistem VeloNet. 🙏✨`,
+          };
+        } else if (isNo) {
+          await prisma.systemSetting.delete({
+            where: { key: `name_confirm_pending:${participant.id}` },
+          });
+
+          await prisma.systemSetting.create({
+            data: {
+              key: `waiting_name_input:${participant.id}`,
+              value: JSON.stringify({
+                timestamp: Date.now(),
+                previousName: participant.name,
+              }),
+            },
+          });
+
+          return {
+            newStatus: participant.status as RegistrationStatusType,
+            replyMessage: `📝 *PERBAIKAN NAMA LENGKAP*\n\nBaik Kak, silakan ketik *Nama Lengkap yang Benar* langsung sebagai balasan pesan ini:`,
+          };
+        }
+      } else {
+        await prisma.systemSetting.delete({
+          where: { key: `name_confirm_pending:${participant.id}` },
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error processing pending name confirmation:", e);
+  }
+
+  // 3. Check if participant has PENDING_FACE_REMINDER
+  try {
+    const faceReminderSetting = await prisma.systemSetting.findUnique({
+      where: { key: `face_reminder_pending:${participant.id}` },
+    });
+
+    if (faceReminderSetting) {
+      const settingData = JSON.parse(faceReminderSetting.value);
+      if (settingData && Date.now() - settingData.timestamp < 86400000) {
+        const isAcceptFace =
+          lowerText === "y" ||
+          lowerText === "ya" ||
+          lowerText === "iya" ||
+          lowerText === "mau" ||
+          lowerText === "daftar" ||
+          lowerText === "link" ||
+          lowerText === "info" ||
+          lowerText === "rekam";
+
+        if (isAcceptFace) {
+          await prisma.systemSetting.delete({
+            where: { key: `face_reminder_pending:${participant.id}` },
+          });
+
+          const magicToken = crypto.randomBytes(32).toString("hex");
+          const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+          const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+
+          await prisma.otpVerification.updateMany({
+            where: { userId: participant.id, isUsed: false },
+            data: { isUsed: true },
+          });
+
+          await prisma.otpVerification.create({
+            data: {
+              userId: participant.id,
+              phoneNumber: participant.phoneNumber,
+              otpCode,
+              magicToken,
+              expiresAt,
+            },
+          });
+
+          let baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "";
+          if (!baseUrl) {
+            try {
+              const setting = await prisma.systemSetting.findUnique({
+                where: { key: "app_base_url" },
+              });
+              if (setting && setting.value && !setting.value.includes("localhost")) {
+                baseUrl = setting.value;
+              }
+            } catch (e) {}
+          }
+          if (!baseUrl || baseUrl.includes("localhost")) {
+            const renderHost = process.env.RENDER_EXTERNAL_HOSTNAME;
+            baseUrl = renderHost ? `https://${renderHost}` : "https://velonet.onrender.com";
+          }
+          baseUrl = baseUrl.replace(/\/$/, "");
+
+          const directFaceUrl = `${baseUrl}/api/student/auth/verify-magic?token=${magicToken}&redirect=/student/face-register`;
+
+          return {
+            newStatus: participant.status as RegistrationStatusType,
+            replyMessage: `📸 *LINK PENDAFTARAN WAJAH (FACE ID) VELONET*\n\nHalo Kak *${
+              participant.name || "Peserta"
+            }*!\n\nSilakan klik link di bawah ini untuk membuka kamera dan merekam data biometrik wajah Anda secara mandiri:\n\n🔗 ${directFaceUrl}\n\n_📌 Pastikan pencahayaan terang dan wajah terlihat jelas tanpa masker. Link aktif selama 2 jam._ 🚀`,
+          };
+        }
+      } else {
+        await prisma.systemSetting.delete({
+          where: { key: `face_reminder_pending:${participant.id}` },
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error processing pending face reminder:", e);
+  }
+
   // Handle Registration Command (REG_...)
   const matchRegPayload = text.match(/REG_[a-zA-Z0-9_]+/i);
   if (matchRegPayload && matchRegPayload[0]) {

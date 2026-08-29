@@ -59,3 +59,85 @@ export async function GET() {
     return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+export async function POST(req: Request) {
+  try {
+    const admin = await getLoggedInAdmin();
+    if (!admin) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const {
+      title,
+      description,
+      durationMinutes = 30,
+      enableFullscreenLock = true,
+      enableTabSwitchDetect = true,
+      maxStrikes = 3,
+      enableCameraProctor = true,
+      supervisorPin = "123456",
+      shuffleQuestions = true,
+      shuffleOptions = true,
+      questions = [],
+    } = body;
+
+    if (!title || !title.trim()) {
+      return NextResponse.json({ success: false, error: "Judul ujian wajib diisi." }, { status: 400 });
+    }
+
+    // Create Quiz in Database
+    const newQuiz = await prisma.quiz.create({
+      data: {
+        title: title.trim(),
+        description: description?.trim() || null,
+        durationMinutes: Number(durationMinutes) || 30,
+        enableFullscreenLock: Boolean(enableFullscreenLock),
+        enableTabSwitchDetect: Boolean(enableTabSwitchDetect),
+        maxStrikes: Number(maxStrikes) || 3,
+        enableCameraProctor: Boolean(enableCameraProctor),
+        supervisorPin: supervisorPin?.trim() || "123456",
+        shuffleQuestions: Boolean(shuffleQuestions),
+        shuffleOptions: Boolean(shuffleOptions),
+        questions: {
+          create: questions.map((q: any, idx: number) => ({
+            type: q.type || "SINGLE_CHOICE",
+            text: q.text || `Soal #${idx + 1}`,
+            imageUrl: q.imageUrl || null,
+            points: Number(q.points) || 10,
+            order: q.order !== undefined ? q.order : idx,
+            sampleAnswer: q.sampleAnswer || null,
+            gradingRubric: q.gradingRubric || null,
+            caseSensitive: Boolean(q.caseSensitive),
+            options: {
+              create: (q.options || []).map((opt: any) => ({
+                text: opt.text || "",
+                isCorrect: Boolean(opt.isCorrect),
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        questions: {
+          include: {
+            options: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Modul ujian berhasil dibuat.",
+      data: newQuiz,
+    });
+  } catch (err: any) {
+    console.error("[Admin Exams API POST]", err);
+    return NextResponse.json(
+      { success: false, error: err.message || "Gagal membuat modul ujian." },
+      { status: 500 }
+    );
+  }
+}
+
