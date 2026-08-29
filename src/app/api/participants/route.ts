@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     const newParticipant = await prisma.user.create({
       data: {
         phoneNumber: cleanNumber,
-        name: name || null,
+        name: name ? name.trim().toUpperCase() : null,
         studentClass: studentClass || null,
         isExcluded: Boolean(isExcluded),
       },
@@ -138,6 +138,10 @@ export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
     const { id, ids, ...data } = body;
+
+    if (data.name && typeof data.name === "string") {
+      data.name = data.name.trim().toUpperCase();
+    }
 
     // Bulk update support
     if (Array.isArray(ids) && ids.length > 0) {

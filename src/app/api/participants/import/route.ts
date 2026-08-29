@@ -71,12 +71,14 @@ export async function POST(req: NextRequest) {
         where: { phoneNumber: cleanNum },
       });
 
+      const uppercaseName = item.name ? item.name.trim().toUpperCase() : null;
+
       if (existing) {
         // Don't overwrite if already completed
         const updated = await prisma.user.update({
           where: { id: existing.id },
           data: {
-            name: existing.name || item.name || null,
+            name: existing.name || uppercaseName || null,
           },
         });
         importedResults.push(updated);
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
         const created = await prisma.user.create({
           data: {
             phoneNumber: cleanNum,
-            name: item.name || null,
+            name: uppercaseName || null,
             status: "NOT_STARTED",
           },
         });

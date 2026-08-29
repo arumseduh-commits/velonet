@@ -282,13 +282,12 @@ export async function processIncomingMessage(
       // If setting is less than 24 hours old
       const settingData = JSON.parse(waitingNameSetting.value);
       if (settingData && Date.now() - settingData.timestamp < 86400000) {
-        // Sanitize name: words title case, remove unwanted characters
+        // Sanitize name: convert to uppercase (capslock), remove unwanted characters
         const cleanedName = text
           .replace(/[^\w\s.,'-]/gi, "")
           .trim()
-          .split(/\s+/)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-          .join(" ");
+          .replace(/\s+/g, " ")
+          .toUpperCase();
 
         if (cleanedName.length >= 2) {
           await prisma.systemSetting.delete({

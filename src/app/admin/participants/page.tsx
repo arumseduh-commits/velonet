@@ -270,7 +270,7 @@ export default function ParticipantsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phoneNumber: newPhone,
-          name: newName,
+          name: newName ? newName.trim().toUpperCase() : "",
           studentClass: newClass,
           isExcluded: newExcluded,
         }),
@@ -689,10 +689,10 @@ export default function ParticipantsPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Ahmad Rizky"
+                  placeholder="Contoh: AHMAD RIZKY"
                   value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 placeholder-slate-400"
+                  onChange={(e) => setNewName(e.target.value.toUpperCase())}
+                  className="w-full uppercase bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 placeholder-slate-400 font-semibold"
                 />
               </div>
 
