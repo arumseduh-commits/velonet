@@ -31,4 +31,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # CBT Anti-Cheat & Proctoring Standard (ATURAN CBT EXAMBRO & MOBILE PROCTORING)
 - **MOBILE PRIORITY**: Anti-kecurangan CBT difokuskan pada event `visibilitychange`, `pagehide`, dan `fullscreenchange`. Fitur webcam proctoring harus selalu berstatus **non-aktif secara default** (`@default(false)`) untuk mencegah gangguan floating video dan deteksi wajah palsu di smartphone.
 
+# Database Indexing & Query Optimization Standard (ATURAN MUTLAK PERFORMA QUERY & INDEXING VELONET)
+- **MANDATORY INDEXING**: Setiap kolom relasi foreign key dan kolom yang sering digunakan untuk filter atau pengurutan data (`status`, `role`, `updatedAt`, `quizId`, `sessionId`, `courseId`, `userId`, dll.) pada `prisma/schema.prisma` WAJIB memiliki definisi `@@index` atau indeks komposit.
+- **PAYLOAD DIET**: Pada endpoint daftar data (tabel/list), DILARANG memuat kolom blob/base64 berukuran besar (seperti `facePhoto` atau konten berkas) secara default. Selalu gunakan `select` pada Prisma Client untuk hanya mengirimkan field metadata yang dibutuhkan antarmuka pengguna.
+- **BATCHING & ATOMIC TRANSACTIONS**: Dilarang menjalankan query database satu per satu di dalam perulangan sequential (*N+1 problem*). Gunakan operator `in` pada `findMany` atau jalankan `Promise.all` di dalam `prisma.$transaction` untuk operasi multi-baris.
+- **NON-BLOCKING GET REQUESTS**: Handler HTTP GET yang di-polling secara berkala tidak boleh menjalankan operasi blocking I/O jaringan eksternal (seperti resolusi socket Baileys) atau database mutating writes di dalam critical request path.
+
 
