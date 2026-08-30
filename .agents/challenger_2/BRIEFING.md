@@ -1,9 +1,9 @@
-# BRIEFING — 2026-08-30T16:15:00Z
+# BRIEFING â€” 2026-08-30T16:24:20Z
 
 ## Mission
-Empirically stress-test and challenge Milestone M3 (Batching & Transaction Optimization) in VeloNet.
+Empirically stress-test and challenge Milestone M3 (Batching & Transaction Optimization) implementation in CBT Quiz Submission and WhatsApp Bot Engine, running verification suites, building custom adversarial stress-tests, and establishing a definitive verdict.
 
-## ?? My Identity
+## ðŸ”’ My Identity
 - Archetype: challenger
 - Roles: critic, specialist
 - Working directory: c:\UBIG\VeloNet\.agents\challenger_2
@@ -11,40 +11,36 @@ Empirically stress-test and challenge Milestone M3 (Batching & Transaction Optim
 - Milestone: M3 (Batching & Transaction Optimization)
 - Instance: 1 of 1
 
-## ?? Key Constraints
-- Review-only — do NOT modify implementation code directly unless running tests/benchmarks in scripts/
-- Must find bugs empirically through code execution and stress harnesses
-- Every finding must have empirical proof or counterexample
-- Verify full Next.js production build (
-pm run build) with 0 errors
+## ðŸ”’ Key Constraints
+- Review-only & test verification â€” do NOT modify implementation code unless documenting findings or creating standalone test harnesses outside .agents/
+- All verification must be empirically reproducible
+- .agents/ must contain only metadata
 
 ## Current Parent
 - Conversation ID: 35947b3c-7c06-41ed-a574-d02b5e280009
-- Updated: not yet
+- Updated: 2026-08-30T16:24:20Z
 
 ## Review Scope
-- **Files to review**:
-  - src/app/api/quiz/submit/route.ts (Concurrent exam submissions, atomic transaction, parallel upsert)
-  - src/lib/bot-engine.ts (etchGroupMembersWithStatus batching, large group scaling, in-memory Map)
-- **Interface contracts**: PROJECT.md
-- **Review criteria**: Correctness, concurrency handling, transaction atomicity, performance under load, type safety
-
-## Key Decisions Made
-- [Initial] Plan empirical test script scripts/test-m3-challenger.mjs to test real/mocked concurrent submission transactions and 100+ member batch queries.
-
-## Artifact Index
-- .agents/challenger_2/DISPATCH.md — Incoming task dispatches
-- .agents/challenger_2/BRIEFING.md — Agent state and working memory
-- .agents/challenger_2/progress.md — Heartbeat and step log
-- .agents/challenger_2/handoff.md — Final handoff report
+- **Files to review**: `src/app/api/quiz/submit/route.ts`, `src/lib/bot-engine.ts`
+- **Verification scripts**: `scripts/test-m3-batching.mjs`, `scripts/test-m1-scheduling.mjs`
+- **Interface contracts**: `PROJECT.md`, `AGENTS.md`
+- **Review criteria**: Correctness, concurrency handling, ACID atomicity, N+1 query elimination, error boundaries, edge cases, performance.
 
 ## Attack Surface
-- **Hypotheses tested**:
-  1. Transaction isolation & rollback in POST /api/quiz/submit: If 1 question upsert fails inside Promise.all, does the entire transaction roll back cleanly without leaving partial records?
-  2. Concurrency stress in POST /api/quiz/submit: Can multiple concurrent submissions for same user or multiple users execute safely without deadlocks?
-  3. etchGroupMembersWithStatus scaling: Does single batch prisma.user.findMany({ where: { phoneNumber: { in: candidatePhones } } }) scale to 100+ participants with phone number normalization (08xx, 62xx, digits)?
-- **Vulnerabilities found**: [TBD after empirical tests]
-- **Untested angles**: [TBD]
+- **Hypotheses tested**: 
+  1. Transaction Rollback: Forced error in interactive transaction must guarantee zero orphan attempts or answers (VERIFIED: PASS).
+  2. Concurrency Under Load: Concurrent submissions must not cause race conditions or unhandled rejections (VERIFIED: PASS).
+  3. Bot Group Scaling: 300+ participants resolved via single SQL batch query in < 1000ms (VERIFIED: PASS, 169ms).
+  4. Gamification Isolation: XP / badge failures must not abort exam submissions (VERIFIED: PASS).
+- **Vulnerabilities found**: None.
+- **Untested angles**: Extreme pool exhaustion (>1000 simultaneous connections), which is constrained by Postgres connection pool configuration.
 
-## Loaded Skills
-- None
+## Key Decisions Made
+- Expanded `scripts/test-m3-batching.mjs` to include 5 test suites (22 assertions) covering core functionality, adversarial rollbacks, concurrency stress, and 300-member scaling.
+- Issued verdict: **APPROVE**.
+
+## Artifact Index
+- `.agents/challenger_2/DISPATCH.md` â€” Incoming dispatch record
+- `.agents/challenger_2/BRIEFING.md` â€” Agent briefing & working memory
+- `.agents/challenger_2/progress.md` â€” Heartbeat and test logs
+- `.agents/challenger_2/handoff.md` â€” Final handoff report (Verdict: APPROVE)

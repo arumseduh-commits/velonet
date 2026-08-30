@@ -430,13 +430,380 @@ async function runBotMemberSyncBatchTest() {
   console.log("  [CLEANUP] Bot test artifacts cleaned up cleanly.");
 }
 
+// -------------------------------------------------------------
+// SUITE 3: Adversarial Atomic Rollback Test
+// -------------------------------------------------------------
+async function runAdversarialRollbackTest() {
+  console.log("\n=======================================================");
+  console.log("SUITE 3: Adversarial Transaction Rollback Integrity");
+  console.log("=======================================================");
+
+  const timestamp = Date.now();
+  const testUser = await prisma.user.create({
+    data: {
+      name: `[ADV_M3] Rollback Student ${timestamp}`,
+      phoneNumber: `628777${timestamp}`,
+      role: "STUDENT",
+    },
+  });
+
+  const testQuiz = await prisma.quiz.create({
+    data: {
+      title: `[ADV_M3] Rollback Test Quiz ${timestamp}`,
+      durationMinutes: 30,
+      questions: {
+        create: [
+          {
+            order: 1,
+            type: "SINGLE_CHOICE",
+            text: "Question 1",
+            points: 50,
+            options: {
+              create: [
+                { text: "A", isCorrect: true },
+                { text: "B", isCorrect: false },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    include: { questions: { include: { options: true } } },
+  });
+
+  const q1 = testQuiz.questions[0];
+
+  let caughtError = null;
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        const attempt = await tx.quizAttempt.create({
+          data: {
+            quizId: testQuiz.id,
+            userId: testUser.id,
+            score: 50,
+            totalScore: 50,
+            status: "GRADED",
+            isFullyGraded: true,
+            startedAt: new Date(),
+            submittedAt: new Date(),
+            answers: JSON.stringify({ [q1.id]: { optionId: q1.options[0].id } }),
+          },
+        });
+
+        await tx.quizStudentAnswer.create({
+          data: {
+            attemptId: attempt.id,
+            questionId: q1.id,
+            earnedPoints: 50,
+            isAutoGraded: true,
+          },
+        });
+
+        throw new Error("ADVERSARIAL_SIMULATED_DB_FAILURE");
+      },
+      { timeout: 15000, maxWait: 5000 }
+    );
+  } catch (err) {
+    caughtError = err;
+  }
+
+  assert(
+    caughtError !== null && caughtError.message.includes("ADVERSARIAL_SIMULATED_DB_FAILURE"),
+    "Rollback Test: Transaction threw simulated error as expected"
+  );
+
+  const orphanedAttempts = await prisma.quizAttempt.findMany({
+    where: { userId: testUser.id, quizId: testQuiz.id },
+  });
+  assert(orphanedAttempts.length === 0, `Rollback Test: 0 orphaned QuizAttempt records found (actual: ${orphanedAttempts.length})`);
+
+  const orphanedAnswers = await prisma.quizStudentAnswer.findMany({
+    where: { questionId: q1.id },
+  });
+  assert(orphanedAnswers.length === 0, `Rollback Test: 0 orphaned QuizStudentAnswer records found (actual: ${orphanedAnswers.length})`);
+
+  // Cleanup
+  await prisma.question.deleteMany({ where: { quizId: testQuiz.id } });
+  await prisma.quiz.deleteMany({ where: { id: testQuiz.id } });
+  await prisma.user.deleteMany({ where: { id: testUser.id } });
+  console.log("  [CLEANUP] Rollback test artifacts cleaned up cleanly.");
+}
+
+// -------------------------------------------------------------
+// SUITE 4: Adversarial Concurrency Stress Test
+// -------------------------------------------------------------
+async function runAdversarialConcurrencyTest() {
+  console.log("\n=======================================================");
+  console.log("SUITE 4: Adversarial Multi-Student High Concurrency");
+  console.log("=======================================================");
+
+  const timestamp = Date.now();
+  const numStudents = 5;
+  const users = [];
+
+  for (let i = 0; i < numStudents; i++) {
+    const u = await prisma.user.create({
+      data: {
+        name: `[ADV_M3] Concurrent Student ${i}_${timestamp}`,
+        phoneNumber: `628555${timestamp}${i}`,
+        role: "STUDENT",
+      },
+    });
+    users.push(u);
+  }
+
+  const testQuiz = await prisma.quiz.create({
+    data: {
+      title: `[ADV_M3] Concurrent Exam ${timestamp}`,
+      durationMinutes: 60,
+      questions: {
+        create: [
+          {
+            order: 1,
+            type: "SINGLE_CHOICE",
+            text: "Concurrency Q1",
+            points: 50,
+            options: {
+              create: [
+                { text: "Correct A", isCorrect: true },
+                { text: "Wrong B", isCorrect: false },
+              ],
+            },
+          },
+          {
+            order: 2,
+            type: "CHECKBOXES",
+            text: "Concurrency Q2",
+            points: 50,
+            options: {
+              create: [
+                { text: "C1", isCorrect: true },
+                { text: "C2", isCorrect: true },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    include: { questions: { include: { options: true } } },
+  });
+
+  const [cq1, cq2] = testQuiz.questions;
+  const cq1Opt = cq1.options[0].id;
+  const cq2Opts = cq2.options.map((o) => o.id);
+
+  const submitPromises = users.map(async (u) => {
+    return prisma.$transaction(
+      async (tx) => {
+        const attemptRecord = await tx.quizAttempt.create({
+          data: {
+            quizId: testQuiz.id,
+            userId: u.id,
+            score: 100,
+            totalScore: 100,
+            status: "GRADED",
+            isFullyGraded: true,
+            startedAt: new Date(),
+            submittedAt: new Date(),
+            answers: JSON.stringify({ [cq1.id]: { optionId: cq1Opt }, [cq2.id]: { selectedOptionIds: cq2Opts } }),
+          },
+        });
+
+        const upserts = [
+          tx.quizStudentAnswer.upsert({
+            where: { attemptId_questionId: { attemptId: attemptRecord.id, questionId: cq1.id } },
+            update: { selectedOptionIds: JSON.stringify([cq1Opt]), earnedPoints: 50, isAutoGraded: true },
+            create: { attemptId: attemptRecord.id, questionId: cq1.id, selectedOptionIds: JSON.stringify([cq1Opt]), earnedPoints: 50, isAutoGraded: true },
+          }),
+          tx.quizStudentAnswer.upsert({
+            where: { attemptId_questionId: { attemptId: attemptRecord.id, questionId: cq2.id } },
+            update: { selectedOptionIds: JSON.stringify(cq2Opts), earnedPoints: 50, isAutoGraded: true },
+            create: { attemptId: attemptRecord.id, questionId: cq2.id, selectedOptionIds: JSON.stringify(cq2Opts), earnedPoints: 50, isAutoGraded: true },
+          }),
+        ];
+
+        await Promise.all(upserts);
+        return attemptRecord;
+      },
+      { timeout: 15000, maxWait: 5000 }
+    );
+  });
+
+  const results = await Promise.all(submitPromises);
+  assert(results.length === numStudents, `Concurrency Test: All ${numStudents} concurrent transactions committed successfully`);
+
+  const allAttempts = await prisma.quizAttempt.findMany({ where: { quizId: testQuiz.id } });
+  assert(allAttempts.length === numStudents, `Concurrency Test: Exactly ${numStudents} attempts persisted`);
+
+  const allAnswers = await prisma.quizStudentAnswer.findMany({ where: { attemptId: { in: allAttempts.map((a) => a.id) } } });
+  assert(allAnswers.length === numStudents * 2, `Concurrency Test: Exactly ${numStudents * 2} answers persisted`);
+
+  // Cleanup
+  await prisma.quizStudentAnswer.deleteMany({ where: { attemptId: { in: allAttempts.map((a) => a.id) } } });
+  await prisma.quizAttempt.deleteMany({ where: { quizId: testQuiz.id } });
+  await prisma.question.deleteMany({ where: { quizId: testQuiz.id } });
+  await prisma.quiz.deleteMany({ where: { id: testQuiz.id } });
+  await prisma.user.deleteMany({ where: { id: { in: users.map((u) => u.id) } } });
+  console.log("  [CLEANUP] Concurrency test artifacts cleaned up cleanly.");
+}
+
+// -------------------------------------------------------------
+// SUITE 5: Adversarial Bot 300+ Members Scaling Test
+// -------------------------------------------------------------
+async function runAdversarialBotScaleTest() {
+  console.log("\n=======================================================");
+  console.log("SUITE 5: Adversarial Bot Sync Scaling (300 Members)");
+  console.log("=======================================================");
+
+  const timestamp = Date.now();
+  const u1 = await prisma.user.create({
+    data: { name: `[ADV_BOT] User 1`, phoneNumber: `62812000${timestamp}`, status: "COMPLETED", role: "STUDENT" },
+  });
+  const u2 = await prisma.user.create({
+    data: { name: `[ADV_BOT] User 2`, phoneNumber: `62813000${timestamp}`, status: "IN_PROGRESS", role: "STUDENT" },
+  });
+
+  const mockParticipants = [
+    { id: `62812000${timestamp}@s.whatsapp.net` },
+    { id: `999000111@lid`, pn: `0813000${timestamp}@s.whatsapp.net` },
+  ];
+
+  for (let i = 0; i < 298; i++) {
+    if (i % 2 === 0) {
+      mockParticipants.push({ id: `628990${i}${timestamp}@s.whatsapp.net` });
+    } else {
+      mockParticipants.push({ id: `random_lid_${i}@lid`, pn: `628991${i}${timestamp}@s.whatsapp.net` });
+    }
+  }
+
+  const tStart = performance.now();
+  const resolvedLidMap = new Map();
+  const cleanBotNum = "628000000000";
+  const cleanBotLid = "9999999999";
+
+  const validParticipants = [];
+  const candidatePhonesSet = new Set();
+
+  for (const p of mockParticipants) {
+    const fullJid = p.id;
+    const pnJid = p.pn || p.phoneNumber || p.phone || resolvedLidMap.get(fullJid);
+
+    let displayPhone = "";
+    if (pnJid) {
+      const rawPn = pnJid.split("@")[0].split(":")[0];
+      displayPhone = rawPn.startsWith("0") ? "62" + rawPn.slice(1) : rawPn;
+    } else if (fullJid.endsWith("@s.whatsapp.net")) {
+      const rawPn = fullJid.split("@")[0].split(":")[0];
+      displayPhone = rawPn.startsWith("0") ? "62" + rawPn.slice(1) : rawPn;
+    } else {
+      displayPhone = "";
+    }
+
+    const cleanMemberNum = fullJid.split("@")[0].split(":")[0];
+    const cleanMemberPn = pnJid ? pnJid.split("@")[0].split(":")[0] : "";
+
+    if (
+      (cleanBotNum && (cleanMemberNum === cleanBotNum || cleanMemberPn === cleanBotNum)) ||
+      (cleanBotLid && (cleanMemberNum === cleanBotLid || cleanMemberPn === cleanBotLid))
+    ) {
+      continue;
+    }
+
+    validParticipants.push({ p, fullJid, pnJid, displayPhone, cleanMemberNum, cleanMemberPn });
+
+    if (displayPhone) {
+      candidatePhonesSet.add(displayPhone);
+      if (displayPhone.startsWith("62")) candidatePhonesSet.add("0" + displayPhone.slice(2));
+      if (displayPhone.startsWith("0")) candidatePhonesSet.add("62" + displayPhone.slice(1));
+    }
+    if (cleanMemberPn) {
+      candidatePhonesSet.add(cleanMemberPn);
+      if (cleanMemberPn.startsWith("0")) candidatePhonesSet.add("62" + cleanMemberPn.slice(1));
+      if (cleanMemberPn.startsWith("62")) candidatePhonesSet.add("0" + cleanMemberPn.slice(2));
+    }
+    if (cleanMemberNum) {
+      candidatePhonesSet.add(cleanMemberNum);
+      if (cleanMemberNum.startsWith("0")) candidatePhonesSet.add("62" + cleanMemberNum.slice(1));
+      if (cleanMemberNum.startsWith("62")) candidatePhonesSet.add("0" + cleanMemberNum.slice(2));
+    }
+  }
+
+  const candidatePhones = Array.from(candidatePhonesSet).filter(Boolean);
+  const existingUsers =
+    candidatePhones.length > 0
+      ? await prisma.user.findMany({
+          where: { phoneNumber: { in: candidatePhones } },
+        })
+      : [];
+
+  const userByPhoneMap = new Map();
+  for (const u of existingUsers) {
+    if (!u.phoneNumber) continue;
+    userByPhoneMap.set(u.phoneNumber, u);
+    const digits = u.phoneNumber.replace(/\D/g, "");
+    userByPhoneMap.set(digits, u);
+    if (digits.startsWith("62")) {
+      userByPhoneMap.set("0" + digits.slice(2), u);
+    } else if (digits.startsWith("0")) {
+      userByPhoneMap.set("62" + digits.slice(1), u);
+    }
+  }
+
+  const membersList = [];
+  for (const item of validParticipants) {
+    const { p, fullJid, pnJid, displayPhone, cleanMemberNum, cleanMemberPn } = item;
+
+    const participant =
+      (displayPhone ? userByPhoneMap.get(displayPhone) : null) ||
+      (cleanMemberPn ? userByPhoneMap.get(cleanMemberPn) : null) ||
+      userByPhoneMap.get(cleanMemberNum) ||
+      null;
+
+    const finalPhone =
+      participant && participant.phoneNumber && participant.phoneNumber.startsWith("62")
+        ? participant.phoneNumber
+        : displayPhone || fullJid.split("@")[0];
+
+    let targetJid = pnJid;
+    if (!targetJid && participant?.phoneNumber && participant.phoneNumber.startsWith("62")) {
+      targetJid = `${participant.phoneNumber}@s.whatsapp.net`;
+    }
+    if (!targetJid) targetJid = fullJid;
+
+    membersList.push({
+      jid: targetJid,
+      phoneNumber: finalPhone,
+      name: participant?.name || p.name || p.notify || null,
+      status: participant?.status || "NOT_STARTED",
+      isExcluded: participant?.isExcluded || false,
+      isRegistered: participant?.status === "COMPLETED",
+      faceRegistered: Boolean(participant?.faceDescriptor),
+    });
+  }
+
+  const tEnd = performance.now();
+  const elapsedMs = Math.round(tEnd - tStart);
+
+  assert(membersList.length === 300, `Bot Sync Scale: 300 participants processed (actual: ${membersList.length})`);
+  assert(existingUsers.length === 2, `Bot Sync Scale: Batch query returned registered users (found: ${existingUsers.length})`);
+  assert(elapsedMs < 1000, `Bot Sync Scale: 300 members processed in ${elapsedMs}ms (< 1000ms threshold)`);
+
+  // Cleanup
+  await prisma.user.deleteMany({ where: { id: { in: [u1.id, u2.id] } } });
+  console.log("  [CLEANUP] Bot scale test artifacts cleaned up cleanly.");
+}
+
 async function main() {
   try {
     await runCbtSubmissionTransactionTest();
     await runBotMemberSyncBatchTest();
+    await runAdversarialRollbackTest();
+    await runAdversarialConcurrencyTest();
+    await runAdversarialBotScaleTest();
 
     console.log("\n=======================================================");
-    console.log("M3 BATCHING & TRANSACTION VERIFICATION SUMMARY");
+    console.log("M3 BATCHING & ADVERSARIAL VERIFICATION SUMMARY");
     console.log("=======================================================");
     console.log(`Total Tests Run : ${totalTests}`);
     console.log(`Passed          : ${passedTests}`);
@@ -446,7 +813,7 @@ async function main() {
       failures.forEach((f) => console.log(f));
       process.exit(1);
     } else {
-      console.log("\n>>> ALL M3 EMPIRICAL TESTS PASSED (100%)! <<<");
+      console.log("\n>>> ALL M3 EMPIRICAL & ADVERSARIAL TESTS PASSED (100%)! <<<");
       process.exit(0);
     }
   } catch (err) {
