@@ -37,4 +37,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **BATCHING & ATOMIC TRANSACTIONS**: Dilarang menjalankan query database satu per satu di dalam perulangan sequential (*N+1 problem*). Gunakan operator `in` pada `findMany` atau jalankan `Promise.all` di dalam `prisma.$transaction` untuk operasi multi-baris.
 - **NON-BLOCKING GET REQUESTS**: Handler HTTP GET yang di-polling secara berkala tidak boleh menjalankan operasi blocking I/O jaringan eksternal (seperti resolusi socket Baileys) atau database mutating writes di dalam critical request path.
 
+# Universal Responsive Pagination Standard (ATURAN MUTLAK PAGINATION TABEL DATA VELONET)
+- **MANDATORY PAGINATION COMPONENT**: Setiap tampilan tabel data atau daftar kartu dengan volume data dinamis WAJIB menggunakan komponen `<Pagination />` dari `@/components/ui/Pagination`.
+- **SERVER-SIDE TRANSACTION PATTERN**: Endpoint API tabel wajib mendukung parameter `page` dan `limit` (default: 10, opsi: 10, 25, 50, 100, "ALL"), serta mengeksekusi `prisma.$transaction([countQuery, findManyQuery])` untuk efisiensi round-trip database.
+- **SMART ELLIPSIS & MOBILE-FIRST**: Navigasi halaman wajib mendukung pemotongan nomor halaman pintar (`1 ... 4 5 6 ... 10`) dan layout responsif yang adaptif terhadap perangkat seluler.
+
 
