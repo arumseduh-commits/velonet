@@ -14,17 +14,17 @@ enum Role {
 }
 
 model User {
-  id           String  @id @default(uuid())
-  phoneNumber  String  @unique
+  id           String    @id @default(uuid())
+  phoneNumber  String    @unique
   name         String?
   password     String?
-  role         Role    @default(STUDENT)
+  role         Role      @default(STUDENT)
   studentClass String?
   motivation   String?
   hobby        String?
   gender       String?
   birthDate    DateTime?
-  status       String  @default("NOT_STARTED")
+  status       String    @default("NOT_STARTED")
 
   isExcluded      Boolean   @default(false)
   isKickedFromGrp Boolean   @default(false)
@@ -46,6 +46,14 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([status])
+  @@index([studentClass])
+  @@index([isExcluded])
+  @@index([isKickedFromGrp])
+  @@index([createdAt])
+  @@index([role, studentClass])
 }
 
 model OtpVerification {
@@ -60,8 +68,10 @@ model OtpVerification {
   expiresAt   DateTime
   createdAt   DateTime @default(now())
 
+  @@index([userId])
   @@index([phoneNumber])
   @@index([magicToken])
+  @@index([userId, isUsed, expiresAt])
 }
 
 model StudentSession {
@@ -76,6 +86,7 @@ model StudentSession {
 
   @@index([userId])
   @@index([sessionToken])
+  @@index([expiresAt])
 }
 
 model BaileysAuth {
@@ -117,6 +128,11 @@ model MeetingSession {
   attendances   Attendance[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  @@index([isActive, isCancelled])
+  @@index([startTime, endTime])
+  @@index([date])
+  @@index([createdAt])
 }
 
 model Attendance {
@@ -126,20 +142,24 @@ model Attendance {
   userId    String
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  checkInTime   DateTime @default(now())
-  status        String   @default("HADIR") // HADIR, TERLAMBAT, IZIN, SAKIT
-  method        String   @default("LOCATION_GPS") // LOCATION_GPS, MANUAL_ADMIN
-  latitude      Float?
-  longitude     Float?
-  distanceMeter Float?
-  faceConfidence Float? // Similarity confidence (0.0 - 1.0)
+  checkInTime       DateTime @default(now())
+  status            String   @default("HADIR") // HADIR, TERLAMBAT, IZIN, SAKIT
+  method            String   @default("LOCATION_GPS") // LOCATION_GPS, MANUAL_ADMIN
+  latitude          Float?
+  longitude         Float?
+  distanceMeter     Float?
+  faceConfidence    Float? // Similarity confidence (0.0 - 1.0)
   facePhotoCaptured String? // Base64 snapshot during check-in
-  notes         String? // Catatan alasan izin/sakit
+  notes             String? // Catatan alasan izin/sakit
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([sessionId, userId])
+  @@index([userId])
+  @@index([sessionId, status])
+  @@index([userId, status])
+  @@index([checkInTime])
 }
 
 model ScrapedArticle {
@@ -157,6 +177,8 @@ model ScrapedArticle {
 
   @@index([category])
   @@index([slug])
+  @@index([category, level])
+  @@index([scrapedAt])
 }
 
 model Course {
@@ -172,6 +194,10 @@ model Course {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([isPublished])
+  @@index([createdAt])
+  @@index([isPublished, createdAt])
 }
 
 model Chapter {
@@ -182,6 +208,9 @@ model Chapter {
   order    Int
 
   lessons Lesson[]
+
+  @@index([courseId])
+  @@index([courseId, order])
 }
 
 enum LessonType {
@@ -205,6 +234,10 @@ model Lesson {
   assignment Assignment?
 
   progress Progress[]
+
+  @@index([chapterId])
+  @@index([chapterId, order])
+  @@index([quizId])
 }
 
 model Enrollment {
@@ -216,6 +249,8 @@ model Enrollment {
   progress Int    @default(0) // Persentase 0-100
 
   @@unique([userId, courseId])
+  @@index([courseId])
+  @@index([userId, progress])
 }
 
 model Progress {
@@ -227,6 +262,8 @@ model Progress {
   completedAt DateTime?
 
   @@unique([userId, lessonId])
+  @@index([lessonId])
+  @@index([userId, isCompleted])
 }
 
 model Assignment {
@@ -238,6 +275,8 @@ model Assignment {
   deadline    DateTime?
 
   submissions Submission[]
+
+  @@index([deadline])
 }
 
 model Submission {
@@ -253,6 +292,11 @@ model Submission {
   feedback     String?
   submittedAt  DateTime  @default(now())
   gradedAt     DateTime?
+
+  @@index([assignmentId])
+  @@index([userId])
+  @@index([assignmentId, userId])
+  @@index([submittedAt])
 }
 
 model GamificationProfile {
@@ -267,6 +311,9 @@ model GamificationProfile {
 
   userBadges UserBadge[]
   xpLogs     XPLog[]
+
+  @@index([xp])
+  @@index([level])
 }
 
 model XPLog {
@@ -276,6 +323,10 @@ model XPLog {
   amount    Int
   reason    String // contoh: "Menyelesaikan Pelajaran 1", "Kehadiran Sempurna"
   createdAt DateTime            @default(now())
+
+  @@index([profileId])
+  @@index([profileId, createdAt])
+  @@index([createdAt])
 }
 
 model UserBadge {
@@ -285,6 +336,10 @@ model UserBadge {
   badgeName String
   iconUrl   String?
   awardedAt DateTime            @default(now())
+
+  @@index([profileId])
+  @@index([profileId, badgeName])
+  @@index([awardedAt])
 }
 
 enum QuestionType {
@@ -299,157 +354,181 @@ model Quiz {
   id          String   @id @default(uuid())
   title       String
   description String?
-  
+
   // Penjadwalan Rentang Waktu Ujian (Window of Availability)
   openAt      DateTime? // Waktu Mulai / Buka Ujian
   closeAt     DateTime? // Waktu Selesai / Tutup Ujian
 
   // Konfigurasi Keamanan & CBT
-  durationMinutes        Int      @default(30)
-  enableFullscreenLock   Boolean  @default(true)
-  enableTabSwitchDetect  Boolean  @default(true)
-  maxStrikes             Int      @default(3)
-  enableCameraProctor    Boolean  @default(false)
-  supervisorPin          String   @default("123456")
-  shuffleQuestions       Boolean  @default(true)
-  shuffleOptions         Boolean  @default(true)
+  durationMinutes       Int     @default(30)
+  enableFullscreenLock  Boolean @default(true)
+  enableTabSwitchDetect Boolean @default(true)
+  maxStrikes            Int     @default(3)
+  enableCameraProctor   Boolean @default(false)
+  supervisorPin         String  @default("123456")
+  shuffleQuestions      Boolean @default(true)
+  shuffleOptions        Boolean @default(true)
 
   // Token Masuk & Pengaturan Hasil Ujian
-  examToken              String?
-  showScoreImmediately   Boolean   @default(true)
-  scoreReleaseAt         DateTime?
-  showDiscussion         Boolean   @default(false)
+  examToken            String?
+  showScoreImmediately Boolean   @default(true)
+  scoreReleaseAt       DateTime?
+  showDiscussion       Boolean   @default(false)
 
-  questions   Question[]
-  attempts    QuizAttempt[]
+  questions Question[]
+  attempts  QuizAttempt[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([openAt, closeAt])
+  @@index([examToken])
 }
 
 model Question {
-  id            String       @id @default(uuid())
-  quizId        String
-  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  type          QuestionType @default(SINGLE_CHOICE)
-  text          String
-  imageUrl      String?      // URL atau path gambar ilustrasi soal
-  points        Int          @default(10)
-  order         Int          @default(0)
-  
+  id       String       @id @default(uuid())
+  quizId   String
+  quiz     Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type     QuestionType @default(SINGLE_CHOICE)
+  text     String
+  imageUrl String? // URL atau path gambar ilustrasi soal
+  points   Int          @default(10)
+  order    Int          @default(0)
+
   // Rubrik & Panduan Penilaian untuk Soal Uraian / Isian & Pembahasan
-  explanation   String?      // Pembahasan & penjelasan rinci butir soal untuk siswa
-  sampleAnswer  String?      // Contoh jawaban ideal
-  gradingRubric String?      // Kriteria rubrik & kata kunci penilaian
-  caseSensitive Boolean      @default(false)
-  
-  options       Option[]
+  explanation   String? // Pembahasan & penjelasan rinci butir soal untuk siswa
+  sampleAnswer  String? // Contoh jawaban ideal
+  gradingRubric String? // Kriteria rubrik & kata kunci penilaian
+  caseSensitive Boolean @default(false)
+
+  options        Option[]
   studentAnswers QuizStudentAnswer[]
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quizId])
+  @@index([quizId, order])
+  @@index([quizId, type])
 }
 
 model Option {
-  id          String   @id @default(uuid())
-  questionId  String
-  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  text        String
-  isCorrect   Boolean  @default(false)
+  id         String   @id @default(uuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean  @default(false)
+
+  @@index([questionId])
+  @@index([questionId, isCorrect])
 }
 
 model QuizAttempt {
-  id          String               @id @default(uuid())
-  quizId      String
-  quiz        Quiz                 @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  status      String               @default("IN_PROGRESS") // IN_PROGRESS, LOCKED, SUBMITTED, GRADED, DISQUALIFIED
-  strikeCount Int                  @default(0)
-  score       Float                @default(0)
-  totalScore  Float                @default(0)
-  
-  isFullyGraded Boolean            @default(false)
-  
-  answers     String?              // JSON stringified user answers fallback
-  
-  startedAt   DateTime             @default(now())
+  id     String @id @default(uuid())
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status      String @default("IN_PROGRESS") // IN_PROGRESS, LOCKED, SUBMITTED, GRADED, DISQUALIFIED
+  strikeCount Int    @default(0)
+  score       Float  @default(0)
+  totalScore  Float  @default(0)
+
+  isFullyGraded Boolean @default(false)
+
+  answers String? // JSON stringified user answers fallback
+
+  startedAt   DateTime  @default(now())
   submittedAt DateTime?
   gradedAt    DateTime?
 
   detailedAnswers QuizStudentAnswer[]
-  violations  ExamViolationLog[]
+  violations      ExamViolationLog[]
 
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([quizId])
   @@index([userId])
+  @@index([quizId, status])
+  @@index([quizId, userId])
+  @@index([userId, createdAt])
+  @@index([quizId, updatedAt])
 }
 
 model QuizStudentAnswer {
-  id                   String      @id @default(uuid())
-  attemptId            String
-  attempt              QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  questionId           String
-  question             Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  
-  selectedOptionIds    String?     // JSON array string misal '["opt-1", "opt-2"]'
-  textResponse         String?     // Isian teks untuk SHORT_ANSWER atau ESSAY
-  
-  isAutoGraded         Boolean     @default(false)
-  earnedPoints         Float       @default(0)
-  
+  id         String      @id @default(uuid())
+  attemptId  String
+  attempt    QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  selectedOptionIds String? // JSON array string misal '["opt-1", "opt-2"]'
+  textResponse      String? // Isian teks untuk SHORT_ANSWER atau ESSAY
+
+  isAutoGraded Boolean @default(false)
+  earnedPoints Float   @default(0)
+
   // Penilaian AI untuk Essay
   aiSuggestedScore     Float?
   aiEvaluationFeedback String?
-  
+
   // Penilaian Manual Guru (Teacher Override)
   teacherScore         Float?
   teacherFeedback      String?
   gradedByUserId       String?
 
-  createdAt            DateTime    @default(now())
-  updatedAt            DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([attemptId, questionId])
+  @@index([questionId])
+  @@index([attemptId, isAutoGraded])
 }
 
 model ExamViolationLog {
   id          String      @id @default(uuid())
   attemptId   String
   attempt     QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  type        String      // TAB_SWITCH, FULLSCREEN_EXIT, DEVTOOLS, MULTIPLE_FACES, NO_FACE, UNAUTHORIZED_KEY
+  type        String // TAB_SWITCH, FULLSCREEN_EXIT, DEVTOOLS, MULTIPLE_FACES, NO_FACE, UNAUTHORIZED_KEY
   description String?
   snapshotUrl String?
   timestamp   DateTime    @default(now())
 
   @@index([attemptId])
+  @@index([attemptId, timestamp])
+  @@index([type])
 }
 
 model AIChatSession {
-  id             String          @id @default(uuid())
-  userId         String          // ID Guru / Mentor
-  title          String          @default("Sesi Konsultasi Guru")
-  contextTopicId String?         // ID artikel MisterGuru jika ada
-  
-  messages       AIChatMessage[]
+  id             String @id @default(uuid())
+  userId         String // ID Guru / Mentor
+  title          String @default("Sesi Konsultasi Guru")
+  contextTopicId String? // ID artikel MisterGuru jika ada
 
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  messages AIChatMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@index([contextTopicId])
 }
 
 model AIChatMessage {
-  id                 String        @id @default(uuid())
-  sessionId          String
-  session            AIChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  
-  role               String        // "user" atau "assistant"
+  id        String        @id @default(uuid())
+  sessionId String
+  session   AIChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  role               String // "user" atau "assistant"
   content            String
-  generatedQuizDraft String?       // JSON stringified draft quiz payload
-  
-  createdAt          DateTime      @default(now())
+  generatedQuizDraft String? // JSON stringified draft quiz payload
+
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([sessionId, createdAt])
 }
-
-

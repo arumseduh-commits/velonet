@@ -17,7 +17,6 @@ export async function GET() {
         studentClass: true,
         gender: true,
         faceDescriptor: true,
-        facePhoto: true,
       },
     });
 
@@ -35,7 +34,6 @@ export async function GET() {
         studentClass: u.studentClass || "-",
         phoneNumber: u.phoneNumber,
         gender: u.gender,
-        facePhoto: u.facePhoto,
         descriptor: descriptorArray,
       };
     });

@@ -30,41 +30,13 @@ export async function GET() {
 
     const ratePercentage = totalSessions > 0 ? Math.round((hadirCount / totalSessions) * 100) : 0;
 
-    let currentPhone = student.phoneNumber;
-    // Auto-heal if phoneNumber is an LID
-    const isLid = currentPhone.length > 14 || (!currentPhone.startsWith("62") && !currentPhone.startsWith("08"));
-    if (isLid) {
-      try {
-        const { botEngine } = await import("@/lib/bot-engine");
-        const resolved = await botEngine.resolveLidToRealPhone(currentPhone);
-        if (resolved && (resolved.startsWith("62") || resolved.startsWith("08"))) {
-          currentPhone = resolved;
-          await prisma.user.update({
-            where: { id: student.id },
-            data: { phoneNumber: currentPhone },
-          }).catch(() => {});
-        }
-      } catch (e) {}
-    }
-
-    // Auto-heal status if user has completed profile
-    if (student.status !== "COMPLETED" && student.name && student.name !== "Siswa Baru" && student.studentClass) {
-      try {
-        await prisma.user.update({
-          where: { id: student.id },
-          data: { status: "COMPLETED" },
-        });
-        student.status = "COMPLETED";
-      } catch (e) {}
-    }
-
     return NextResponse.json({
       success: true,
       data: {
         student: {
           id: student.id,
           name: student.name || "",
-          phoneNumber: currentPhone,
+          phoneNumber: student.phoneNumber,
           studentClass: student.studentClass || "",
           motivation: student.motivation || "",
           hobby: student.hobby || "",

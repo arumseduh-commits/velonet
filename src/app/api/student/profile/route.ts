@@ -12,29 +12,12 @@ export async function GET() {
       );
     }
 
-    let currentPhone = student.phoneNumber;
-    // Auto-heal if phoneNumber is an LID
-    const isLid = currentPhone.length > 14 || (!currentPhone.startsWith("62") && !currentPhone.startsWith("08"));
-    if (isLid) {
-      try {
-        const { botEngine } = await import("@/lib/bot-engine");
-        const resolved = await botEngine.resolveLidToRealPhone(currentPhone);
-        if (resolved && (resolved.startsWith("62") || resolved.startsWith("08"))) {
-          currentPhone = resolved;
-          await prisma.user.update({
-            where: { id: student.id },
-            data: { phoneNumber: currentPhone },
-          }).catch(() => {});
-        }
-      } catch (e) {}
-    }
-
     return NextResponse.json({
       success: true,
       data: {
         id: student.id,
         name: student.name || "",
-        phoneNumber: currentPhone,
+        phoneNumber: student.phoneNumber,
         studentClass: student.studentClass || "",
         gender: student.gender || "",
         birthDate: student.birthDate ? student.birthDate.toISOString().split("T")[0] : "",

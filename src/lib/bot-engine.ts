@@ -707,10 +707,25 @@ class WhatsAppBotEngine extends EventEmitter {
       }
     }
 
-    const membersList = [];
+    // 2. Pre-process all participants and collect candidate phone numbers into a Set (Pass 1)
+    const cleanBotNum = (this.userInfo?.id || "").split("@")[0].split(":")[0];
+    const cleanBotLid = (this.socket?.user?.lid || "").split("@")[0].split(":")[0];
+
+    interface ValidParticipant {
+      p: any;
+      fullJid: string;
+      pnJid: string | undefined;
+      displayPhone: string;
+      cleanMemberNum: string;
+      cleanMemberPn: string;
+    }
+
+    const validParticipants: ValidParticipant[] = [];
+    const candidatePhonesSet = new Set<string>();
+
     for (const p of metadata.participants) {
-      let fullJid = p.id;
-      let pnJid = (p as any).pn || (p as any).phoneNumber || (p as any).phone || resolvedLidMap.get(fullJid);
+      const fullJid = p.id;
+      const pnJid = (p as any).pn || (p as any).phoneNumber || (p as any).phone || resolvedLidMap.get(fullJid);
 
       let displayPhone = "";
       if (pnJid) {
@@ -724,10 +739,6 @@ class WhatsAppBotEngine extends EventEmitter {
         displayPhone = "";
       }
 
-      // Extract clean digits for bot's own phone number & LID without device suffix (e.g. 6285187257740:12 -> 6285187257740)
-      const cleanBotNum = (this.userInfo?.id || "").split("@")[0].split(":")[0];
-      const cleanBotLid = (this.socket?.user?.lid || "").split("@")[0].split(":")[0];
-
       const cleanMemberNum = fullJid.split("@")[0].split(":")[0];
       const cleanMemberPn = pnJid ? pnJid.split("@")[0].split(":")[0] : "";
 
@@ -738,46 +749,69 @@ class WhatsAppBotEngine extends EventEmitter {
         continue;
       }
 
-      let participant = await prisma.user.findFirst({
-        where: {
-          OR: [
-            ...(displayPhone ? [{ phoneNumber: displayPhone }] : []),
-            ...(pnJid ? [{ phoneNumber: pnJid.split("@")[0] }] : []),
-            { phoneNumber: cleanMemberNum },
-          ],
-        },
+      validParticipants.push({
+        p,
+        fullJid,
+        pnJid,
+        displayPhone,
+        cleanMemberNum,
+        cleanMemberPn,
       });
 
-      // If we have displayPhone (real 62 number), auto-update participant's phoneNumber in DB if it was previously an LID
-      if (participant && displayPhone && displayPhone.startsWith("62") && participant.phoneNumber !== displayPhone) {
-        const existingReal = await prisma.user.findUnique({
-          where: { phoneNumber: displayPhone },
-        });
-
-        if (existingReal && existingReal.id !== participant.id) {
-          const merged = await prisma.user.update({
-            where: { id: existingReal.id },
-            data: {
-              name: participant.name || existingReal.name || null,
-              studentClass: participant.studentClass || existingReal.studentClass || null,
-              motivation: participant.motivation || existingReal.motivation || null,
-              hobby: participant.hobby || existingReal.hobby || null,
-              status: participant.status !== "NOT_STARTED" ? participant.status : existingReal.status,
-            },
-          });
-          try {
-            await prisma.user.delete({ where: { id: participant.id } });
-          } catch (e) {}
-          participant = merged;
-        } else {
-          try {
-            participant = await prisma.user.update({
-              where: { id: participant.id },
-              data: { phoneNumber: displayPhone },
-            });
-          } catch (e) {}
-        }
+      // Collect all candidate phone formats for batch lookup
+      if (displayPhone) {
+        candidatePhonesSet.add(displayPhone);
+        if (displayPhone.startsWith("62")) candidatePhonesSet.add("0" + displayPhone.slice(2));
+        if (displayPhone.startsWith("0")) candidatePhonesSet.add("62" + displayPhone.slice(1));
       }
+      if (cleanMemberPn) {
+        candidatePhonesSet.add(cleanMemberPn);
+        if (cleanMemberPn.startsWith("0")) candidatePhonesSet.add("62" + cleanMemberPn.slice(1));
+        if (cleanMemberPn.startsWith("62")) candidatePhonesSet.add("0" + cleanMemberPn.slice(2));
+      }
+      if (cleanMemberNum) {
+        candidatePhonesSet.add(cleanMemberNum);
+        if (cleanMemberNum.startsWith("0")) candidatePhonesSet.add("62" + cleanMemberNum.slice(1));
+        if (cleanMemberNum.startsWith("62")) candidatePhonesSet.add("0" + cleanMemberNum.slice(2));
+      }
+    }
+
+    // 3. Single Batch Query to Database
+    const candidatePhones = Array.from(candidatePhonesSet).filter(Boolean);
+    const existingUsers =
+      candidatePhones.length > 0
+        ? await prisma.user.findMany({
+            where: {
+              phoneNumber: { in: candidatePhones },
+            },
+          })
+        : [];
+
+    // 4. Build Fast In-Memory Map (0ms)
+    const userByPhoneMap = new Map<string, (typeof existingUsers)[0]>();
+    for (const u of existingUsers) {
+      if (!u.phoneNumber) continue;
+      userByPhoneMap.set(u.phoneNumber, u);
+      const digits = u.phoneNumber.replace(/\D/g, "");
+      userByPhoneMap.set(digits, u);
+      if (digits.startsWith("62")) {
+        userByPhoneMap.set("0" + digits.slice(2), u);
+      } else if (digits.startsWith("0")) {
+        userByPhoneMap.set("62" + digits.slice(1), u);
+      }
+    }
+
+    // 5. Match participants and build results (Pass 2)
+    const membersList = [];
+    for (const item of validParticipants) {
+      const { p, fullJid, pnJid, displayPhone, cleanMemberNum, cleanMemberPn } = item;
+
+      // Find user from memory map in O(1)
+      const participant =
+        (displayPhone ? userByPhoneMap.get(displayPhone) : null) ||
+        (cleanMemberPn ? userByPhoneMap.get(cleanMemberPn) : null) ||
+        userByPhoneMap.get(cleanMemberNum) ||
+        null;
 
       const finalPhone =
         participant && participant.phoneNumber && participant.phoneNumber.startsWith("62")

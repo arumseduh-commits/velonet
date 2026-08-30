@@ -51,3 +51,39 @@ Integrity mode: development
 - [ ] Tampilan 100% responsif mobile & desktop sesuai aturan UI/UX VeloNet.
 - [ ] `npm run build` sukses 100% dengan 0 error TypeScript.
 - [ ] Seluruh perubahan di-commit dan di-push ke branch `main` GitHub.
+
+## 2026-08-30T15:58:28Z
+
+Lakukan audit menyeluruh dan optimasi arsitektur database indexing Prisma, eliminasi transmisi payload berat data biometrik, serta refactor query batching CBT dan sinkronisasi bot pada aplikasi VeloNet.
+
+Working directory: c:\UBIG\VeloNet
+Integrity mode: development
+
+## Requirements
+
+### R1. Comprehensive Database Indexing
+Tambahkan definisi indeks komposit dan foreign key index pada Prisma Schema (`prisma/schema.prisma`) untuk seluruh model relasi dan filter sorting utama (`User`, `MeetingSession`, `Attendance`, `Question`, `Option`, `QuizAttempt`, `QuizStudentAnswer`, `Chapter`, `Lesson`, `Enrollment`, `Progress`, `Submission`, `XPLog`, `UserBadge`, `AIChatSession`, `AIChatMessage`).
+
+### R2. Payload Diet & Elimination of Blocking I/O
+Pangkas transfer data berlebih dengan mengecualikan kolom `facePhoto` (base64 gambar berukuran besar) dari query daftar peserta (`/api/participants`) dan endpoint face descriptors (`/api/attendance/face-descriptors`). Hapus pemanggilan blocking resolving LID dari critical GET request path.
+
+### R3. Batching & Transaction Optimization
+Refactor loop database sequential (N+1 query) pada pengumpulan ujian CBT (`/api/quiz/submit`) dan sinkronisasi anggota grup bot (`fetchGroupMembersWithStatus` di `bot-engine.ts`) menjadi batch query (`findMany` dengan operator `in`) dan eksekusi transaksi paralel (`Promise.all` / `prisma.$transaction`).
+
+### R4. Code Integrity & Build Verification
+Pastikan seluruh komponen dan endpoint tetap mematuhi standar UI/UX dialog custom (`useDialog`), mobile responsive, dan lolos verifikasi build Next.js (`npm run build`) tanpa error.
+
+## Acceptance Criteria
+
+### Database & Indexing
+- [ ] Seluruh relasi foreign key dan kolom filter/sort pada `prisma/schema.prisma` memiliki definisi `@@index`.
+
+### Performance & Payload Diet
+- [ ] Endpoint `GET /api/participants` mengembalikan metadata peserta tanpa membebani jaringan dengan raw base64 `facePhoto`.
+- [ ] Endpoint `GET /api/attendance/face-descriptors` hanya mengirimkan vektor embedding biometrik (`faceDescriptor`) dan metadata esensial (<50KB total untuk 30 user).
+- [ ] Pengumpulan kuis/ujian CBT memproses penilaian seluruh butir soal dalam satu transaksi/batch paralel.
+- [ ] Pencocokan anggota grup bot menggunakan single batch `findMany` untuk seluruh anggota grup sekaligus.
+
+### Build & Integrity
+- [ ] Project lolos build dan type-check Next.js (`npm run build`) tanpa error.
+- [ ] Perubahan kode disinkronkan dan di-commit ke Git repository.

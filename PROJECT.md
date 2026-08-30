@@ -1,69 +1,56 @@
-# Project: VeloNet CBT Exam Scheduling & Realtime Live Proctor Leaderboard
+# Project: VeloNet Database Indexing, Payload Diet, and CBT/Bot Batch Optimization
 
 ## Architecture
-VeloNet CBT is a Next.js 14+ App Router application with PostgreSQL, Prisma ORM, and Tailwind CSS.
-- **Admin Management**: `/admin/exams/*` manages exam creation, editing, scheduling (`openAt`, `closeAt`), and live supervision (`/admin/exams/[quizId]/proctor`).
-- **Student Exam Hub & Runner**: `/student/exams` lists available exams with availability status; `/student/quiz/[quizId]` runs the CBT exam with window-of-availability gating, countdown timer, anti-cheat monitoring, and background interim progress sync.
-- **APIs**:
-  - `/api/admin/exams/*`: Admin CRUD for exams and proctor actions.
-  - `/api/admin/exams/[quizId]/proctor`: Realtime proctor polling endpoint.
-  - `/api/admin/exams/[quizId]/action`: Supervisor actions (UNLOCK, FORCE_SUBMIT, DISQUALIFY, RESET_STRIKES).
-  - `/api/student/exams`: Lists student exams with calculated availability.
-  - `/api/quiz/[quizId]/start`: Starts/resumes quiz attempt with token and availability checks.
-  - `/api/quiz/[quizId]/progress`: Non-blocking fast background answer & score synchronization.
-  - `/api/quiz/[quizId]/submit`: Final exam submission.
+VeloNet is a Next.js App Router application backed by PostgreSQL (Prisma ORM) and Tailwind CSS.
+- **Database Layer**: `prisma/schema.prisma` managing core entities (`User`, `MeetingSession`, `Attendance`, `Question`, `Option`, `QuizAttempt`, `QuizStudentAnswer`, `Chapter`, `Lesson`, `Enrollment`, `Progress`, `Submission`, `XPLog`, `UserBadge`, `AIChatSession`, `AIChatMessage`, etc.).
+- **Attendance & Biometrics**:
+  - `/api/participants`: Retrieves participant lists for meetings/classes.
+  - `/api/attendance/face-descriptors`: Exposes biometric embeddings for attendance face recognition without transmitting heavy base64 raw photos.
+- **CBT Quiz Engine**:
+  - `/api/quiz/submit`: Grades and persists full student exam submissions with questions and options.
+- **Bot Engine**:
+  - `src/lib/bot-engine.ts`: Bot coordination and WhatsApp group member synchronization (`fetchGroupMembersWithStatus`).
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Prisma Schema & DB Push | `openAt DateTime?` and `closeAt DateTime?` on Quiz model, verified via `npx prisma db push` | M1 (DONE) | ORIGINAL_REQUEST §R1.1 |
-| 2 | Admin Exam Create & Edit Scheduling Form | Date/time pickers (`type="datetime-local"`) for `openAt` & `closeAt`, chronological validation (`openAt < closeAt`), payload persistence | M1 (DONE) | ORIGINAL_REQUEST §R1.2 |
-| 3 | Student Exams Availability Display | Status badges ("Ujian Belum Dibuka", "Sedang Berlangsung", "Ujian Telah Ditutup") with countdown & disabled action buttons | M1 (DONE) | ORIGINAL_REQUEST §R1.3 |
-| 4 | Student Quiz Runner Window Restrictions | Dedicated "Ujian Belum Dibuka" waiting screen with live ticking countdown, "Ujian Telah Ditutup" expired screen, personal timer tolerance if started before `closeAt` | M1 (DONE) | ORIGINAL_REQUEST §R1.3 |
-| 5 | Quiz Runner Token & Timer Bug Fixes | Fix token payload mismatch (`examToken` vs `token`) and timer reset on page reload (`remainingDurationSecs`) | M1 (DONE) | Survey Finding |
-| 6 | Fast Background Progress Sync Hook & API | Connect runner answer changes to `/api/quiz/[quizId]/progress` with optimistic UI and non-blocking background sync | M2 (DONE) | ORIGINAL_REQUEST §R3.1 |
-| 7 | Live Proctor Realtime Polling (3s) | High-frequency polling (3s) with concurrency lock, silent background update, and live connection status | M3 (DONE) | ORIGINAL_REQUEST §R2.1 |
-| 8 | Gamified Top 3 Podium ala Quizizz | Gold #1, Silver #2, Bronze #3 podium with animated rank transitions, delta badges (`↑`, `↓`, `=`), and score points | M3 (DONE) | ORIGINAL_REQUEST §R2.2 |
-| 9 | Live Participant List with Progress Bar & Question Matrix | Progress bar (% answered) + per-question visual dot matrix, realtime score, connection status, strike indicators (Yellow 1-2, Red 3+) | M3 (DONE) | ORIGINAL_REQUEST §R2.3 |
-| 10 | Quick Proctor Actions with useDialog | Unlock, Force Submit, Kick/Disqualify, Reset Strikes using custom `useDialog` from `@/components/ui/DialogProvider` | M3 (DONE) | ORIGINAL_REQUEST §R2.4, AGENTS.md |
-| 11 | Class Filtering & Sorting Controls | Filter by `studentClass` and sort by Highest Score, Fastest Progress, Most Strikes, Name | M3 (DONE) | ORIGINAL_REQUEST §R2.5 |
-| 12 | 100% Mobile Responsiveness (<640px) | Responsive tables (`overflow-x-auto`), flex-col/sm:flex-row headers, responsive modal dialogs, drawer menus | M3 (DONE) | AGENTS.md |
-| 13 | E2E Testing Suite (Tiers 1-4) & Build Verification | Requirement-driven test suite, `npm run build` with 0 TypeScript/ESLint errors, Git commit & push | M4 | AGENTS.md, ORIGINAL_REQUEST Acceptance |
+| 1 | Comprehensive Database Indexing | Add composite indices (`@@index`) and foreign key indices in `prisma/schema.prisma` for `User`, `MeetingSession`, `Attendance`, `Question`, `Option`, `QuizAttempt`, `QuizStudentAnswer`, `Chapter`, `Lesson`, `Enrollment`, `Progress`, `Submission`, `XPLog`, `UserBadge`, `AIChatSession`, `AIChatMessage`. | M1 | ORIGINAL_REQUEST §R1 |
+| 2 | Biometric Payload Diet (/api/participants) | Exclude heavy base64 `facePhoto` from participant list query in `/api/participants`. | M2 | ORIGINAL_REQUEST §R2 |
+| 3 | Biometric Payload Diet (/api/attendance/face-descriptors) | Exclude `facePhoto` and only return vector embeddings (`faceDescriptor`) and essential metadata (<50KB total for 30 users). | M2 | ORIGINAL_REQUEST §R2 |
+| 4 | Elimination of Blocking LID Resolving | Remove blocking LID resolving from critical GET request paths. | M2 | ORIGINAL_REQUEST §R2 |
+| 5 | CBT Quiz Submission Batching & Transaction | Refactor sequential N+1 query loop in `/api/quiz/submit` to single batch query (`findMany` with `in`) and transaction/parallel writes. | M3 | ORIGINAL_REQUEST §R3 |
+| 6 | Bot Group Member Sync Batching | Refactor `fetchGroupMembersWithStatus` in `src/lib/bot-engine.ts` from sequential lookups to single batch `findMany` using `in`. | M3 | ORIGINAL_REQUEST §R3 |
+| 7 | Next.js Build Verification & GitHub Sync | Pass `npm run build` with 0 errors, verify custom dialogs & mobile responsiveness, git commit and push to origin main. | M4 | ORIGINAL_REQUEST §R4, AGENTS.md |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Window of Availability Scheduling | Prisma schema, db push, Admin Create/Edit forms, Student Exams hub, Quiz Runner gating & countdowns, timer bugfixes | none | DONE |
-| M2 | Student Fast Progress Sync | Background sync hook in runner, non-blocking `/api/quiz/[quizId]/progress` integration | M1 | DONE |
-| M3 | Realtime Live Proctor & Gamified Leaderboard | `/admin/exams/[quizId]/proctor`, 3s polling, Top 3 Podium, live progress matrix, strike badges, supervisor actions with `useDialog`, mobile responsive | M2 | DONE |
-| M4 | E2E Testing, Build Check & GitHub Sync | Comprehensive test suite, `npm run build` verification, `git commit` and `git push origin main` | M3 | IN_PROGRESS |
+| M1 | Comprehensive Database Indexing | Prisma schema indexes (`@@index`), `npx prisma generate` / `db push` validation | none | IN_PROGRESS |
+| M2 | Payload Diet & Elimination of Blocking I/O | Optimize `/api/participants` and `/api/attendance/face-descriptors`, eliminate blocking LID resolving | M1 | IN_PROGRESS |
+| M3 | Batching & Transaction Optimization | Refactor `/api/quiz/submit` and `src/lib/bot-engine.ts` to batch queries & transactions | M2 | IN_PROGRESS |
+| M4 | E2E Testing, Build Check & Git Sync | Full build verification (`npm run build`), review/challenger/auditor verification, git commit & push | M3 | PLANNED |
 
 ## Interface Contracts
-### Admin Exam API ↔ Create/Edit Form
-- Payload: `{ openAt?: string | null, closeAt?: string | null, ... }` (ISO 8601 string or null)
-- Validation: If both provided, `new Date(openAt) < new Date(closeAt)` must be true.
+### Attendance Face Descriptors API
+- Endpoint: `GET /api/attendance/face-descriptors?sessionId=...`
+- Response: `Array<{ id: string, name: string, studentId?: string, faceDescriptor: string | number[] }>` (NO `facePhoto` raw base64 string)
 
-### Student Quiz Runner ↔ Progress Sync API
-- Endpoint: `POST /api/quiz/[quizId]/progress`
-- Payload: `{ questionId: string, answer: any }`
-- Response: `{ success: true, answeredCount: number, totalQuestions: number, currentScore: number }`
+### Participants List API
+- Endpoint: `GET /api/participants`
+- Response: List of participants with `id, name, email, role, class, status` without `facePhoto` payload.
 
-### Proctor Dashboard ↔ Proctor API
-- Endpoint: `GET /api/admin/exams/[quizId]/proctor`
-- Response includes:
-  - `quiz`: id, title, totalQuestions, questions: [{ id, questionNumber }]
-  - `participants`: array of `{ id, studentId, studentName, studentClass, status, score, answeredCount, totalQuestions, answeredQuestionIds: string[], strikes, violations: [], lastPing, startedAt, submittedAt }`
+### CBT Quiz Submission API
+- Endpoint: `POST /api/quiz/submit`
+- Logic: Evaluate all answers against questions & options, update attempt and insert answers in a single `prisma.$transaction`.
+
+### Bot Group Member Status
+- Function: `fetchGroupMembersWithStatus` in `src/lib/bot-engine.ts`
+- Logic: Query all members in a single `prisma.user.findMany({ where: { phoneNumber: { in: numbers } } })` rather than loop querying.
 
 ## Code Layout
-- `prisma/schema.prisma`: Data models
-- `src/app/admin/exams/create/page.tsx`: Admin Exam creation form
-- `src/app/admin/exams/[quizId]/edit/page.tsx`: Admin Exam edit form
-- `src/app/admin/exams/page.tsx`: Admin Exams list
-- `src/app/admin/exams/[quizId]/proctor/page.tsx`: Realtime Live Proctor & Leaderboard
-- `src/app/api/admin/exams/...`: Admin exam APIs
-- `src/app/api/admin/exams/[quizId]/proctor/route.ts`: Proctor polling endpoint
-- `src/app/api/admin/exams/[quizId]/action/route.ts`: Supervisor actions endpoint
-- `src/app/student/exams/page.tsx`: Student Exam Hub
-- `src/app/student/quiz/[quizId]/page.tsx`: Student Quiz Runner
-- `src/app/api/quiz/[quizId]/progress/route.ts`: Student progress sync endpoint
-- `src/components/ui/DialogProvider.tsx`: Custom Dialog & Toast system (`useDialog`)
+- `prisma/schema.prisma`: Database models & composite indices
+- `src/app/api/participants/route.ts`: Participant listing
+- `src/app/api/attendance/face-descriptors/route.ts`: Face descriptors biometric endpoint
+- `src/app/api/quiz/submit/route.ts`: CBT quiz submission handler
+- `src/lib/bot-engine.ts`: Bot synchronization engine
+- `src/components/ui/DialogProvider.tsx`: Dialog system

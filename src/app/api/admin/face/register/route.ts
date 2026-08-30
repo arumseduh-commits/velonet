@@ -37,12 +37,11 @@ export async function POST(req: Request) {
         studentClass: true,
         gender: true,
         faceDescriptor: true,
-        facePhoto: true,
       },
     });
 
     if (existingUsersWithFace.length > 0) {
-      const matchResult = findBestFaceMatch(faceDescriptor, existingUsersWithFace, 0.45);
+      const matchResult = findBestFaceMatch(faceDescriptor, existingUsersWithFace as any, 0.45);
       if (matchResult.isMatch && matchResult.matchedUser) {
         const ownerName = matchResult.matchedUser.name || "Peserta Lain";
         const ownerClass = matchResult.matchedUser.studentClass || "-";

@@ -189,73 +189,91 @@ export async function POST(req: Request) {
       });
     }
 
-    // Find existing attempt or create new
-    let existingAttempt = await prisma.quizAttempt.findFirst({
-      where: {
-        quizId,
-        userId: student!.id,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    let quizAttempt;
-    if (existingAttempt) {
-      quizAttempt = await prisma.quizAttempt.update({
-        where: { id: existingAttempt.id },
-        data: {
-          score: earnedScore,
-          totalScore,
-          status: hasPendingEssays ? "SUBMITTED" : "GRADED",
-          isFullyGraded: !hasPendingEssays,
-          submittedAt: new Date(),
-          answers: JSON.stringify(answers),
-        },
-      });
-    } else {
-      quizAttempt = await prisma.quizAttempt.create({
-        data: {
-          quizId,
-          userId: student!.id,
-          score: earnedScore,
-          totalScore,
-          status: hasPendingEssays ? "SUBMITTED" : "GRADED",
-          isFullyGraded: !hasPendingEssays,
-          startedAt: new Date(),
-          submittedAt: new Date(),
-          answers: JSON.stringify(answers),
-        },
-      });
-    }
-
-    // Save individual QuizStudentAnswer records
-    for (const detail of gradedDetails) {
-      await prisma.quizStudentAnswer.upsert({
-        where: {
-          attemptId_questionId: {
-            attemptId: quizAttempt.id,
-            questionId: detail.questionId,
+    // Atomic Database Transaction: Attempt Creation/Update + Parallel Answers Upsert
+    const quizAttempt = await prisma.$transaction(
+      async (tx) => {
+        const existingAttempt = await tx.quizAttempt.findFirst({
+          where: {
+            quizId,
+            userId: student!.id,
           },
-        },
-        update: {
-          selectedOptionIds: detail.selectedOptionIds ? JSON.stringify(detail.selectedOptionIds) : null,
-          textResponse: detail.textResponse || null,
-          isAutoGraded: detail.isAutoGraded,
-          earnedPoints: detail.earnedPoints,
-          aiSuggestedScore: detail.aiSuggestedScore,
-          aiEvaluationFeedback: detail.aiEvaluationFeedback,
-        },
-        create: {
-          attemptId: quizAttempt.id,
-          questionId: detail.questionId,
-          selectedOptionIds: detail.selectedOptionIds ? JSON.stringify(detail.selectedOptionIds) : null,
-          textResponse: detail.textResponse || null,
-          isAutoGraded: detail.isAutoGraded,
-          earnedPoints: detail.earnedPoints,
-          aiSuggestedScore: detail.aiSuggestedScore,
-          aiEvaluationFeedback: detail.aiEvaluationFeedback,
-        },
-      });
-    }
+          orderBy: { createdAt: "desc" },
+        });
+
+        let attemptRecord;
+        if (existingAttempt) {
+          attemptRecord = await tx.quizAttempt.update({
+            where: { id: existingAttempt.id },
+            data: {
+              score: earnedScore,
+              totalScore,
+              status: hasPendingEssays ? "SUBMITTED" : "GRADED",
+              isFullyGraded: !hasPendingEssays,
+              submittedAt: new Date(),
+              answers: JSON.stringify(answers),
+            },
+          });
+        } else {
+          attemptRecord = await tx.quizAttempt.create({
+            data: {
+              quizId,
+              userId: student!.id,
+              score: earnedScore,
+              totalScore,
+              status: hasPendingEssays ? "SUBMITTED" : "GRADED",
+              isFullyGraded: !hasPendingEssays,
+              startedAt: new Date(),
+              submittedAt: new Date(),
+              answers: JSON.stringify(answers),
+            },
+          });
+        }
+
+        // Parallel Upsert of all student answers in the transaction
+        const answerUpsertPromises = gradedDetails.map((detail) =>
+          tx.quizStudentAnswer.upsert({
+            where: {
+              attemptId_questionId: {
+                attemptId: attemptRecord.id,
+                questionId: detail.questionId,
+              },
+            },
+            update: {
+              selectedOptionIds:
+                detail.selectedOptionIds && detail.selectedOptionIds.length > 0
+                  ? JSON.stringify(detail.selectedOptionIds)
+                  : null,
+              textResponse: detail.textResponse || null,
+              isAutoGraded: detail.isAutoGraded,
+              earnedPoints: detail.earnedPoints,
+              aiSuggestedScore: detail.aiSuggestedScore,
+              aiEvaluationFeedback: detail.aiEvaluationFeedback,
+            },
+            create: {
+              attemptId: attemptRecord.id,
+              questionId: detail.questionId,
+              selectedOptionIds:
+                detail.selectedOptionIds && detail.selectedOptionIds.length > 0
+                  ? JSON.stringify(detail.selectedOptionIds)
+                  : null,
+              textResponse: detail.textResponse || null,
+              isAutoGraded: detail.isAutoGraded,
+              earnedPoints: detail.earnedPoints,
+              aiSuggestedScore: detail.aiSuggestedScore,
+              aiEvaluationFeedback: detail.aiEvaluationFeedback,
+            },
+          })
+        );
+
+        await Promise.all(answerUpsertPromises);
+
+        return attemptRecord;
+      },
+      {
+        timeout: 15000,
+        maxWait: 5000,
+      }
+    );
 
     try {
       await awardXP(student!.id, 50, "Menyelesaikan Ujian CBT");
