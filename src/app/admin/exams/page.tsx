@@ -23,6 +23,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 
 function formatIndonesianDateTime(dateInput: string | Date | null | undefined): string {
   if (!dateInput) return "-";
@@ -40,15 +41,6 @@ function formatIndonesianDateTime(dateInput: string | Date | null | undefined): 
 }
 
 function getExamAvailability(openAt?: string | null, closeAt?: string | null) {
-  if (!openAt && !closeAt) {
-    return {
-      status: "FLEXIBLE",
-      label: "Akses Fleksibel",
-      badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
-      dotClass: "bg-slate-400",
-    };
-  }
-
   const now = new Date();
   const openDate = openAt ? new Date(openAt) : null;
   const closeDate = closeAt ? new Date(closeAt) : null;
@@ -56,16 +48,16 @@ function getExamAvailability(openAt?: string | null, closeAt?: string | null) {
   if (openDate && now < openDate) {
     return {
       status: "UPCOMING",
-      label: "Terjadwal",
-      badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
+      label: "Belum Dibuka",
+      badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
       dotClass: "bg-amber-500",
     };
   }
 
   if (closeDate && now > closeDate) {
     return {
-      status: "CLOSED",
-      label: "Telah Berakhir",
+      status: "EXPIRED",
+      label: "Ujian Selesai / Ditutup",
       badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
       dotClass: "bg-rose-500",
     };
@@ -85,18 +77,39 @@ export default function AdminExamsListPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fetchExams = async () => {
-    setLoading(true);
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "ALL">(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
+  const fetchExams = async (isSilent = false, overridePage?: number, overridePageSize?: number | "ALL") => {
+    if (!isSilent) setLoading(true);
     try {
-      const res = await fetch("/api/admin/exams");
+      const activePage = overridePage !== undefined ? overridePage : page;
+      const activeSize = overridePageSize !== undefined ? overridePageSize : pageSize;
+
+      const url = new URL("/api/admin/exams", window.location.origin);
+      if (searchQuery) url.searchParams.set("query", searchQuery);
+      url.searchParams.set("page", activePage.toString());
+      url.searchParams.set("limit", activeSize.toString());
+
+      const res = await fetch(url.toString());
       const json = await res.json();
       if (json.success && json.data) {
         setExams(json.data);
+        if (json.pagination) {
+          setTotalItems(json.pagination.total);
+          setTotalPages(json.pagination.totalPages);
+        } else {
+          setTotalItems(json.data.length);
+          setTotalPages(1);
+        }
       }
     } catch (err) {
       toast.error("Gagal memuat daftar ujian.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -127,8 +140,15 @@ export default function AdminExamsListPage() {
   };
 
   useEffect(() => {
-    fetchExams();
-  }, []);
+    setPage(1);
+    fetchExams(false, 1);
+  }, [pageSize]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    fetchExams(false, 1);
+  };
 
   const filteredExams = exams.filter((e) =>
     e.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -172,7 +192,7 @@ export default function AdminExamsListPage() {
           </Link>
 
           <button
-            onClick={fetchExams}
+            onClick={() => fetchExams()}
             disabled={loading}
             className="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10 cursor-pointer flex items-center gap-2 text-xs font-bold"
           >
@@ -413,6 +433,27 @@ export default function AdminExamsListPage() {
           })}
         </div>
       )}
+
+      {/* Pagination Controls */}
+      <div className="rounded-3xl bg-white border border-slate-200 shadow-sm px-4">
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+            fetchExams(false, newPage, pageSize);
+          }}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+            fetchExams(false, 1, newSize);
+          }}
+          itemLabel="modul ujian"
+          isLoading={loading}
+        />
+      </div>
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 
 export default function AdminAILearningAssistantPage() {
   const router = useRouter();
@@ -38,6 +39,10 @@ export default function AdminAILearningAssistantPage() {
   const [loadingMaterials, setLoadingMaterials] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [syncing, setSyncing] = useState(false);
+
+  // KB Pagination State
+  const [kbPage, setKbPage] = useState(1);
+  const [kbPageSize, setKbPageSize] = useState<number | "ALL">(10);
 
   // Generator Config Form State
   const [sourceType, setSourceType] = useState<"KNOWLEDGE_BASE" | "CUSTOM">("KNOWLEDGE_BASE");
@@ -209,6 +214,13 @@ export default function AdminAILearningAssistantPage() {
       (m.summary && m.summary.toLowerCase().includes(q))
     );
   });
+
+  const kbTotal = filteredMaterials.length;
+  const kbTotalPages = kbPageSize === "ALL" ? 1 : Math.ceil(kbTotal / kbPageSize) || 1;
+  const paginatedMaterials =
+    kbPageSize === "ALL"
+      ? filteredMaterials
+      : filteredMaterials.slice((kbPage - 1) * kbPageSize, kbPage * kbPageSize);
 
   return (
     <div className="space-y-6 text-slate-900 pb-24">
@@ -637,7 +649,7 @@ export default function AdminAILearningAssistantPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredMaterials.map((m) => (
+                  paginatedMaterials.map((m) => (
                     <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3.5 px-4 font-bold text-slate-900 max-w-sm truncate">
                         {m.title}
@@ -675,6 +687,23 @@ export default function AdminAILearningAssistantPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="border-t border-slate-100 bg-slate-50/50 px-2 rounded-2xl">
+            <Pagination
+              currentPage={kbPage}
+              totalPages={kbTotalPages}
+              totalItems={kbTotal}
+              pageSize={kbPageSize}
+              onPageChange={(newPage) => setKbPage(newPage)}
+              onPageSizeChange={(newSize) => {
+                setKbPageSize(newSize);
+                setKbPage(1);
+              }}
+              itemLabel="materi referensi"
+              isLoading={loadingMaterials}
+            />
           </div>
         </div>
       )}

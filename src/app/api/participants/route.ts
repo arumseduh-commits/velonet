@@ -30,31 +30,78 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const participants = await prisma.user.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        phoneNumber: true,
-        name: true,
-        studentClass: true,
-        motivation: true,
-        hobby: true,
-        gender: true,
-        birthDate: true,
-        status: true,
-        isExcluded: true,
-        isKickedFromGrp: true,
-        lastSentAt: true,
-        faceDescriptor: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+
+    const page = Math.max(1, parseInt(pageParam || "1", 10));
+    const isAll = limitParam === "ALL";
+    const limit = isAll ? undefined : Math.max(1, parseInt(limitParam || "10", 10));
+    const safeLimit = limit ?? 10;
+
+    const selectFields = {
+      id: true,
+      phoneNumber: true,
+      name: true,
+      studentClass: true,
+      status: true,
+      role: true,
+      notes: true,
+      isExcluded: true,
+      isKickedFromGrp: true,
+      lastSentAt: true,
+      faceDescriptor: true,
+      createdAt: true,
+      updatedAt: true,
+    };
+
+    if (isAll) {
+      const [total, participants] = await prisma.$transaction([
+        prisma.user.count({ where: whereClause }),
+        prisma.user.findMany({
+          where: whereClause,
+          select: selectFields,
+          orderBy: { updatedAt: "desc" },
+        }),
+      ]);
+
+      return NextResponse.json({
+        success: true,
+        data: participants,
+        pagination: {
+          total,
+          page: 1,
+          limit: "ALL",
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      });
+    }
+
+    const [total, participants] = await prisma.$transaction([
+      prisma.user.count({ where: whereClause }),
+      prisma.user.findMany({
+        where: whereClause,
+        select: selectFields,
+        take: safeLimit,
+        skip: (page - 1) * safeLimit,
+        orderBy: { updatedAt: "desc" },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / safeLimit) || 1;
 
     return NextResponse.json({
       success: true,
       data: participants,
+      pagination: {
+        total,
+        page,
+        limit: safeLimit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
     });
   } catch (error: any) {
     return NextResponse.json(

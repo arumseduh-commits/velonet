@@ -5,16 +5,47 @@ import { botEngine } from "@/lib/bot-engine";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const kickList = await prisma.user.findMany({
-      where: { status: RegistrationStatus.OPTED_OUT },
-      orderBy: { updatedAt: "desc" },
-    });
+    const searchParams = req.nextUrl.searchParams;
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+    const query = searchParams.get("query") || "";
+
+    const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+    const isAll = limitParam === "ALL";
+    const limit = isAll ? undefined : (parseInt(limitParam || "", 10) || 10);
+
+    const whereClause: any = { status: RegistrationStatus.OPTED_OUT };
+    if (query) {
+      whereClause.OR = [
+        { name: { contains: query, mode: "insensitive" } },
+        { phoneNumber: { contains: query } },
+      ];
+    }
+
+    const [total, kickList] = await prisma.$transaction([
+      prisma.user.count({ where: whereClause }),
+      prisma.user.findMany({
+        where: whereClause,
+        orderBy: { updatedAt: "desc" },
+        ...(limit && !isAll ? { take: limit, skip: (page - 1) * limit } : {}),
+      }),
+    ]);
+
+    const totalPages = isAll || !limit ? 1 : Math.ceil(total / limit) || 1;
 
     return NextResponse.json({
       success: true,
       data: kickList,
+      pagination: {
+        total,
+        page: isAll ? 1 : page,
+        limit: isAll ? "ALL" : (limit || total),
+        totalPages,
+        hasNext: !isAll && page < totalPages,
+        hasPrev: !isAll && page > 1,
+      },
     });
   } catch (error: any) {
     return NextResponse.json(

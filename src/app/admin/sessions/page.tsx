@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 import {
   CalendarCheck,
   Plus,
@@ -21,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  Search,
 } from "lucide-react";
 
 const InteractiveLocationPicker = dynamic(
@@ -60,6 +62,13 @@ export default function SessionsAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "ALL">(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Edit & Broadcast WA Modal State
   const [broadcastModalSession, setBroadcastModalSession] = useState<SessionItem | null>(null);
   const [broadcastCustomNote, setBroadcastCustomNote] = useState("");
@@ -97,9 +106,59 @@ export default function SessionsAdminPage() {
     }
   };
 
+  // Fetch all sessions
+  const fetchSessions = async (isSilent = false, overridePage?: number, overridePageSize?: number | "ALL") => {
+    try {
+      if (!isSilent) setIsLoading(true);
+      const activePage = overridePage !== undefined ? overridePage : page;
+      const activeSize = overridePageSize !== undefined ? overridePageSize : pageSize;
+
+      const url = new URL("/api/sessions", window.location.origin);
+      if (searchQuery) url.searchParams.set("query", searchQuery);
+      url.searchParams.set("page", activePage.toString());
+      url.searchParams.set("limit", activeSize.toString());
+
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSessions(json.data);
+          if (json.pagination) {
+            setTotalItems(json.pagination.total);
+            setTotalPages(json.pagination.totalPages);
+          } else {
+            setTotalItems(json.data.length);
+            setTotalPages(1);
+          }
+        } else if (Array.isArray(json)) {
+          setSessions(json);
+          setTotalItems(json.length);
+          setTotalPages(1);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch sessions:", err);
+    } finally {
+      if (!isSilent) setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
+    setPage(1);
+    fetchSessions(false, 1);
     fetchLocationPresets();
-  }, []);
+    const nowLocal = new Date();
+    const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
+    setDate(today);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchSessions(true);
+      }
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, [pageSize]);
 
   const handleLocationPresetChange = (presetName: string) => {
     setLocationPreset(presetName);
@@ -264,36 +323,7 @@ export default function SessionsAdminPage() {
     text: string;
   } | null>(null);
 
-  // Fetch all sessions
-  const fetchSessions = async (isSilent = false) => {
-    try {
-      if (!isSilent) setIsLoading(true);
-      const res = await fetch("/api/sessions");
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch sessions:", err);
-    } finally {
-      if (!isSilent) setIsLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    fetchSessions();
-    const nowLocal = new Date();
-    const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
-    setDate(today);
-
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        fetchSessions(true);
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -781,6 +811,27 @@ export default function SessionsAdminPage() {
           })}
         </div>
       )}
+
+      {/* Pagination Controls */}
+      <div className="rounded-3xl bg-white border border-slate-200 shadow-sm px-4">
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+            fetchSessions(false, newPage, pageSize);
+          }}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+            fetchSessions(false, 1, newSize);
+          }}
+          itemLabel="sesi pertemuan"
+          isLoading={isLoading}
+        />
+      </div>
 
       {/* Modal Form: Buat Sesi Baru */}
       {isModalOpen && (() => {

@@ -2,35 +2,57 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const admin = await getLoggedInAdmin();
     if (!admin) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const quizzes = await prisma.quiz.findMany({
-      include: {
-        questions: {
-          select: { id: true },
-        },
-        attempts: {
-          select: {
-            id: true,
-            status: true,
-            strikeCount: true,
-            score: true,
+    const { searchParams } = new URL(req.url);
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+    const query = searchParams.get("query") || "";
+
+    const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+    const isAll = limitParam === "ALL";
+    const limit = isAll ? undefined : (parseInt(limitParam || "", 10) || 10);
+
+    const whereClause: any = {};
+    if (query) {
+      whereClause.OR = [
+        { title: { contains: query, mode: "insensitive" } },
+        { description: { contains: query, mode: "insensitive" } },
+      ];
+    }
+
+    const [total, quizzes] = await prisma.$transaction([
+      prisma.quiz.count({ where: whereClause }),
+      prisma.quiz.findMany({
+        where: whereClause,
+        include: {
+          questions: {
+            select: { id: true },
+          },
+          attempts: {
+            select: {
+              id: true,
+              status: true,
+              strikeCount: true,
+              score: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+        ...(limit && !isAll ? { take: limit, skip: (page - 1) * limit } : {}),
+      }),
+    ]);
 
     const formatted = quizzes.map((q) => {
       const totalParticipants = q.attempts.length;
       const inProgress = q.attempts.filter((a) => a.status === "IN_PROGRESS").length;
       const locked = q.attempts.filter((a) => a.status === "LOCKED").length;
-      const submitted = q.attempts.filter((a) => a.status === "SUBMITTED").length;
+      const submitted = q.attempts.filter((a) => a.status === "SUBMITTED" || a.status === "GRADED").length;
 
       return {
         id: q.id,
@@ -55,7 +77,20 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ success: true, data: formatted });
+    const totalPages = isAll || !limit ? 1 : Math.ceil(total / limit) || 1;
+
+    return NextResponse.json({
+      success: true,
+      data: formatted,
+      pagination: {
+        total,
+        page: isAll ? 1 : page,
+        limit: isAll ? "ALL" : (limit || total),
+        totalPages,
+        hasNext: !isAll && page < totalPages,
+        hasPrev: !isAll && page > 1,
+      },
+    });
   } catch (err) {
     console.error("[Admin Exams API GET]", err);
     return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });

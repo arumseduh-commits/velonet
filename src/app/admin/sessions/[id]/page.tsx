@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 import {
   ArrowLeft,
   CalendarCheck,
@@ -60,6 +61,10 @@ export default function SessionDetailPage({
   const [session, setSession] = useState<SessionData | null>(null);
   const [participants, setParticipants] = useState<ParticipantAttendanceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "ALL">(10);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -219,6 +224,13 @@ export default function SessionDetailPage({
 
     return matchesSearch && matchesStatus;
   });
+
+  const totalItems = filteredList.length;
+  const totalPages = pageSize === "ALL" ? 1 : Math.ceil(totalItems / pageSize) || 1;
+  const paginatedList =
+    pageSize === "ALL"
+      ? filteredList
+      : filteredList.slice((page - 1) * pageSize, page * pageSize);
 
   // Summary Counters
   const hadirCount = participants.filter((p) => p.status === "HADIR").length;
@@ -460,15 +472,16 @@ export default function SessionDetailPage({
             </thead>
 
             <tbody className="divide-y divide-slate-100 text-slate-800">
-              {filteredList.length === 0 ? (
+              {paginatedList.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">
                     Tidak ada data peserta yang cocok dengan pencarian / filter.
                   </td>
                 </tr>
               ) : (
-                filteredList.map((p, idx) => {
+                paginatedList.map((p, idx) => {
                   const isUpdatingThis = updatingId === p.participantId;
+                  const itemIndex = (pageSize === "ALL" ? 0 : (page - 1) * pageSize) + idx + 1;
                   const timeStr = p.checkInTime
                     ? new Date(p.checkInTime).toLocaleTimeString("id-ID", {
                         hour: "2-digit",
@@ -481,7 +494,7 @@ export default function SessionDetailPage({
                       key={p.participantId}
                       className="hover:bg-slate-50/80 transition-colors"
                     >
-                      <td className="p-4 font-mono text-slate-400 font-semibold">{idx + 1}</td>
+                      <td className="p-4 font-mono text-slate-400 font-semibold">{itemIndex}</td>
 
                       <td className="p-4 font-bold text-slate-900">
                         {p.name}
@@ -518,27 +531,37 @@ export default function SessionDetailPage({
                         )}
                       </td>
 
-                      <td className="p-4 font-mono text-slate-600">
+                      <td className="p-4 font-mono font-medium text-slate-700">
                         {timeStr}
                       </td>
 
-                      <td className="p-4 font-mono text-emerald-700 font-bold">
-                        {p.distanceMeter != null ? `${p.distanceMeter}m` : "-"}
+                      <td className="p-4 font-mono font-semibold text-slate-700">
+                        {p.distanceMeter !== null ? (
+                          <span
+                            className={
+                              p.distanceMeter <= session.radiusMeter
+                                ? "text-emerald-700 font-bold"
+                                : "text-amber-800 font-bold"
+                            }
+                          >
+                            {p.distanceMeter}m
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">-</span>
+                        )}
                       </td>
 
-                      <td className="p-4 text-slate-500 max-w-xs truncate" title={p.notes || ""}>
+                      <td className="p-4 text-slate-600 text-xs max-w-xs truncate" title={p.notes || ""}>
                         {p.notes || "-"}
                       </td>
 
                       <td className="p-4 text-right">
                         {isExpired ? (
-                          <span className="text-[11px] font-medium text-slate-400 italic">
-                            🔒 Rekap Terkunci
-                          </span>
+                          <span className="text-slate-400 italic text-[11px]">Terkunci</span>
                         ) : isUpdatingThis ? (
                           <Loader2 className="w-4 h-4 text-emerald-600 animate-spin ml-auto" />
                         ) : (
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             <button
                               onClick={() => handleUpdateStatus(p.participantId, "HADIR")}
                               className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
@@ -591,6 +614,23 @@ export default function SessionDetailPage({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            itemLabel="peserta"
+            isLoading={isLoading}
+          />
         </div>
       </div>
 

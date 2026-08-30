@@ -18,6 +18,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 
 interface CumulativeItem {
   participantId: string;
@@ -39,17 +40,29 @@ export default function CumulativeReportsPage() {
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "ALL">(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   // Filters
   const [selectedMonth, setSelectedMonth] = useState("ALL");
   const [selectedYear, setSelectedYear] = useState("2026");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fetchReport = async (isSilent = false) => {
+  const fetchReport = async (isSilent = false, overridePage?: number, overridePageSize?: number | "ALL") => {
     try {
       if (!isSilent) setIsLoading(true);
+      const activePage = overridePage !== undefined ? overridePage : page;
+      const activeSize = overridePageSize !== undefined ? overridePageSize : pageSize;
+
       const url = new URL("/api/reports/cumulative", window.location.origin);
       if (selectedMonth !== "ALL") url.searchParams.set("month", selectedMonth);
       if (selectedYear !== "ALL") url.searchParams.set("year", selectedYear);
+      if (searchQuery) url.searchParams.set("query", searchQuery);
+      url.searchParams.set("page", activePage.toString());
+      url.searchParams.set("limit", activeSize.toString());
 
       const res = await fetch(url.toString());
       const json = await res.json();
@@ -57,6 +70,13 @@ export default function CumulativeReportsPage() {
         setReportList(json.report);
         setTotalSessions(json.totalSessions);
         setTotalParticipants(json.totalParticipants);
+        if (json.pagination) {
+          setTotalItems(json.pagination.total);
+          setTotalPages(json.pagination.totalPages);
+        } else {
+          setTotalItems(json.report.length);
+          setTotalPages(1);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch cumulative report:", err);
@@ -66,16 +86,17 @@ export default function CumulativeReportsPage() {
   };
 
   useEffect(() => {
-    fetchReport();
-    // Real-time Auto-Sync Poller (Every 4s)
+    setPage(1);
+    fetchReport(false, 1);
+    // Real-time Auto-Sync Poller (Every 5s)
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         fetchReport(true);
       }
-    }, 4000);
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, pageSize]);
 
   const handleExportCSV = () => {
     const url = `/api/reports/cumulative/export?month=${selectedMonth}&year=${selectedYear}`;
@@ -304,6 +325,27 @@ export default function CumulativeReportsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              fetchReport(false, newPage, pageSize);
+            }}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+              fetchReport(false, 1, newSize);
+            }}
+            itemLabel="peserta"
+            isLoading={isLoading}
+          />
         </div>
       </div>
     </div>

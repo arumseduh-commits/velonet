@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getParticipantSlug } from "@/lib/slug";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 import {
   Search,
   Plus,
@@ -48,6 +49,12 @@ export default function ParticipantsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "ALL">(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   // Default Tab Status Filter: ACTIVE (Peserta Aktif / COMPLETED)
   const [activeTab, setActiveTab] = useState<"ACTIVE" | "WAITING" | "ALL">("ACTIVE");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -68,9 +75,12 @@ export default function ParticipantsPage() {
   // All fetched participants for calculating tab badge counts
   const [allParticipantsForBadges, setAllParticipantsForBadges] = useState<Participant[]>([]);
 
-  const fetchParticipants = async (isSilent = false) => {
+  const fetchParticipants = async (isSilent = false, overridePage?: number, overridePageSize?: number | "ALL") => {
     if (!isSilent) setLoading(true);
     try {
+      const activePage = overridePage !== undefined ? overridePage : page;
+      const activeSize = overridePageSize !== undefined ? overridePageSize : pageSize;
+
       const url = new URL("/api/participants", window.location.origin);
       if (searchQuery) url.searchParams.set("query", searchQuery);
       
@@ -81,15 +91,25 @@ export default function ParticipantsPage() {
         url.searchParams.set("status", statusFilter);
       }
 
+      url.searchParams.set("page", activePage.toString());
+      url.searchParams.set("limit", activeSize.toString());
+
       const res = await fetch(url.toString());
       const json = await res.json();
       if (json.success) {
         setParticipants(json.data);
+        if (json.pagination) {
+          setTotalItems(json.pagination.total);
+          setTotalPages(json.pagination.totalPages);
+        } else {
+          setTotalItems(json.data.length);
+          setTotalPages(1);
+        }
       }
 
       // Also fetch un-filtered for badge counters if needed
       if (!isSilent && !searchQuery) {
-        const allRes = await fetch("/api/participants");
+        const allRes = await fetch("/api/participants?limit=ALL");
         const allJson = await allRes.json();
         if (allJson.success) {
           setAllParticipantsForBadges(allJson.data);
@@ -103,16 +123,17 @@ export default function ParticipantsPage() {
   };
 
   useEffect(() => {
-    fetchParticipants();
+    setPage(1);
+    fetchParticipants(false, 1);
     setSelectedIds([]); // reset bulk selection when tab/filter changes
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
         fetchParticipants(true);
       }
-    }, 3500);
+    }, 4500);
 
     return () => clearInterval(interval);
-  }, [activeTab, statusFilter]);
+  }, [activeTab, statusFilter, pageSize]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -651,6 +672,27 @@ export default function ParticipantsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              fetchParticipants(false, newPage, pageSize);
+            }}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+              fetchParticipants(false, 1, newSize);
+            }}
+            itemLabel="peserta"
+            isLoading={loading}
+          />
         </div>
       </div>
 

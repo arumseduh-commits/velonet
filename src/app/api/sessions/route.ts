@@ -1,19 +1,41 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const sessions = await prisma.meetingSession.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        attendances: {
-          select: {
-            id: true,
-            status: true,
+    const { searchParams } = new URL(req.url);
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+    const query = searchParams.get("query") || "";
+
+    const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+    const isAll = limitParam === "ALL";
+    const limit = isAll ? undefined : (parseInt(limitParam || "", 10) || 10);
+
+    const whereClause: any = {};
+    if (query) {
+      whereClause.OR = [
+        { title: { contains: query, mode: "insensitive" } },
+        { locationName: { contains: query, mode: "insensitive" } },
+      ];
+    }
+
+    const [total, sessions] = await prisma.$transaction([
+      prisma.meetingSession.count({ where: whereClause }),
+      prisma.meetingSession.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        ...(limit && !isAll ? { take: limit, skip: (page - 1) * limit } : {}),
+        include: {
+          attendances: {
+            select: {
+              id: true,
+              status: true,
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
     const formatted = sessions.map((s) => {
       const hadirCount = s.attendances.filter((a) => a.status === "HADIR").length;
@@ -26,7 +48,20 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json(formatted);
+    const totalPages = isAll || !limit ? 1 : Math.ceil(total / limit) || 1;
+
+    return NextResponse.json({
+      success: true,
+      data: formatted,
+      pagination: {
+        total,
+        page: isAll ? 1 : page,
+        limit: isAll ? "ALL" : (limit || total),
+        totalPages,
+        hasNext: !isAll && page < totalPages,
+        hasPrev: !isAll && page > 1,
+      },
+    });
   } catch (error: any) {
     console.error("GET /api/sessions error:", error);
     return NextResponse.json(

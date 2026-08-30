@@ -7,10 +7,34 @@ export async function GET(req: Request) {
     const monthParam = searchParams.get("month"); // e.g. "8" or "ALL"
     const yearParam = searchParams.get("year");   // e.g. "2026" or "ALL"
 
+    const query = searchParams.get("query") || "";
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+
+    const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+    const isAll = limitParam === "ALL";
+    const limit = isAll ? undefined : (parseInt(limitParam || "", 10) || 10);
+
     // 1. Fetch all completed/registered participants
     const participants = await prisma.user.findMany({
       where: {
         isExcluded: false,
+        ...(query
+          ? {
+              OR: [
+                { name: { contains: query, mode: "insensitive" } },
+                { phoneNumber: { contains: query } },
+                { studentClass: { contains: query, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        phoneNumber: true,
+        studentClass: true,
+        status: true,
       },
       orderBy: { name: "asc" },
     });
@@ -19,7 +43,12 @@ export async function GET(req: Request) {
     const allSessions = await prisma.meetingSession.findMany({
       orderBy: { date: "desc" },
       include: {
-        attendances: true,
+        attendances: {
+          select: {
+            userId: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -35,7 +64,7 @@ export async function GET(req: Request) {
     const now = new Date();
 
     // 3. Aggregate cumulative statistics per participant
-    const reportData = participants.map((p) => {
+    const allReportData = participants.map((p) => {
       let hadirCount = 0;
       let izinCount = 0;
       let alpaCount = 0;
@@ -72,11 +101,25 @@ export async function GET(req: Request) {
       };
     });
 
+    const totalItems = allReportData.length;
+    const totalPages = isAll || !limit ? 1 : Math.ceil(totalItems / limit) || 1;
+    const paginatedReport = isAll || !limit
+      ? allReportData
+      : allReportData.slice((page - 1) * limit, page * limit);
+
     return NextResponse.json({
       success: true,
       totalSessions: totalSessionsCount,
-      totalParticipants: participants.length,
-      report: reportData,
+      totalParticipants: totalItems,
+      report: paginatedReport,
+      pagination: {
+        total: totalItems,
+        page: isAll ? 1 : page,
+        limit: isAll ? "ALL" : (limit || totalItems),
+        totalPages,
+        hasNext: !isAll && page < totalPages,
+        hasPrev: !isAll && page > 1,
+      },
     });
   } catch (error: any) {
     console.error("GET /api/reports/cumulative error:", error);

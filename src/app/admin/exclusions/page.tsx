@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ShieldAlert, Plus, Trash2, RefreshCw, UserCheck } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 
 interface ExcludedParticipant {
   id: string;
@@ -20,24 +21,45 @@ export default function ExclusionsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const fetchExclusions = async () => {
-    setLoading(true);
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "ALL">(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
+  const fetchExclusions = async (isSilent = false, overridePage?: number, overridePageSize?: number | "ALL") => {
+    if (!isSilent) setLoading(true);
     try {
-      const res = await fetch("/api/exclusions");
+      const activePage = overridePage !== undefined ? overridePage : page;
+      const activeSize = overridePageSize !== undefined ? overridePageSize : pageSize;
+
+      const url = new URL("/api/exclusions", window.location.origin);
+      url.searchParams.set("page", activePage.toString());
+      url.searchParams.set("limit", activeSize.toString());
+
+      const res = await fetch(url.toString());
       const json = await res.json();
       if (json.success) {
         setExclusions(json.data);
+        if (json.pagination) {
+          setTotalItems(json.pagination.total);
+          setTotalPages(json.pagination.totalPages);
+        } else {
+          setTotalItems(json.data.length);
+          setTotalPages(1);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch exclusions:", err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchExclusions();
-  }, []);
+    setPage(1);
+    fetchExclusions(false, 1);
+  }, [pageSize]);
 
   const handleAddExclusion = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +234,27 @@ export default function ExclusionsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              fetchExclusions(false, newPage, pageSize);
+            }}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+              fetchExclusions(false, 1, newSize);
+            }}
+            itemLabel="pengecualian"
+            isLoading={loading}
+          />
         </div>
       </div>
     </div>

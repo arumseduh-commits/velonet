@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { UserX, CheckSquare, Square, Copy, Check, RefreshCw, AlertCircle, UserMinus, ShieldAlert, Search } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import Pagination from "@/components/ui/Pagination";
 
 interface KickParticipant {
   id: string;
@@ -29,20 +30,42 @@ export default function KickListPage() {
   const [targetGroupId, setTargetGroupId] = useState<string>("");
   const [customJid, setCustomJid] = useState<string>("");
   const [kickingId, setKickingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const fetchKickList = async () => {
-    setLoading(true);
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "ALL">(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
+  const fetchKickList = async (isSilent = false, overridePage?: number, overridePageSize?: number | "ALL") => {
+    if (!isSilent) setLoading(true);
     try {
-      const res = await fetch("/api/kick-list");
+      const activePage = overridePage !== undefined ? overridePage : page;
+      const activeSize = overridePageSize !== undefined ? overridePageSize : pageSize;
+
+      const url = new URL("/api/kick-list", window.location.origin);
+      if (searchQuery) url.searchParams.set("query", searchQuery);
+      url.searchParams.set("page", activePage.toString());
+      url.searchParams.set("limit", activeSize.toString());
+
+      const res = await fetch(url.toString());
       const json = await res.json();
       if (json.success) {
         setList(json.data);
+        if (json.pagination) {
+          setTotalItems(json.pagination.total);
+          setTotalPages(json.pagination.totalPages);
+        } else {
+          setTotalItems(json.data.length);
+          setTotalPages(1);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch kick list:", err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -62,9 +85,10 @@ export default function KickListPage() {
   };
 
   useEffect(() => {
-    fetchKickList();
+    setPage(1);
+    fetchKickList(false, 1);
     fetchGroups();
-  }, []);
+  }, [pageSize]);
 
   const toggleKickStatus = async (id: string, currentStatus: boolean) => {
     try {
@@ -133,8 +157,6 @@ export default function KickListPage() {
       setKickingId(null);
     }
   };
-
-  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const handleResendConfirmation = async (participant: KickParticipant) => {
     const confirmed = await confirm({
@@ -210,7 +232,7 @@ export default function KickListPage() {
           </button>
 
           <button
-            onClick={fetchKickList}
+            onClick={() => fetchKickList()}
             className="p-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl border border-slate-200 shadow-xs cursor-pointer"
             title="Refresh Kick List"
           >
@@ -415,6 +437,27 @@ export default function KickListPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              fetchKickList(false, newPage, pageSize);
+            }}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+              fetchKickList(false, 1, newSize);
+            }}
+            itemLabel="peserta"
+            isLoading={loading}
+          />
         </div>
       </div>
     </div>
