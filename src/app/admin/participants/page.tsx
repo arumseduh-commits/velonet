@@ -55,8 +55,8 @@ export default function ParticipantsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Default Tab Status Filter: ACTIVE (Peserta Aktif / COMPLETED)
-  const [activeTab, setActiveTab] = useState<"ACTIVE" | "WAITING" | "ALL">("ACTIVE");
+  // Default Tab Status Filter: ALL (Menampilkan semua peserta)
+  const [activeTab, setActiveTab] = useState<"ACTIVE" | "WAITING" | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
   // Bulk Action State
@@ -85,8 +85,10 @@ export default function ParticipantsPage() {
       if (searchQuery) url.searchParams.set("query", searchQuery);
       
       // Handle tab filter
-      if (activeTab !== "ALL") {
-        url.searchParams.set("status", activeTab);
+      if (activeTab === "ACTIVE") {
+        url.searchParams.set("status", "ACTIVE");
+      } else if (activeTab === "WAITING") {
+        url.searchParams.set("status", "WAITING");
       } else if (statusFilter !== "ALL") {
         url.searchParams.set("status", statusFilter);
       }
