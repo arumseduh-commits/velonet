@@ -36,7 +36,16 @@ class WhatsAppBotEngine extends EventEmitter {
   private isInitializing: boolean = false;
   private lidCache: Map<string, string> = new Map();
   private processedMsgIds: Set<string> = new Set();
-  private groupMembersCache: Map<string, { members: Set<string>; expiresAt: number }> = new Map();
+  private groupMembersCache: Map<
+    string,
+    {
+      members: Set<string>;
+      lidToPhone: Map<string, string>;
+      phoneToLid: Map<string, string>;
+      expiresAt: number;
+      fetchedAt: number;
+    }
+  > = new Map();
   private lastReplyTimestamps: Map<string, number> = new Map();
 
   constructor() {
@@ -212,6 +221,20 @@ class WhatsAppBotEngine extends EventEmitter {
 
           // Group Message Handling (@g.us)
           if (remoteJid.endsWith("@g.us")) {
+            const groupSenderJid = (msg as any).participant || (msg.key as any).participant;
+            const pushName = msg.pushName || undefined;
+
+            // Record active group sender into groupMembersCache immediately
+            if (groupSenderJid) {
+              const senderDigits = groupSenderJid.split("@")[0].split(":")[0].replace(/\D/g, "");
+              const groupCache = this.groupMembersCache.get(remoteJid);
+              if (groupCache && senderDigits) {
+                groupCache.members.add(senderDigits);
+                if (senderDigits.startsWith("0")) groupCache.members.add("62" + senderDigits.slice(1));
+                if (senderDigits.startsWith("62")) groupCache.members.add("0" + senderDigits.slice(2));
+              }
+            }
+
             // ALWAYS log the Group JID whenever a group message arrives
             this.emit(
               "log",
@@ -232,9 +255,6 @@ class WhatsAppBotEngine extends EventEmitter {
               });
               continue;
             }
-
-            const groupSenderJid = (msg as any).participant || (msg.key as any).participant;
-            const pushName = msg.pushName || undefined;
 
             // Automatically catch group replies like "ya", "iya", "hadir", "ikut", "lanjut", "ok"
             if (
@@ -497,7 +517,10 @@ class WhatsAppBotEngine extends EventEmitter {
   /**
    * Fast in-memory cached group member lookup (0ms)
    */
-  public async isPhoneInGroup(groupIdInput: string, phoneNumber: string): Promise<boolean> {
+  /**
+   * Fast in-memory cached group member lookup (0ms) with multi-tier LID & phone resolution
+   */
+  public async isPhoneInGroup(groupIdInput: string, phoneNumberOrJid: string): Promise<boolean> {
     if (!this.socket || this.connectionState !== "CONNECTED") return false;
 
     let cleanGroupId = groupIdInput.trim();
@@ -505,61 +528,271 @@ class WhatsAppBotEngine extends EventEmitter {
       cleanGroupId = `${cleanGroupId.replace(/\D/g, "")}@g.us`;
     }
 
-    const cleanTargetPhone = phoneNumber.replace(/\D/g, "");
-    const formattedNum = cleanTargetPhone.startsWith("0") ? "62" + cleanTargetPhone.slice(1) : cleanTargetPhone;
+    if (!phoneNumberOrJid) return false;
 
-    // Check cache first (2-minute TTL)
-    const now = Date.now();
-    let memberSet: Set<string> | null = null;
-    const cached = this.groupMembersCache.get(cleanGroupId);
-    if (cached && cached.expiresAt > now) {
-      memberSet = cached.members;
-    } else {
-      // Populate cache from groupMetadata
-      try {
-        const metadata = await this.socket.groupMetadata(cleanGroupId).catch(() => null);
-        if (metadata && metadata.participants) {
-          memberSet = new Set<string>();
-          for (const p of metadata.participants) {
-            const pDigits = p.id.split("@")[0].split(":")[0];
-            memberSet.add(pDigits);
-            if (pDigits.startsWith("0")) memberSet.add("62" + pDigits.slice(1));
-            if (pDigits.startsWith("62")) memberSet.add("0" + pDigits.slice(2));
+    // Extract raw identifier (strip device suffix like :0, :1, and domains like @s.whatsapp.net, @lid)
+    const rawTarget = phoneNumberOrJid.split("@")[0].split(":")[0].trim();
+    const digitsOnly = rawTarget.replace(/\D/g, "");
 
-            if ((p as any).pn) {
-              const pnDigits = (p as any).pn.split("@")[0].split(":")[0];
-              memberSet.add(pnDigits);
-              if (pnDigits.startsWith("0")) memberSet.add("62" + pnDigits.slice(1));
-              if (pnDigits.startsWith("62")) memberSet.add("0" + pnDigits.slice(2));
-              if (pDigits) this.lidCache.set(pDigits, pnDigits);
-            }
-          }
-          this.groupMembersCache.set(cleanGroupId, {
-            members: memberSet,
-            expiresAt: now + 2 * 60 * 1000,
-          });
-        }
-      } catch (e) {
-        console.warn("[BotEngine] Could not fetch group metadata for isPhoneInGroup:", e);
+    const targetCandidates = new Set<string>();
+    if (rawTarget) targetCandidates.add(rawTarget);
+    if (digitsOnly) {
+      targetCandidates.add(digitsOnly);
+      if (digitsOnly.startsWith("0")) {
+        targetCandidates.add("62" + digitsOnly.slice(1));
+        targetCandidates.add(digitsOnly.slice(1));
+      } else if (digitsOnly.startsWith("62")) {
+        targetCandidates.add("0" + digitsOnly.slice(2));
+        targetCandidates.add(digitsOnly.slice(2));
+      } else if (digitsOnly.startsWith("8")) {
+        targetCandidates.add("0" + digitsOnly);
+        targetCandidates.add("62" + digitsOnly);
       }
     }
 
-    if (!memberSet) {
-      return false;
+    // Helper to fetch and populate group members cache
+    const populateGroupCache = async (forceFresh = false) => {
+      const now = Date.now();
+      const cached = this.groupMembersCache.get(cleanGroupId);
+      if (!forceFresh && cached && cached.expiresAt > now) {
+        return cached;
+      }
+
+      try {
+        const metadata = await this.socket?.groupMetadata(cleanGroupId);
+        if (!metadata || !metadata.participants) {
+          return cached || null;
+        }
+
+        const memberSet = new Set<string>();
+        const lidToPhone = new Map<string, string>();
+        const phoneToLid = new Map<string, string>();
+        const unresolvedLidJids: string[] = [];
+
+        for (const p of metadata.participants) {
+          const pIdClean = p.id.split("@")[0].split(":")[0];
+          const pDigits = pIdClean.replace(/\D/g, "");
+
+          if (pDigits) {
+            memberSet.add(pDigits);
+            if (pDigits.startsWith("0")) {
+              memberSet.add("62" + pDigits.slice(1));
+              memberSet.add(pDigits.slice(1));
+            } else if (pDigits.startsWith("62")) {
+              memberSet.add("0" + pDigits.slice(2));
+              memberSet.add(pDigits.slice(2));
+            } else if (pDigits.startsWith("8")) {
+              memberSet.add("0" + pDigits);
+              memberSet.add("62" + pDigits);
+            }
+          }
+
+          // Check explicit phone fields on participant
+          const pnRaw =
+            (p as any).pn ||
+            (p as any).phoneNumber ||
+            (p as any).phone ||
+            (p as any).jid;
+          if (pnRaw && typeof pnRaw === "string") {
+            const pnClean = pnRaw.split("@")[0].split(":")[0].replace(/\D/g, "");
+            if (pnClean) {
+              memberSet.add(pnClean);
+              if (pnClean.startsWith("0")) {
+                memberSet.add("62" + pnClean.slice(1));
+                memberSet.add(pnClean.slice(1));
+              } else if (pnClean.startsWith("62")) {
+                memberSet.add("0" + pnClean.slice(2));
+                memberSet.add(pnClean.slice(2));
+              } else if (pnClean.startsWith("8")) {
+                memberSet.add("0" + pnClean);
+                memberSet.add("62" + pnClean);
+              }
+              if (pDigits) {
+                const formattedPn = pnClean.startsWith("0") ? "62" + pnClean.slice(1) : pnClean;
+                lidToPhone.set(pDigits, formattedPn);
+                phoneToLid.set(formattedPn, pDigits);
+                this.lidCache.set(pDigits, formattedPn);
+                this.lidCache.set(formattedPn, pDigits);
+              }
+            }
+          } else if (p.id.endsWith("@lid") || pDigits.length > 13) {
+            // LID participant without explicit phone number attached
+            if (this.lidCache.has(pDigits)) {
+              const cachedPhone = this.lidCache.get(pDigits)!;
+              memberSet.add(cachedPhone);
+              if (cachedPhone.startsWith("62")) memberSet.add("0" + cachedPhone.slice(2));
+              lidToPhone.set(pDigits, cachedPhone);
+              phoneToLid.set(cachedPhone, pDigits);
+            } else {
+              unresolvedLidJids.push(p.id);
+            }
+          }
+        }
+
+        // Batch resolve any unresolved LID members via onWhatsApp with 5s timeout safeguard
+        if (unresolvedLidJids.length > 0 && this.socket) {
+          try {
+            const onWaPromise = this.socket.onWhatsApp(...unresolvedLidJids);
+            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+            const res = await Promise.race([onWaPromise, timeoutPromise]);
+
+            if (res && Array.isArray(res)) {
+              for (let i = 0; i < res.length; i++) {
+                const item = res[i];
+                const originalLidJid = unresolvedLidJids[i];
+                const originalLidDigits = originalLidJid ? originalLidJid.split("@")[0].split(":")[0] : "";
+
+                if (item && item.jid) {
+                  const realPn = item.jid.split("@")[0].split(":")[0].replace(/\D/g, "");
+                  const formattedPn = realPn.startsWith("0") ? "62" + realPn.slice(1) : realPn;
+                  const itemLidDigits = (item as any).lid
+                    ? (item as any).lid.split("@")[0].split(":")[0]
+                    : originalLidDigits;
+
+                  if (formattedPn) {
+                    memberSet.add(formattedPn);
+                    if (formattedPn.startsWith("62")) {
+                      memberSet.add("0" + formattedPn.slice(2));
+                      memberSet.add(formattedPn.slice(2));
+                    }
+                  }
+
+                  if (itemLidDigits && formattedPn) {
+                    lidToPhone.set(itemLidDigits, formattedPn);
+                    phoneToLid.set(formattedPn, itemLidDigits);
+                    this.lidCache.set(itemLidDigits, formattedPn);
+                    this.lidCache.set(formattedPn, itemLidDigits);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("[BotEngine] Failed to resolve LID members via onWhatsApp:", e);
+          }
+        }
+
+        const newCache = {
+          members: memberSet,
+          lidToPhone,
+          phoneToLid,
+          expiresAt: now + 2 * 60 * 1000,
+          fetchedAt: now,
+        };
+        this.groupMembersCache.set(cleanGroupId, newCache);
+        return newCache;
+      } catch (err) {
+        console.error("[BotEngine] Error fetching groupMetadata in isPhoneInGroup:", err);
+        return cached || null;
+      }
+    };
+
+    let cache = await populateGroupCache(false);
+    if (!cache) return false;
+
+    // Check Tier 1: Direct candidate match in memberSet
+    let matched = false;
+    for (const cand of targetCandidates) {
+      if (cache.members.has(cand)) {
+        matched = true;
+        break;
+      }
     }
 
-    // Direct check by formatted number & raw digits
-    if (memberSet.has(formattedNum) || memberSet.has(cleanTargetPhone)) {
-      return true;
+    // Check Tier 2: Check in-memory lidCache & cache maps
+    if (!matched) {
+      for (const cand of targetCandidates) {
+        const mappedPhone = this.lidCache.get(cand) || cache.lidToPhone.get(cand);
+        if (mappedPhone && cache.members.has(mappedPhone)) {
+          matched = true;
+          break;
+        }
+        const mappedLid = this.lidCache.get(cand) || cache.phoneToLid.get(cand);
+        if (mappedLid && cache.members.has(mappedLid)) {
+          matched = true;
+          break;
+        }
+      }
     }
 
-    // Check if phone number maps to an LID or reverse phone
-    const resolved = await this.resolveLidToRealPhone(phoneNumber).catch(() => null);
-    if (resolved && (memberSet.has(resolved) || memberSet.has(resolved.replace(/^0/, "62")))) {
-      return true;
+    // Check Tier 3: Check database BaileysAuth for persistent LID mapping
+    if (!matched) {
+      for (const cand of targetCandidates) {
+        const dbResolved = await this.resolveLidToRealPhone(cand);
+        if (
+          dbResolved &&
+          (cache.members.has(dbResolved) ||
+            cache.members.has(dbResolved.replace(/^0/, "62")) ||
+            cache.members.has(dbResolved.replace(/^62/, "0")))
+        ) {
+          matched = true;
+          break;
+        }
+        const dbLid = await this.resolvePhoneToLid(cand);
+        if (dbLid && cache.members.has(dbLid)) {
+          matched = true;
+          break;
+        }
+      }
     }
 
-    return false;
+    // Check Tier 4: Smart Cache Invalidation
+    // If the cache was already populated earlier and user might have joined recently, refresh once
+    const wasOldCache = Date.now() - cache.fetchedAt > 5000;
+    if (!matched && wasOldCache) {
+      cache = await populateGroupCache(true);
+      if (cache) {
+        for (const cand of targetCandidates) {
+          if (cache.members.has(cand)) {
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          for (const cand of targetCandidates) {
+            const mappedPhone = this.lidCache.get(cand) || cache.lidToPhone.get(cand);
+            if (mappedPhone && cache.members.has(mappedPhone)) {
+              matched = true;
+              break;
+            }
+            const mappedLid = this.lidCache.get(cand) || cache.phoneToLid.get(cand);
+            if (mappedLid && cache.members.has(mappedLid)) {
+              matched = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Check Tier 5: Active onWhatsApp probe for this specific user
+    if (!matched && this.socket && this.connectionState === "CONNECTED") {
+      try {
+        for (const cand of targetCandidates) {
+          if (cand.length >= 9 && (cand.startsWith("62") || cand.startsWith("08") || cand.startsWith("8"))) {
+            const formattedCand = cand.startsWith("0")
+              ? "62" + cand.slice(1)
+              : cand.startsWith("8")
+              ? "62" + cand
+              : cand;
+            const testJid = `${formattedCand}@s.whatsapp.net`;
+            const res = await this.socket.onWhatsApp(testJid).catch(() => null);
+            if (res && res[0]) {
+              const item = res[0];
+              const lid = (item as any).lid ? (item as any).lid.split("@")[0].split(":")[0] : null;
+              if (lid && cache && cache.members.has(lid)) {
+                matched = true;
+                this.lidCache.set(cand, lid);
+                this.lidCache.set(lid, formattedCand);
+                this.lidCache.set(formattedCand, lid);
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    return matched;
   }
 
   /**
@@ -585,11 +818,64 @@ class WhatsAppBotEngine extends EventEmitter {
   }
 
   /**
+   * Resolves a real mobile phone number to an LID if available
+   */
+  public async resolvePhoneToLid(phoneOrJid: string): Promise<string | null> {
+    if (!phoneOrJid) return null;
+    const raw = phoneOrJid.split("@")[0].split(":")[0].replace(/\D/g, "");
+    const formatted = raw.startsWith("0") ? "62" + raw.slice(1) : raw;
+
+    if (this.lidCache.has(formatted)) {
+      const val = this.lidCache.get(formatted);
+      if (val && val !== formatted) return val;
+    }
+    if (this.lidCache.has(raw)) {
+      const val = this.lidCache.get(raw);
+      if (val && val !== raw) return val;
+    }
+
+    try {
+      const authRecord = await prisma.baileysAuth.findUnique({
+        where: { key: `lid-mapping-${formatted}` },
+      });
+      if (authRecord && authRecord.value) {
+        let val = authRecord.value.trim();
+        try {
+          val = JSON.parse(val);
+        } catch (e) {}
+        if (typeof val === "string" && val.length > 10) {
+          const lidClean = val.split("@")[0].split(":")[0].replace(/\D/g, "");
+          this.lidCache.set(formatted, lidClean);
+          return lidClean;
+        }
+      }
+    } catch (e) {}
+
+    // Try live probe via onWhatsApp if connected
+    if (this.socket && this.connectionState === "CONNECTED") {
+      try {
+        const testJid = `${formatted}@s.whatsapp.net`;
+        const res = await this.socket.onWhatsApp(testJid).catch(() => null);
+        if (res && res[0] && (res[0] as any).lid) {
+          const lidClean = (res[0] as any).lid.split("@")[0].split(":")[0].replace(/\D/g, "");
+          if (lidClean) {
+            this.lidCache.set(formatted, lidClean);
+            this.lidCache.set(lidClean, formatted);
+            return lidClean;
+          }
+        }
+      } catch (e) {}
+    }
+
+    return null;
+  }
+
+  /**
    * Resolves an LID or unknown JID to a real Indonesian mobile number (628xxx)
    */
   public async resolveLidToRealPhone(jidOrLid: string): Promise<string | null> {
     if (!jidOrLid) return null;
-    const raw = jidOrLid.split("@")[0].split(":")[0];
+    const raw = jidOrLid.split("@")[0].split(":")[0].replace(/\D/g, "");
 
     // If it's already a valid Indonesian mobile number
     if ((raw.startsWith("62") || raw.startsWith("08")) && raw.length >= 10 && raw.length <= 15) {
@@ -645,9 +931,29 @@ class WhatsAppBotEngine extends EventEmitter {
     // 2. Check cached group members
     for (const cached of this.groupMembersCache.values()) {
       if (cached.members.has(raw)) {
-        this.lidCache.set(raw, raw);
-        return raw;
+        const mapped = cached.lidToPhone.get(raw);
+        if (mapped) {
+          this.lidCache.set(raw, mapped);
+          return mapped;
+        }
       }
+    }
+
+    // 3. Try live probe via onWhatsApp if connected
+    if (this.socket && this.connectionState === "CONNECTED" && (jidOrLid.endsWith("@lid") || raw.length > 13)) {
+      try {
+        const testJid = jidOrLid.includes("@") ? jidOrLid : `${raw}@lid`;
+        const res = await this.socket.onWhatsApp(testJid).catch(() => null);
+        if (res && res[0] && res[0].jid) {
+          const cleanJidNum = res[0].jid.split("@")[0].split(":")[0].replace(/\D/g, "");
+          const finalNum = cleanJidNum.startsWith("0") ? "62" + cleanJidNum.slice(1) : cleanJidNum;
+          if (finalNum.startsWith("62")) {
+            this.lidCache.set(raw, finalNum);
+            this.lidCache.set(finalNum, raw);
+            return finalNum;
+          }
+        }
+      } catch (e) {}
     }
 
     return null;

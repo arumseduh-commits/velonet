@@ -59,6 +59,25 @@ export async function processIncomingMessage(
   const cleanJid = rawSenderJid.split("@")[0].split(":")[0];
   const incomingNum = normalizePhoneNumber(cleanJid);
   let normalizedRealPhone = realPhoneNum ? normalizePhoneNumber(realPhoneNum) : undefined;
+  let participant: any = null;
+
+  // Helper to verify group membership across all candidate identifiers
+  const verifyGroupMembership = async (): Promise<boolean> => {
+    if (!checkGroup) return true;
+    if (participant && participant.phoneNumber) {
+      if (await checkGroup(participant.phoneNumber)) return true;
+    }
+    if (normalizedRealPhone && (!participant || normalizedRealPhone !== participant.phoneNumber)) {
+      if (await checkGroup(normalizedRealPhone)) return true;
+    }
+    if (incomingNum && incomingNum !== participant?.phoneNumber && incomingNum !== normalizedRealPhone) {
+      if (await checkGroup(incomingNum)) return true;
+    }
+    if (rawSenderJid) {
+      if (await checkGroup(rawSenderJid)) return true;
+    }
+    return false;
+  };
 
   // 0. If real phone number is not provided and incoming is an LID, lookup BaileysAuth LID mapping
   if (!normalizedRealPhone && (rawSenderJid.endsWith("@lid") || incomingNum.length > 13)) {
@@ -82,7 +101,6 @@ export async function processIncomingMessage(
   }
 
   // 1. Find participant by real phone number FIRST if available
-  let participant = null;
   if (normalizedRealPhone) {
     participant = await prisma.user.findUnique({
       where: { phoneNumber: normalizedRealPhone },
@@ -484,7 +502,7 @@ export async function processIncomingMessage(
     if (!isAlreadyCompleted) {
       let isInGroup = true;
       if (checkGroup) {
-        isInGroup = await checkGroup(participant.phoneNumber);
+        isInGroup = await verifyGroupMembership();
       }
 
       if (!isInGroup) {
@@ -572,7 +590,7 @@ export async function processIncomingMessage(
     if (!isProfileCompleted) {
       let isInGroup = true;
       if (checkGroup) {
-        isInGroup = await checkGroup(participant.phoneNumber);
+        isInGroup = await verifyGroupMembership();
       }
 
       if (!isInGroup) {
@@ -744,7 +762,7 @@ export async function processIncomingMessage(
     // Cek keberadaan di Grup Utama sebelum memberikan link pendaftaran
     let isInGroup = true;
     if (checkGroup) {
-      isInGroup = await checkGroup(participant.phoneNumber);
+      isInGroup = await verifyGroupMembership();
     }
 
     if (!isInGroup) {
