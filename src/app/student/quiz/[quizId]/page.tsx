@@ -1120,7 +1120,19 @@ export default function QuizTakingPage() {
                   </span>
                   <div>
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Tipe: {qType.replace("_", " ")}
+                      Tipe: {
+                        qType === "CHECKBOXES" || qType === "MULTIPLE_CHOICE"
+                          ? "Pilihan Ganda Kompleks"
+                          : qType === "SINGLE_CHOICE"
+                          ? "Pilihan Ganda"
+                          : qType === "TRUE_FALSE"
+                          ? "Benar / Salah"
+                          : qType === "SHORT_ANSWER"
+                          ? "Jawaban Singkat"
+                          : qType === "ESSAY"
+                          ? "Esai / Uraian"
+                          : qType.replace("_", " ")
+                      }
                     </span>
                     <span className="text-[10px] text-slate-500">Bobot: {currentQuestion.points} Poin</span>
                   </div>
@@ -1211,13 +1223,14 @@ export default function QuizTakingPage() {
                   </div>
                 )}
 
-                {/* 2. MULTIPLE CHOICE */}
-                {qType === "MULTIPLE_CHOICE" && (
+                {/* 2. MULTIPLE CHOICE / CHECKBOXES */}
+                {(qType === "CHECKBOXES" || qType === "MULTIPLE_CHOICE") && (
                   <div className="space-y-3">
                     <p className="text-xs text-blue-400 font-semibold mb-2">
                       * Pilih satu atau lebih jawaban yang menurut Anda benar.
                     </p>
                     {currentQuestion.options?.map((opt: any, optIdx: number) => {
+                      const letter = String.fromCharCode(65 + optIdx);
                       const isSelected = (currentAnswer.selectedOptionIds || []).includes(opt.id);
                       const isCorrectAnswer = opt.isCorrect;
 
@@ -1233,15 +1246,23 @@ export default function QuizTakingPage() {
                         >
                           <div className="flex items-center gap-3">
                             <div
-                              className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
+                              className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
                                 isSelected ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-500 border border-slate-700"
                               }`}
                             >
                               {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                             </div>
+                            <span
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center font-bold text-xs transition-colors shrink-0 ${
+                                isSelected ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-400 border border-slate-700"
+                              }`}
+                            >
+                              {letter}
+                            </span>
                             <span className="text-xs sm:text-sm font-medium leading-snug">{opt.text}</span>
                           </div>
 
+                          {/* Supervisor Answer Key Peek (Admin Preview Only) */}
                           {isPreview && showAnswerKeys && isCorrectAnswer && (
                             <span className="px-2 py-0.5 rounded-md bg-emerald-950 border border-emerald-600 text-emerald-400 text-[10px] font-bold shrink-0">
                               Kunci Benar ✓

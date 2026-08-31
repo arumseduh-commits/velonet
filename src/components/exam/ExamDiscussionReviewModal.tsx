@@ -165,8 +165,18 @@ export default function ExamDiscussionReviewModal({
                       <span className="w-7 h-7 rounded-xl bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-black">
                         #{idx + 1}
                       </span>
-                      <span className="text-[11px] font-bold text-slate-400 uppercase">
-                        {q.type.replace("_", " ")}
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        {q.type === "CHECKBOXES" || q.type === "MULTIPLE_CHOICE"
+                          ? "Pilihan Ganda Kompleks"
+                          : q.type === "SINGLE_CHOICE"
+                          ? "Pilihan Ganda"
+                          : q.type === "TRUE_FALSE"
+                          ? "Benar / Salah"
+                          : q.type === "SHORT_ANSWER"
+                          ? "Jawaban Singkat"
+                          : q.type === "ESSAY"
+                          ? "Esai / Uraian"
+                          : q.type.replace("_", " ")}
                       </span>
                     </div>
 

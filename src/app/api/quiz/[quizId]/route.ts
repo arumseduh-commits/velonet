@@ -92,6 +92,20 @@ export async function GET(
           if (correctOpt && selectedOptionId) {
             studentIsCorrect = correctOpt.id === selectedOptionId;
           }
+        } else if (q.type === "CHECKBOXES") {
+          const correctIds = q.options.filter((o) => o.isCorrect).map((o) => o.id);
+          const selected = selectedOptionIds || (selectedOptionId ? [selectedOptionId] : []);
+          const wrongSelected = selected.filter((id) => !correctIds.includes(id));
+          const correctSelected = selected.filter((id) => correctIds.includes(id));
+          studentIsCorrect = wrongSelected.length === 0 && correctSelected.length === correctIds.length && correctIds.length > 0;
+        } else if (q.type === "SHORT_ANSWER") {
+          const textAns = (studentAnsRecord.textResponse || "").trim();
+          const expected = (q.sampleAnswer || q.options.find((o) => o.isCorrect)?.text || "").trim();
+          if (textAns && expected) {
+            studentIsCorrect = q.caseSensitive
+              ? textAns === expected
+              : textAns.toLowerCase() === expected.toLowerCase();
+          }
         }
       }
 
