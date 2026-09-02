@@ -21,6 +21,7 @@ import {
   UserX,
   FileSpreadsheet,
   Navigation,
+  Lock,
 } from "lucide-react";
 
 interface ParticipantAttendanceItem {
@@ -333,7 +334,8 @@ export default function SessionDetailPage({
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {isExpired ? (
               <span className="px-3 py-1 rounded-full font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1.5">
-                🔒 Sesi Selesai (Data Absensi Terkunci)
+                <Lock className="w-3.5 h-3.5 text-rose-600" />
+                <span>Sesi Selesai (Data Absensi Terkunci)</span>
               </span>
             ) : (
               <span className="px-3 py-1 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">

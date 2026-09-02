@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Calendar,
   Search,
+  ArrowRight,
 } from "lucide-react";
 
 const InteractiveLocationPicker = dynamic(
@@ -566,10 +567,10 @@ export default function SessionsAdminPage() {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-white border border-emerald-200/80 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-white border border-emerald-200/80 shadow-xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm shadow-emerald-600/20">
               <CalendarCheck className="w-5 h-5" />
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
@@ -577,13 +578,13 @@ export default function SessionsAdminPage() {
             </h1>
           </div>
           <p className="text-slate-600 text-xs sm:text-sm">
-            Kelola jadwal kumpul sore, titik koordinat GPS & geofence, dan broadcast pengumuman via WhatsApp.
+            Kelola jadwal perkumpulan, radius koordinat GPS, dan presensi
           </p>
         </div>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/25 transition-all cursor-pointer shrink-0"
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-xs btn-press transition-all cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Buat Sesi Baru</span>
@@ -1063,9 +1064,10 @@ export default function SessionsAdminPage() {
                         type="button"
                         disabled={!date}
                         onClick={() => setCreateStep(2)}
-                        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs btn-press transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                       >
-                        <span>Lanjutkan ➔</span>
+                        <span>Lanjutkan</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -1195,9 +1197,10 @@ export default function SessionsAdminPage() {
                         type="button"
                         disabled={!title.trim()}
                         onClick={() => setCreateStep(3)}
-                        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs btn-press transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                       >
-                        <span>Lanjutkan ➔</span>
+                        <span>Lanjutkan</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -1221,7 +1224,7 @@ export default function SessionsAdminPage() {
                           type="button"
                           disabled={isSavingPreset}
                           onClick={handleSaveNewPreset}
-                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 bg-emerald-100 hover:bg-emerald-200 px-2.5 py-1 rounded-lg border border-emerald-300 transition-all cursor-pointer"
+                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 bg-emerald-100 hover:bg-emerald-200 px-2.5 py-1 rounded-lg border border-emerald-300 btn-press transition-all cursor-pointer"
                         >
                           {isSavingPreset ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                           <span>Simpan Titik Jadi Template</span>
@@ -1234,10 +1237,10 @@ export default function SessionsAdminPage() {
                           onChange={(e) => handleLocationPresetChange(e.target.value)}
                           className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 transition-colors text-xs font-medium cursor-pointer"
                         >
-                          <option value="Lainnya">✍️ Lokasi Baru / Custom (Pilih di Peta)...</option>
+                          <option value="Lainnya">Lokasi Baru / Custom (Pilih di Peta)...</option>
                           {dbPresets.map((preset) => (
                             <option key={preset.id} value={preset.name}>
-                              📍 {preset.name} (Tersimpan)
+                              {preset.name} (Tersimpan)
                             </option>
                           ))}
                         </select>

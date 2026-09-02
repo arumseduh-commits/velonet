@@ -339,7 +339,7 @@ export default function InteractiveLocationPicker({
         <form onSubmit={handleSearch} className="relative flex items-center">
           <input
             type="text"
-            placeholder="🔍 Cari tempat / alamat (misal: Probolinggo, SMK, Alun-alun)..."
+            placeholder="Cari tempat / alamat (misal: Probolinggo, SMK, Alun-alun)..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -387,9 +387,9 @@ export default function InteractiveLocationPicker({
             type="button"
             key={region.name}
             onClick={() => handleSelectQuickRegion(region)}
-            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-800 font-medium whitespace-nowrap transition-all cursor-pointer"
+            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-800 font-medium whitespace-nowrap btn-press transition-all cursor-pointer"
           >
-            📍 {region.name}
+            {region.name}
           </button>
         ))}
       </div>

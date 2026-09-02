@@ -681,10 +681,10 @@ export default function ExamProctorControlRoom() {
             onChange={(e) => setSortBy(e.target.value as any)}
             className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[40px]"
           >
-            <option value="SCORE">Urut: Skor Tertinggi 🏆</option>
-            <option value="PROGRESS">Urut: Progress Tercepat 📑</option>
-            <option value="STRIKES">Urut: Pelanggaran Terbanyak ⚠️</option>
-            <option value="NAME">Urut: Nama Siswa (A-Z) 🔤</option>
+            <option value="SCORE">Urut: Skor Tertinggi</option>
+            <option value="PROGRESS">Urut: Progress Tercepat</option>
+            <option value="STRIKES">Urut: Pelanggaran Terbanyak</option>
+            <option value="NAME">Urut: Nama Siswa (A-Z)</option>
           </select>
 
           <div className="relative flex-1 min-w-[160px]">

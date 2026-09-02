@@ -127,9 +127,8 @@ export function StudentHeader() {
                 </span>
               )}
             </span>
-            <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-              <span>Velocity English Hub</span>
-              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+            <p className="text-[11px] text-slate-500 font-medium truncate">
+              Komunitas Velocity
             </p>
           </div>
         </Link>
@@ -143,7 +142,7 @@ export function StudentHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press transition-all ${
                 item.isActive
                   ? "bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 shadow-xs"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent"
@@ -160,7 +159,7 @@ export function StudentHeader() {
       <div className="flex items-center gap-2">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 border border-slate-200 text-xs font-medium transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 border border-slate-200 text-xs font-semibold btn-press transition-all cursor-pointer"
           title="Keluar dari Portal Siswa"
         >
           <LogOut className="w-4 h-4 text-rose-500" />

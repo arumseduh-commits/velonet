@@ -59,12 +59,12 @@ export default function PublicMaterialsPage() {
   }, []);
 
   const categories = [
-    { id: "ALL", name: "📚 Semua Kategori" },
-    { id: "Grammar Guide", name: "📝 Grammar Guide" },
-    { id: "TOEIC & Test Preps", name: "🎯 TOEIC & Test Preps" },
-    { id: "Speaking & Dialogues", name: "💬 Speaking & Dialogues" },
-    { id: "Text Genres", name: "📄 Text Genres" },
-    { id: "Vocabulary Builder", name: "💡 Vocabulary Builder" },
+    { id: "ALL", name: "Semua Kategori" },
+    { id: "Grammar Guide", name: "Grammar Guide" },
+    { id: "TOEIC & Test Preps", name: "TOEIC & Preps" },
+    { id: "Speaking & Dialogues", name: "Speaking & Dialogues" },
+    { id: "Text Genres", name: "Text Genres" },
+    { id: "Vocabulary Builder", name: "Vocabulary" },
   ];
 
   const filteredMaterials = materials.filter((item) => {

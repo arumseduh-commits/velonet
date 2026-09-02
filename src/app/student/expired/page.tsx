@@ -78,7 +78,7 @@ function ExpiredContent() {
           </p>
           <ul className="text-[11px] text-slate-600 space-y-1.5 list-disc list-inside">
             <li>Buka halaman <strong>Login / Pendaftaran</strong> Portal Siswa.</li>
-            <li>Klik tombol <strong>⚡ Login Instan via WhatsApp</strong> atau <strong>Daftar via WhatsApp</strong>.</li>
+            <li>Klik tombol <strong>Login Instan via WhatsApp</strong> atau <strong>Daftar via WhatsApp</strong>.</li>
             <li>Kirim pesan WhatsApp otomatis ke Bot dan klik tautan baru yang dikirimkan.</li>
           </ul>
         </div>
@@ -87,7 +87,7 @@ function ExpiredContent() {
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <Link
             href="/student/login"
-            className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 btn-press transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
             <span>MINTA TAUTAN BARU</span>

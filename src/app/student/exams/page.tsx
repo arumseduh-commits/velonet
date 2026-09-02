@@ -152,26 +152,26 @@ export default function StudentExamsPage() {
   return (
     <div className="space-y-6 pb-24 max-w-5xl mx-auto px-3 sm:px-0">
       {/* Header Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white shadow-xl relative overflow-hidden">
-        <div className="relative z-10 space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
-            <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
-            <span>VeloExambro Safe CBT</span>
+      <div className="p-6 sm:p-7 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white shadow-md relative overflow-hidden">
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider">
+              <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
+              <span>VeloExambro Safe CBT</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight">
+              Pusat Ujian CBT Online
+            </h1>
+            <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+              Ujian resmi terjadwal dengan pengawasan otomatis ExamBro
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Pusat Ujian CBT Online
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
-            Ikuti ujian resmi dengan pengawasan otomatis, deteksi perpindahan tab, dan kunci layar penuh untuk menjamin integritas kejujuran.
-          </p>
-        </div>
 
-        {/* Refresh Button */}
-        <div className="relative z-10 mt-4 flex items-center gap-2">
+          {/* Refresh Button */}
           <button
             onClick={fetchExams}
             disabled={loading}
-            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 border border-white/10 cursor-pointer"
+            className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 border border-white/10 btn-press cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span>Muat Ulang</span>
@@ -184,7 +184,7 @@ export default function StudentExamsPage() {
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200 self-start w-full sm:w-auto">
           <button
             onClick={() => setActiveTab("ALL")}
-            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+            className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-xs font-bold btn-press transition-all cursor-pointer text-center ${
               activeTab === "ALL"
                 ? "bg-white text-slate-900 shadow-xs"
                 : "text-slate-500 hover:text-slate-900"
@@ -194,7 +194,7 @@ export default function StudentExamsPage() {
           </button>
           <button
             onClick={() => setActiveTab("ACTIVE")}
-            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+            className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-xs font-bold btn-press transition-all cursor-pointer text-center ${
               activeTab === "ACTIVE"
                 ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-500 hover:text-slate-900"
@@ -204,7 +204,7 @@ export default function StudentExamsPage() {
           </button>
           <button
             onClick={() => setActiveTab("COMPLETED")}
-            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+            className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-xs font-bold btn-press transition-all cursor-pointer text-center ${
               activeTab === "COMPLETED"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "text-slate-500 hover:text-slate-900"

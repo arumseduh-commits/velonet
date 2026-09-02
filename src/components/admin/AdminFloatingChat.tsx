@@ -317,8 +317,8 @@ export function AdminFloatingChat() {
             {/* Sparkle Badge */}
             <span className="absolute -top-1 -right-1 flex h-4 w-4">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-400 text-[9px] font-black text-slate-950 items-center justify-center">
-                ✨
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-400 text-slate-950 items-center justify-center">
+                <Sparkles className="w-2.5 h-2.5" />
               </span>
             </span>
           </button>
@@ -507,7 +507,7 @@ export function AdminFloatingChat() {
                     {msg.adminAction && (
                       <div className="p-3 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                          ⚡ Tindakan Cepat Admin
+                          Tindakan Cepat Admin
                         </span>
                         {msg.adminAction.type === "navigate" && msg.adminAction.url && (
                           <button
@@ -515,7 +515,7 @@ export function AdminFloatingChat() {
                               setIsOpen(false);
                               router.push(msg.adminAction.url);
                             }}
-                            className="w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-between border border-blue-200 transition-colors cursor-pointer"
+                            className="w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-between border border-blue-200 btn-press transition-colors cursor-pointer"
                           >
                             <span>{msg.adminAction.label}</span>
                             <ArrowRight className="w-3.5 h-3.5" />
@@ -529,7 +529,7 @@ export function AdminFloatingChat() {
                       <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-white border border-slate-800 shadow-md space-y-3">
                         <div>
                           <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-800/80">
-                            ✨ Draf Soal CBT Multi-Format
+                            Draf Soal CBT Multi-Format
                           </span>
                           <h4 className="font-bold text-sm text-white mt-1">
                             {parsedDraft.title}
@@ -566,19 +566,19 @@ export function AdminFloatingChat() {
                           <button
                             onClick={() => handlePublishQuiz(parsedDraft)}
                             disabled={publishing}
-                            className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/30 transition-all cursor-pointer disabled:opacity-50"
+                            className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs btn-press transition-all cursor-pointer disabled:opacity-50"
                           >
                             <Send className="w-3.5 h-3.5" />
-                            <span>🚀 Terbitkan ke VeloExambro</span>
+                            <span>Terbitkan ke VeloExambro</span>
                           </button>
 
                           <button
                             onClick={() => handleOpenAppendModal(parsedDraft)}
                             disabled={publishing}
-                            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+                            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 btn-press transition-colors cursor-pointer"
                           >
                             <Layers className="w-3.5 h-3.5 text-blue-400" />
-                            <span>➕ Masukkan ke Kuis yang Sudah Ada</span>
+                            <span>Masukkan ke Kuis yang Sudah Ada</span>
                           </button>
                         </div>
                       </div>

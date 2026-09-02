@@ -33,6 +33,7 @@ import {
   Lock,
   Unlock,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 
 interface LogItem {
@@ -746,10 +747,10 @@ export default function BotControlPage() {
           {status.state === "CONNECTED" && (
             <button
               onClick={() => setShowJoinModal(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs btn-press transition-all cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
-              <span>➕ Gabungkan Bot via Link Undangan</span>
+              <span>Gabungkan Bot via Link Undangan</span>
             </button>
           )}
 
@@ -867,7 +868,7 @@ export default function BotControlPage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    🔒 <b>Aturan Aktif:</b> Nomor baru yang belum ada di grup ini akan <b>ditolak saat mendaftar</b> dan otomatis dikirimi link undangan grup WhatsApp di bawah.
+                    <span className="font-semibold text-slate-800">Aturan Aktif:</span> Nomor baru yang belum ada di grup ini akan ditolak saat mendaftar dan otomatis dikirimi link undangan grup WhatsApp di bawah.
                   </p>
                 </div>
 
@@ -1091,23 +1092,25 @@ export default function BotControlPage() {
                 <div className="flex items-center justify-center gap-2 p-1 rounded-xl bg-slate-100 border border-slate-200">
                   <button
                     onClick={() => setLoginMode("QR")}
-                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold btn-press transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       loginMode === "QR"
-                        ? "bg-white text-blue-600 shadow-xs border border-slate-200"
+                        ? "bg-white text-blue-600 shadow-xs border border-slate-200 font-bold"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    📷 Scan QR Code
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Scan QR Code</span>
                   </button>
                   <button
                     onClick={() => setLoginMode("PAIRING")}
-                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold btn-press transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                       loginMode === "PAIRING"
-                        ? "bg-white text-blue-600 shadow-xs border border-slate-200"
+                        ? "bg-white text-blue-600 shadow-xs border border-slate-200 font-bold"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    🔑 Kode 8-Angka (Tanpa Kamera)
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Kode 8-Angka</span>
                   </button>
                 </div>
 
@@ -1170,7 +1173,7 @@ export default function BotControlPage() {
                           {pairingCodeResult}
                         </div>
                         <p className="text-[11px] text-emerald-700 leading-relaxed pt-1">
-                          💡 <b>Langkah Tautkan di HP:</b> Buka WA ➔ Perangkat Tertaut ➔ Tautkan Perangkat ➔ <b>"Tautkan dengan Nomor Telepon"</b> ➔ Masukkan kode di atas!
+                          <span className="font-semibold">Langkah Tautkan di HP:</span> Buka WA &rarr; Perangkat Tertaut &rarr; Tautkan Perangkat &rarr; <b>"Tautkan dengan Nomor Telepon"</b> &rarr; Masukkan kode di atas.
                         </p>
                       </div>
                     )}
@@ -1200,7 +1203,7 @@ export default function BotControlPage() {
                   {primaryGroup.id === groupData.groupId ? (
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold shadow-xs">
                       <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      <span>Grup Utama Resmi Aktif ✅</span>
+                      <span>Grup Utama Resmi Aktif</span>
                     </div>
                   ) : (
                     <button
@@ -1515,7 +1518,7 @@ export default function BotControlPage() {
                   required
                 />
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  💡 <b>Petunjuk:</b> Buka info grup WhatsApp di HP Anda ➔ Klik <b>"Undang via Tautan" (Invite via Link)</b> ➔ Tempelkan linknya di atas. Bot akan langsung bergabung otomatis!
+                  <span className="font-semibold text-slate-700">Petunjuk:</span> Buka info grup WhatsApp di HP Anda &rarr; Klik <b>"Undang via Tautan" (Invite via Link)</b> &rarr; Tempelkan tautannya di atas. Bot akan bergabung otomatis.
                 </p>
               </div>
 
@@ -1611,7 +1614,7 @@ export default function BotControlPage() {
                   autoFocus
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  💡 <b>Petunjuk:</b> Isikan nama atau keterangan jabatan agar mudah dikenali di daftar pengecualian.
+                  <span className="font-semibold text-slate-700">Petunjuk:</span> Isikan nama atau keterangan jabatan agar mudah dikenali di daftar pengecualian.
                 </p>
               </div>
 

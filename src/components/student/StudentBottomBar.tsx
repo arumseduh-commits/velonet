@@ -60,29 +60,63 @@ export function StudentBottomBar() {
     },
   ];
 
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/90 backdrop-blur-xl border-t border-slate-200/90 px-2 py-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-      <div className="grid grid-cols-5 gap-1 max-w-md mx-auto">
-        {navItems.map((item) => {
-          const isActive = item.isActive;
-          const Icon = item.icon;
+  const activeIndex = navItems.findIndex((item) => item.isActive);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl transition-all duration-200 ${
-                isActive
-                  ? "bg-emerald-50 border border-emerald-200 font-bold text-emerald-700 shadow-xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Icon className={`w-4 h-4 transition-transform ${isActive ? "scale-110 text-emerald-600" : "text-slate-400"}`} />
-              <span className="text-[10px] mt-1 tracking-tight truncate font-medium">{item.label}</span>
-            </Link>
-          );
-        })}
+  return (
+    <nav
+      aria-label="Navigasi Bawah Siswa"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/90 backdrop-blur-xl border-t border-slate-200/90 px-3 pt-2 pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.06)]"
+    >
+      <div className="relative max-w-md mx-auto">
+        {/* Dynamic Sliding Active Pill Background */}
+        {activeIndex !== -1 && (
+          <div
+            className="absolute top-0 bottom-0 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 pointer-events-none transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            style={{
+              width: "20%",
+              transform: `translateX(${activeIndex * 100}%)`,
+            }}
+          >
+            {/* Top active accent indicator dot */}
+            <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-emerald-600 shadow-xs" />
+          </div>
+        )}
+
+        <div className="grid grid-cols-5 gap-0 relative z-10">
+          {navItems.map((item) => {
+            const isActive = item.isActive;
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-transform duration-150 active:scale-90 select-none cursor-pointer"
+              >
+                <div
+                  className={`transition-all duration-300 ${
+                    isActive
+                      ? "-translate-y-0.5 scale-110 text-emerald-600"
+                      : "text-slate-400 group-hover:text-slate-600"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                </div>
+                <span
+                  className={`text-[10px] mt-1 tracking-tight truncate transition-colors duration-200 ${
+                    isActive
+                      ? "font-bold text-emerald-700"
+                      : "font-medium text-slate-500 group-hover:text-slate-700"
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </nav>
   );
 }
+

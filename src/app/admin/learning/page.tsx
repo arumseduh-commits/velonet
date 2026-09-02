@@ -103,7 +103,7 @@ export default function AdminAILearningAssistantPage() {
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(`Database diperbarui: ${json.totalScraped} materi tersimpan! 🎉`);
+        toast.success(`Database diperbarui: ${json.totalScraped} materi tersimpan!`);
         fetchKnowledgeBase();
       } else {
         toast.error(json.error || "Gagal menyinkronkan data.");
@@ -254,26 +254,26 @@ export default function AdminAILearningAssistantPage() {
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-200/80 w-fit">
         <button
           onClick={() => setActiveTab("GENERATOR")}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold btn-press transition-all cursor-pointer ${
             activeTab === "GENERATOR"
-              ? "bg-white text-blue-700 shadow-sm"
+              ? "bg-white text-blue-700 shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900"
           }`}
         >
           <Sparkles className="w-4 h-4 text-amber-500" />
-          <span>✨ Generator Soal AI</span>
+          <span>Generator Soal AI</span>
         </button>
 
         <button
           onClick={() => setActiveTab("KNOWLEDGE_BASE")}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold btn-press transition-all cursor-pointer ${
             activeTab === "KNOWLEDGE_BASE"
-              ? "bg-white text-blue-700 shadow-sm"
+              ? "bg-white text-blue-700 shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900"
           }`}
         >
           <BookOpen className="w-4 h-4 text-blue-600" />
-          <span>📚 Knowledge Base ({materials.length} Materi)</span>
+          <span>Knowledge Base ({materials.length} Materi)</span>
         </button>
       </div>
 
@@ -450,7 +450,7 @@ export default function AdminAILearningAssistantPage() {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 text-amber-300" />
-                    <span>✨ Generate Soal Ujian dengan AI</span>
+                    <span>Generate Soal Ujian dengan AI</span>
                   </>
                 )}
               </button>
@@ -503,7 +503,7 @@ export default function AdminAILearningAssistantPage() {
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        <span>🚀 Terbitkan ke VeloExambro</span>
+                        <span>Terbitkan ke VeloExambro</span>
                       </>
                     )}
                   </button>
@@ -572,7 +572,7 @@ export default function AdminAILearningAssistantPage() {
                       {/* Explanation */}
                       {q.explanation && (
                         <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed">
-                          <strong>💡 Pembahasan AI:</strong> {q.explanation}
+                          <strong>Pembahasan AI:</strong> {q.explanation}
                         </div>
                       )}
                     </div>

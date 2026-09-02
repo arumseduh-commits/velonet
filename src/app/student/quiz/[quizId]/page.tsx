@@ -825,12 +825,13 @@ export default function QuizTakingPage() {
                 Nilai dan papan peringkat akan diumumkan oleh Guru setelah seluruh sesi ujian berakhir.
               </p>
               {quiz.scoreReleaseAt && (
-                <div className="pt-2 border-t border-slate-700 text-[11px] text-amber-300 font-mono">
-                  📅 Jadwal Rilis Nilai:{" "}
+                <div className="pt-2 border-t border-slate-700 text-[11px] text-amber-300 font-mono flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Jadwal Rilis Nilai:{" "}
                   {new Date(quiz.scoreReleaseAt).toLocaleString("id-ID", {
                     dateStyle: "medium",
                     timeStyle: "short",
-                  })}
+                  })}</span>
                 </div>
               )}
             </div>

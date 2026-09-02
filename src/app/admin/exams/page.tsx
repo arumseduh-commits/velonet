@@ -160,41 +160,41 @@ export default function AdminExamsListPage() {
   return (
     <div className="space-y-6 pb-20">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white shadow-lg relative overflow-hidden">
-        <div className="relative z-10 space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white shadow-md relative overflow-hidden">
+        <div className="relative z-10 space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider">
             <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
             <span>VeloExambro Control Center</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight">
             Pusat Ujian Aman & Anti-Kecurangan
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
-            Pantau dan amankan ujian CBT secara real-time. Dilengkapi deteksi perpindahan tab, penguncian layar, dan AI Face Proctoring langsung di browser.
+          <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+            Pantau dan kelola modul ujian CBT terproteksi ExamBro
           </p>
         </div>
 
-        <div className="relative z-10 flex flex-wrap items-center gap-3">
+        <div className="relative z-10 flex flex-wrap items-center gap-2.5">
           <Link
             href="/admin/exams/create"
-            className="px-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-xs btn-press transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Buat Ujian Baru</span>
+            <span>Buat Ujian Baru</span>
           </Link>
 
           <Link
             href="/admin/ai-assistant"
-            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md shadow-amber-500/25 transition-all flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-xs btn-press transition-all flex items-center gap-2"
           >
-            <Sparkles className="w-4 h-4 text-white" />
-            <span>✨ Chat AI Teacher Copilot</span>
+            <Sparkles className="w-4 h-4 text-slate-950" />
+            <span>AI Copilot</span>
           </Link>
 
           <button
             onClick={() => fetchExams()}
             disabled={loading}
-            className="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10 cursor-pointer flex items-center gap-2 text-xs font-bold"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10 btn-press cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             <span>Refresh</span>

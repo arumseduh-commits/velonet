@@ -407,7 +407,7 @@ export default function AdminAITeacherAssistantPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
                         <div>
                           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-800/60">
-                            ✨ Draf Soal CBT Multi-Format
+                            Draf Soal CBT Multi-Format
                           </span>
                           <h3 className="font-extrabold text-base sm:text-lg text-white mt-1">
                             {parsedDraft.title}
@@ -418,10 +418,10 @@ export default function AdminAITeacherAssistantPage() {
                         <button
                           onClick={() => handlePublishDraftQuiz(parsedDraft)}
                           disabled={publishing}
-                          className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs btn-press transition-all cursor-pointer disabled:opacity-50 shrink-0"
                         >
                           <Send className="w-3.5 h-3.5" />
-                          <span>🚀 Terbitkan ke VeloExambro</span>
+                          <span>Terbitkan ke VeloExambro</span>
                         </button>
                       </div>
 

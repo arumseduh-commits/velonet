@@ -20,6 +20,7 @@ import {
   Zap,
   ArrowRight,
   AlertCircle,
+  Lock,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import {
@@ -342,9 +343,9 @@ export default function CompleteProfilePage() {
       const json = await res.json();
       if (json.success) {
         setLivenessStage("DONE");
-        setGuideText("Verifikasi Biometrik Berhasil! 🎉");
+        setGuideText("Verifikasi Biometrik Berhasil!");
         stopKYCCamera();
-        toast.success("Pendaftaran & Verifikasi Wajah Berhasil! Selamat datang di VeloNet. 🎉");
+        toast.success("Pendaftaran & Verifikasi Wajah Berhasil! Selamat datang di VeloNet.");
         setTimeout(() => {
           router.replace("/student");
         }, 1500);
@@ -385,7 +386,7 @@ export default function CompleteProfilePage() {
           // 1. Stage: Center
           if (!blinkDetected && livenessStage === "CENTER" && faceCenteredCount > 5) {
             setLivenessStage("BLINK");
-            setGuideText("Silakan KEDIPKAN MATA Anda secara natural 👁️");
+            setGuideText("Silakan KEDIPKAN MATA Anda secara natural");
           }
 
           // 2. Stage: Blink Detection (EAR < 0.225)
@@ -393,7 +394,7 @@ export default function CompleteProfilePage() {
             blinkDetected = true;
             setBlinkProgress(true);
             setLivenessStage("SMILE");
-            setGuideText("Bagus! Sekarang silakan TERSENYUM ke kamera 😊");
+            setGuideText("Bagus! Sekarang silakan TERSENYUM ke kamera");
           }
 
           // 3. Stage: Smile Detection (Smile Score > 0.60)
@@ -573,10 +574,10 @@ export default function CompleteProfilePage() {
           </div>
         </div>
 
-        {/* Bottom Safety Info */}
         <div className="w-full max-w-md pb-2 text-center z-20">
-          <p className="text-[11px] text-slate-300 drop-shadow-sm">
-            🔒 Data biometrik Anda dienkripsi dan hanya digunakan untuk absensi kehadiran resmi ekskul.
+          <p className="text-[11px] text-slate-300 drop-shadow-sm flex items-center justify-center gap-1.5">
+            <Lock className="w-3 h-3 text-slate-400" />
+            <span>Data biometrik Anda dienkripsi dan hanya digunakan untuk absensi kehadiran resmi.</span>
           </p>
         </div>
       </div>
@@ -752,27 +753,27 @@ export default function CompleteProfilePage() {
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: "Laki-laki" })}
-                className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 btn-press transition-all cursor-pointer ${
                   formData.gender === "Laki-laki"
                     ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-xs font-bold"
                     : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
                 }`}
                 style={{ minHeight: "44px" }}
               >
-                <span>👨 Laki-laki</span>
+                <span>Laki-laki</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: "Perempuan" })}
-                className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`py-3 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 btn-press transition-all cursor-pointer ${
                   formData.gender === "Perempuan"
                     ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-xs font-bold"
                     : "bg-white border-slate-300 text-slate-600 hover:border-slate-400"
                 }`}
                 style={{ minHeight: "44px" }}
               >
-                <span>👩 Perempuan</span>
+                <span>Perempuan</span>
               </button>
             </div>
           </div>

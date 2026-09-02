@@ -532,10 +532,10 @@ _Atau balas *LOGIN* pada chat ini untuk menerima link direct login 1-klik._ 🙏
                 }`}
               >
                 {stats.percentage >= 75
-                  ? "🌟 Sangat Rajin & Aktif"
+                  ? "Sangat Rajin & Aktif"
                   : stats.percentage >= 50
-                  ? "👍 Cukup Aktif"
-                  : "⚠️ Perlu Perhatian (Alpa Tinggi)"}
+                  ? "Cukup Aktif"
+                  : "Perlu Perhatian (Alpa Tinggi)"}
               </span>
             </div>
           </div>
@@ -1096,7 +1096,7 @@ _Atau balas *LOGIN* pada chat ini untuk menerima link direct login 1-klik._ 🙏
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                       : "bg-slate-200 text-slate-600"
                   }`}>
-                    {participant.faceDescriptor ? "Vektor 128-d Terdaftar ✅" : "Belum Direkam ⚠️"}
+                    {participant.faceDescriptor ? "Vektor 128-d Terdaftar" : "Belum Direkam"}
                   </span>
                 </div>
 

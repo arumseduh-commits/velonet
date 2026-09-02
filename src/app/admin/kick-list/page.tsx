@@ -257,10 +257,10 @@ export default function KickListPage() {
             >
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
-                  👥 {g.subject} ({g.size || 0} Anggota)
+                  {g.subject} ({g.size || 0} Anggota)
                 </option>
               ))}
-              <option value="custom">✍️ Ketik ID Grup Custom (JID)...</option>
+              <option value="custom">Ketik ID Grup Custom (JID)...</option>
             </select>
           ) : (
             <input

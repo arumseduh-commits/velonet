@@ -106,7 +106,7 @@ export function AdminHeader({ onOpenMobileSidebar }: AdminHeaderProps) {
 
         <Link
           href="/admin/bot"
-          className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors shadow-xs"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold btn-press transition-all shadow-xs"
         >
           <Bot className="w-4 h-4" />
           <span className="hidden sm:inline">Kelola Bot</span>
@@ -114,7 +114,7 @@ export function AdminHeader({ onOpenMobileSidebar }: AdminHeaderProps) {
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-medium transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-700 border border-slate-200 text-xs font-semibold btn-press transition-all cursor-pointer"
           title="Keluar dari Admin Dashboard"
         >
           <LogOut className="w-4 h-4 text-rose-600" />

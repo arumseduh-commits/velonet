@@ -65,7 +65,7 @@ export default function ExamTutorialModal({
       description:
         "Setiap pilihan jawaban atau isian essay yang Anda pilih langsung tersimpan seketika tanpa perlu menekan tombol simpan manual.",
       points: [
-        "Klik tombol bendera [🚩 Ragu-ragu] pada soal yang ingin Anda tinjau kembali nanti.",
+        "Klik tombol bendera [Ragu-ragu] pada soal yang ingin Anda tinjau kembali nanti.",
         "Soal yang ditandai ragu-ragu akan berwarna kuning pada palet nomor soal.",
         "Klik kembali tombol bendera untuk menghapus tanda ragu-ragu.",
       ],
@@ -80,7 +80,7 @@ export default function ExamTutorialModal({
       points: [
         "Saat waktu tersisa 5 menit, timer akan berkedip kuning dan merah.",
         "Jika waktu habis, jawaban Anda akan otomatis dikumpulkan dan dinilai oleh sistem.",
-        "Klik tombol [🚀 Kumpulkan Ujian] pada soal terakhir jika sudah selesai sebelum waktu habis.",
+        "Klik tombol [Kumpulkan Ujian] pada soal terakhir jika sudah selesai sebelum waktu habis.",
       ],
     },
   ];

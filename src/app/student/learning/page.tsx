@@ -56,12 +56,12 @@ export default function StudentLearningPage() {
   }, []);
 
   const categories = [
-    { id: "ALL", name: "📚 Semua Materi" },
-    { id: "Grammar Guide", name: "📝 Grammar Guide" },
-    { id: "TOEIC & Test Preps", name: "🎯 TOEIC & Test Preps" },
-    { id: "Speaking & Dialogues", name: "💬 Speaking & Dialogues" },
-    { id: "Text Genres", name: "📄 Text Genres" },
-    { id: "Vocabulary Builder", name: "💡 Vocabulary Builder" },
+    { id: "ALL", name: "Semua Materi" },
+    { id: "Grammar Guide", name: "Grammar Guide" },
+    { id: "TOEIC & Test Preps", name: "TOEIC & Preps" },
+    { id: "Speaking & Dialogues", name: "Speaking & Dialogues" },
+    { id: "Text Genres", name: "Text Genres" },
+    { id: "Vocabulary Builder", name: "Vocabulary" },
   ];
 
   const filteredMaterials = materials.filter((item) => {
@@ -103,29 +103,28 @@ export default function StudentLearningPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 space-y-6 max-w-6xl mx-auto pb-24 md:pb-12">
       {/* Top Header Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50/50 to-white border border-blue-200 shadow-sm text-slate-900">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50/40 to-white border border-blue-200/80 shadow-xs text-slate-900">
+        <div className="flex items-center gap-3.5">
           <Link
             href="/student"
-            className="p-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 transition-colors border border-slate-200 shadow-xs"
+            className="p-2.5 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 transition-colors border border-slate-200 shadow-xs btn-press"
+            title="Kembali ke Dashboard"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 text-xs font-semibold">
-                MisterGuru Hub
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-wide mt-1 flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 text-xs font-semibold">
+              MisterGuru Hub
+            </span>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
               <BookOpen className="w-6 h-6 text-blue-600" />
-              <span>Bank Materi & Latihan Soal Bahasa Inggris</span>
+              <span>Bank Materi & Latihan</span>
             </h1>
           </div>
         </div>
 
-        <div className="text-xs text-slate-600 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs max-w-xs">
-          💡 <i>Materi dan latihan dikurasi langsung dari sumber edukasi terpercaya <b>MisterGuru.web.id</b>.</i>
+        <div className="text-xs text-slate-500 bg-white/80 px-3.5 py-2 rounded-2xl border border-slate-200 shadow-xs self-start sm:self-auto">
+          <span>Kurasi materi terpercaya MisterGuru</span>
         </div>
       </div>
 
@@ -157,9 +156,9 @@ export default function StudentLearningPage() {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press transition-all cursor-pointer ${
                 selectedCategory === cat.id
-                  ? "bg-blue-600 text-white shadow-sm border border-blue-600 font-bold"
+                  ? "bg-blue-600 text-white shadow-xs border border-blue-600 font-bold"
                   : "bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-xs"
               }`}
             >

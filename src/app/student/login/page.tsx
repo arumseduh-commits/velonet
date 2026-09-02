@@ -506,14 +506,14 @@ function StudentLoginContent() {
             <button
               type="button"
               onClick={handleOpenFaceModal}
-              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/20 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-sm shadow-emerald-600/20 btn-press transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Camera className="w-4 h-4" />
               <span>BUKA KAMERA PINDAI WAJAH (FULL SCREEN)</span>
             </button>
 
             <p className="text-[11px] text-slate-500">
-              💡 Pastikan wajah Anda sudah pernah direkam di profil VeloNet.
+              Pastikan wajah Anda sudah pernah direkam di profil VeloNet.
             </p>
           </div>
         )}

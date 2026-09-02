@@ -84,19 +84,17 @@ export default function AdminOverviewPage() {
   return (
     <div className="space-y-6 text-slate-900 pb-20">
       {/* 1. Header Banner & Quick Action Strip */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border border-blue-200/80 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border border-blue-200/80 shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-100/80 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1">
-              <Zap className="w-3 h-3 text-amber-500" />
-              LMS & Community Command Center
-            </span>
-          </div>
+          <span className="px-2.5 py-0.5 rounded-full bg-blue-100/80 text-blue-700 border border-blue-200 text-xs font-semibold inline-flex items-center gap-1">
+            <Zap className="w-3 h-3 text-amber-500" />
+            <span>Command Center</span>
+          </span>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 flex items-center gap-2">
             <span>Overview Sistem Velocity</span>
           </h1>
           <p className="text-xs text-slate-600 mt-0.5">
-            Monitoring pendaftaran anggota, bank materi MisterGuru, katalog kursus, dan sesi presensi GPS/Face ID
+            Ringkasan metrik komunitas, modul pembelajaran, dan presensi
           </p>
         </div>
 
@@ -105,7 +103,7 @@ export default function AdminOverviewPage() {
           <button
             onClick={handleTriggerReminder}
             disabled={reminderRunning}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold shadow-xs btn-press transition-all cursor-pointer"
           >
             {reminderRunning ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -117,7 +115,7 @@ export default function AdminOverviewPage() {
 
           <Link
             href="/admin/face-terminal"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs btn-press transition-all cursor-pointer"
           >
             <Camera className="w-4 h-4" />
             <span>Terminal Wajah</span>
@@ -126,7 +124,7 @@ export default function AdminOverviewPage() {
           <a
             href="/api/participants/export?format=excel"
             download
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold shadow-xs btn-press transition-colors cursor-pointer"
           >
             <Download className="w-4 h-4 text-emerald-600" />
             <span>Export Excel</span>

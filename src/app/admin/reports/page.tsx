@@ -137,20 +137,20 @@ export default function CumulativeReportsPage() {
             <BarChart3 className="w-4 h-4" />
             <span>Rekapitulasi Kehadiran Progresif</span>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            Laporan Kumulatif Bulanan & Semester
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            Laporan Kumulatif Presensi
           </h1>
-          <p className="text-xs text-slate-600 mt-1">
-            Rekap total keaktifan anggota komunitas Velocity secara kumulatif dari seluruh sesi pertemuan.
+          <p className="text-xs text-slate-600 mt-0.5">
+            Rekapitulasi total keaktifan anggota dari seluruh sesi pertemuan
           </p>
         </div>
 
         <button
           onClick={handleExportCSV}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-xs btn-press transition-all cursor-pointer"
         >
           <FileSpreadsheet className="w-4 h-4" />
-          <span>Export Excel Kumulatif (.csv)</span>
+          <span>Export CSV (.csv)</span>
         </button>
       </div>
 

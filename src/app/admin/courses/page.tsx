@@ -133,29 +133,27 @@ export default function AdminCoursesPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto text-slate-900 pb-24">
       {/* 1. Header Banner */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border border-blue-200/80 shadow-xs">
-        <div className="flex items-center gap-4">
-          <div className="p-3.5 rounded-2xl bg-blue-100/80 text-blue-700 border border-blue-200">
-            <FolderKanban className="w-7 h-7" />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border border-blue-200/80 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 rounded-2xl bg-blue-100/80 text-blue-700 border border-blue-200">
+            <FolderKanban className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-100/80 text-blue-700 border border-blue-200 text-xs font-bold">
-                LMS Curriculum
-              </span>
-            </div>
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-100/80 text-blue-700 border border-blue-200 text-xs font-semibold">
+              LMS Curriculum
+            </span>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
               Manajemen Kursus & Modul
             </h1>
             <p className="text-xs text-slate-600 mt-0.5">
-              Kelola daftar kursus, kurikulum terstruktur, dan modul pembelajaran siswa
+              Kelola kurikulum kursus dan modul pembelajaran siswa
             </p>
           </div>
         </div>
 
         <button
           onClick={handleOpenModal}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold text-xs shadow-xs btn-press transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Buat Kursus Baru</span>

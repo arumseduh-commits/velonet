@@ -19,6 +19,7 @@ import {
   Clock,
   MapPin,
   Award,
+  AlertTriangle,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -151,12 +152,22 @@ export default function StudentProfilePage() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-bold text-slate-900">Biometrik Wajah AI (Face ID)</h3>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                 student?.isFaceRegistered
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}>
-                {student?.isFaceRegistered ? "Terdaftar & Aktif ✅" : "Belum Direkam ⚠️"}
+                {student?.isFaceRegistered ? (
+                  <>
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>Terdaftar & Aktif</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Belum Direkam</span>
+                  </>
+                )}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -328,8 +339,20 @@ export default function StudentProfilePage() {
                       </span>
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-[11px] font-medium text-slate-600">
-                        {rec.method === "FACE" ? "📸 Wajah AI" : rec.method === "GEOFENCE" ? "📍 GPS" : "✍️ Manual"}
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                        {rec.method === "FACE" ? (
+                          <>
+                            <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Wajah AI</span>
+                          </>
+                        ) : rec.method === "GEOFENCE" ? (
+                          <>
+                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            <span>GPS</span>
+                          </>
+                        ) : (
+                          <span>Manual</span>
+                        )}
                       </span>
                     </td>
                     <td className="py-3 px-3 font-mono text-slate-500 text-[11px]">

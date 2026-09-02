@@ -176,7 +176,7 @@ export default function StudentFaceRegisterPage() {
     setBlinkProgress(true);
     setSmileProgress(true);
     setLivenessStage("DONE");
-    setGuideText("✅ Perekaman wajah selesai! Silakan simpan biometrik Anda.");
+    setGuideText("Perekaman wajah selesai! Silakan simpan biometrik Anda.");
     toast.success(`Berhasil merekam ${descriptors.length} sampel biometrik bebas noise!`);
     isSamplingRef.current = false;
   }, [toast]);
@@ -210,14 +210,14 @@ export default function StudentFaceRegisterPage() {
         // Smart responsive guide texts
         if (!blinkProgress && !smileProgress) {
           if (stableFramesRef.current > 6) {
-            setGuideText("Kedipkan mata 👀 atau tersenyumlah sedikit 😊 (atau tahan sejenak)");
+            setGuideText("Kedipkan mata atau tersenyumlah sedikit (atau tahan sejenak)");
           } else {
             setGuideText("Wajah terdeteksi! Tahan posisi Anda...");
           }
         } else if (blinkProgress && !smileProgress) {
-          setGuideText("Kedipan terdeteksi! Kedipkan lagi atau tersenyum 😊");
+          setGuideText("Kedipan terdeteksi! Kedipkan lagi atau tersenyum");
         } else if (smileProgress && !blinkProgress) {
-          setGuideText("Senyuman terdeteksi! Tahan senyuman Anda 😊");
+          setGuideText("Senyuman terdeteksi! Tahan senyuman Anda");
         }
 
         // Auto-Trigger burst capture:
@@ -453,7 +453,7 @@ export default function StudentFaceRegisterPage() {
                 >
                   <Eye className="w-4 h-4 shrink-0" />
                   <span className="font-semibold">
-                    {blinkProgress ? "Kedipan Terdeteksi ✅" : "1. Kedipkan Mata"}
+                    {blinkProgress ? "Kedipan Terdeteksi" : "1. Kedipkan Mata"}
                   </span>
                 </div>
 
@@ -466,7 +466,7 @@ export default function StudentFaceRegisterPage() {
                 >
                   <Smile className="w-4 h-4 shrink-0" />
                   <span className="font-semibold">
-                    {smileProgress ? "Senyuman Terdeteksi ✅" : "2. Tersenyum Santai"}
+                    {smileProgress ? "Senyuman Terdeteksi" : "2. Tersenyum Santai"}
                   </span>
                 </div>
               </div>

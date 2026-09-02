@@ -36,6 +36,7 @@ import {
   ShieldAlert,
   KeyRound,
   Lock,
+  Edit3,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -207,10 +208,10 @@ export default function StudentDashboardPage() {
 
   const badgeTitle =
     (stats?.ratePercentage || 0) >= 90
-      ? "🌟 Velocity Star"
+      ? "Velocity Star"
       : (stats?.ratePercentage || 0) >= 75
-      ? "🥇 Active Learner"
-      : "🎗️ Velocity Member";
+      ? "Active Learner"
+      : "Velocity Member";
 
   const learningCategories = [
     { title: "Grammar Guide", count: "12 Topik", icon: BookMarked, color: "text-blue-600", bg: "bg-blue-50/70 border-blue-200 hover:border-blue-300 hover:bg-blue-50" },
@@ -222,7 +223,7 @@ export default function StudentDashboardPage() {
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 pb-24 md:pb-12 text-slate-900">
       {/* 1. HERO USER BANNER */}
-      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white border border-emerald-200/80 shadow-sm text-slate-900">
+      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white border border-emerald-200/80 shadow-xs text-slate-900">
         {/* Subtle background decorative shapes */}
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
@@ -231,11 +232,11 @@ export default function StudentDashboardPage() {
           {/* User Info Left */}
           <div className="flex items-center gap-4 sm:gap-5">
             <div className="relative">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center text-white font-black text-2xl sm:text-3xl shadow-md shadow-emerald-500/20 ring-4 ring-white shrink-0">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center text-white font-black text-2xl sm:text-3xl shadow-sm shadow-emerald-500/20 ring-4 ring-white shrink-0">
                 {student?.name?.charAt(0).toUpperCase() || "S"}
               </div>
               <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-xs" title="Akun Aktif">
-                ✓
+                <CheckCircle2 className="w-3.5 h-3.5" />
               </span>
             </div>
 
@@ -244,14 +245,17 @@ export default function StudentDashboardPage() {
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                   {student?.name}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold">
                   Kelas {student?.studentClass}
                 </span>
               </div>
               <p className="text-xs text-slate-600 flex items-center gap-2 flex-wrap">
-                <span className="text-amber-600 font-semibold">{badgeTitle}</span>
+                <span className="inline-flex items-center gap-1 text-amber-600 font-semibold">
+                  <Award className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{badgeTitle}</span>
+                </span>
                 <span>•</span>
-                <span className="text-slate-500">WA: +{student?.phoneNumber}</span>
+                <span className="text-slate-500 font-medium">WA: +{student?.phoneNumber}</span>
               </p>
             </div>
           </div>
@@ -260,7 +264,7 @@ export default function StudentDashboardPage() {
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
             <Link
               href="/student/exams"
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold text-xs shadow-xs btn-press transition-all cursor-pointer"
             >
               <ShieldAlert className="w-4 h-4 text-indigo-100" />
               <span>Ujian CBT</span>
@@ -268,7 +272,7 @@ export default function StudentDashboardPage() {
 
             <Link
               href="/student/learning"
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs btn-press transition-all cursor-pointer"
             >
               <BookOpen className="w-4 h-4 text-blue-100" />
               <span>Materi LMS</span>
@@ -276,7 +280,7 @@ export default function StudentDashboardPage() {
 
             <Link
               href="/student/attendance"
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs btn-press transition-all cursor-pointer"
             >
               <Camera className="w-4 h-4 text-emerald-100" />
               <span>Absen Wajah</span>
@@ -378,11 +382,12 @@ export default function StudentDashboardPage() {
             <ShieldCheck className="w-4 h-4 text-teal-600" />
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <span className="px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-bold">
-              Siap Digunakan ✅
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+              <span>Siap Digunakan</span>
             </span>
           </div>
-          <p className="text-[11px] text-slate-500">Enkripsi 128-D Vektor</p>
+          <p className="text-[11px] text-slate-500 font-medium">Enkripsi 128-D Vektor</p>
         </div>
       </div>
 
@@ -390,12 +395,12 @@ export default function StudentDashboardPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-indigo-600" />
-              <span>Ujian CBT Resmi (ExamBro Safe)</span>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
+              <span>Ujian CBT Resmi</span>
             </h2>
             <p className="text-xs text-slate-500">
-              Modul ujian resmi terjadwal dengan pengawasan AI dan anti-kecurangan
+              Evaluasi kompetensi terstruktur dengan proteksi ExamBro
             </p>
           </div>
 
@@ -525,11 +530,11 @@ export default function StudentDashboardPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-600" />
-              <span>Katalog Materi & Latihan Soal</span>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+              <span>Katalog Materi & Latihan</span>
             </h2>
-            <p className="text-xs text-slate-500">Pilih topik materi dan kerjakan kuis evaluasi untuk mengasah skill</p>
+            <p className="text-xs text-slate-500">Pelajari modul dan kuis evaluasi berkala</p>
           </div>
 
           <Link
@@ -549,7 +554,7 @@ export default function StudentDashboardPage() {
               <Link
                 key={idx}
                 href="/student/learning"
-                className={`p-4 rounded-2xl border ${cat.bg} hover:scale-[1.02] shadow-xs transition-all flex flex-col justify-between space-y-3 cursor-pointer group`}
+                className={`p-4 rounded-2xl border ${cat.bg} hover:scale-[1.02] shadow-xs btn-press transition-all flex flex-col justify-between space-y-3 cursor-pointer group`}
               >
                 <div className="flex items-center justify-between">
                   <div className={`p-2 rounded-xl bg-white border border-slate-200/80 shadow-xs ${cat.color}`}>
@@ -573,7 +578,7 @@ export default function StudentDashboardPage() {
             <Link
               key={item.id}
               href="/student/learning"
-              className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between space-y-4 group cursor-pointer text-slate-900"
+              className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-blue-300 btn-press transition-all flex flex-col justify-between space-y-4 group cursor-pointer text-slate-900"
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -615,11 +620,11 @@ export default function StudentDashboardPage() {
       <div className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <CalendarCheck className="w-5 h-5 text-emerald-600" />
-              <span>Riwayat Absensi & Sesi Pertemuan</span>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+              <CalendarCheck className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+              <span>Riwayat Kehadiran</span>
             </h2>
-            <p className="text-xs text-slate-500">Rekap kehadiran Anda pada pertemuan ekskul Bahasa Inggris</p>
+            <p className="text-xs text-slate-500">Rekapitulasi presensi pertemuan komunitas</p>
           </div>
 
           <Link
@@ -674,11 +679,22 @@ export default function StudentDashboardPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-slate-600">
-                        {r.method === "FACE" || r.method === "FACE_RECOGNITION"
-                          ? "📸 Face Recognition"
-                          : r.method === "LOCATION_GPS" || r.method === "GEOFENCE"
-                          ? "📍 GPS Lokasi"
-                          : "✍️ Manual"}
+                        {r.method === "FACE" || r.method === "FACE_RECOGNITION" ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                            <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Face ID</span>
+                          </span>
+                        ) : r.method === "LOCATION_GPS" || r.method === "GEOFENCE" ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700">
+                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            <span>GPS Lokasi</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                            <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Manual</span>
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-emerald-600">
                         {r.distanceMeter != null ? `${Math.round(r.distanceMeter)}m` : "-"}
