@@ -44,14 +44,16 @@ export async function POST(req: Request) {
     });
 
     if (existingUsersWithFace.length > 0) {
-      const matchResult = findBestFaceMatch(faceDescriptor, existingUsersWithFace as any, 0.45);
+      // Threshold 0.20: Only reject if truly identical (same physical person registering multiple accounts)
+      // Normal variation across different students (distance >= 0.20, similarity 50-80%) is safely permitted
+      const matchResult = findBestFaceMatch(faceDescriptor, existingUsersWithFace as any, 0.20);
       if (matchResult.isMatch && matchResult.matchedUser) {
         const ownerName = matchResult.matchedUser.name || "Peserta Lain";
         const ownerClass = matchResult.matchedUser.studentClass || "-";
         return NextResponse.json(
           {
             success: false,
-            error: `❌ Perekaman Wajah Ditolak: Wajah ini sudah terdaftar pada akun "${ownerName}" (${ownerClass}) dengan tingkat kecocokan biometrik ${matchResult.similarity}%. Satu wajah hanya dapat digunakan untuk 1 akun resmi Velocity.`,
+            error: `❌ Perekaman Wajah Ditolak: Wajah ini terdeteksi identik dengan akun "${ownerName}" (${ownerClass}) dengan tingkat kemiripan ${matchResult.similarity}%. Satu wajah fisik hanya dapat digunakan untuk 1 akun resmi.`,
           },
           { status: 409 }
         );

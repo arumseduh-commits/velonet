@@ -377,12 +377,12 @@ export async function detectFaceLivenessAndDescriptor(
     const rightEar = calculateEAR(rightEye);
     const avgEar = (leftEar + rightEar) / 2;
 
-    // A blink is detected when average EAR drops below 0.225
-    const isBlinking = avgEar < 0.225;
+    // A blink is detected when EAR drops below 0.25 or either eye narrows below 0.235 (responsive for mobile cameras)
+    const isBlinking = avgEar < 0.25 || leftEar < 0.235 || rightEar < 0.235;
 
-    // Smile detection via happy expression probability (> 0.60)
+    // Smile detection via happy expression probability (lowered to 0.30 so natural subtle smiles are recognized)
     const smileScore = detection.expressions?.happy || 0;
-    const isSmiling = smileScore >= 0.60;
+    const isSmiling = smileScore >= 0.30;
 
     return {
       detected: true,
@@ -440,4 +440,35 @@ export function captureFrameBase64(
   }
 
   return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+/**
+ * Averages multiple 128-dimensional face descriptor vectors and normalizes the result (L2 Unit Norm).
+ * This significantly cancels out sensor noise and motion grain on low-cost smartphone cameras.
+ */
+export function computeAverageDescriptor(descriptors: number[][]): number[] {
+  if (!descriptors || descriptors.length === 0) return [];
+  if (descriptors.length === 1) return descriptors[0];
+
+  const len = descriptors[0].length;
+  const avg = new Array(len).fill(0);
+
+  for (const desc of descriptors) {
+    for (let i = 0; i < len; i++) {
+      avg[i] += desc[i];
+    }
+  }
+
+  let sumSquares = 0;
+  for (let i = 0; i < len; i++) {
+    avg[i] /= descriptors.length;
+    sumSquares += avg[i] * avg[i];
+  }
+
+  const norm = Math.sqrt(sumSquares) || 1;
+  for (let i = 0; i < len; i++) {
+    avg[i] /= norm;
+  }
+
+  return avg;
 }

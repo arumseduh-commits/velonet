@@ -41,14 +41,15 @@ export async function POST(req: Request) {
     });
 
     if (existingUsersWithFace.length > 0) {
-      const matchResult = findBestFaceMatch(faceDescriptor, existingUsersWithFace as any, 0.45);
+      // Threshold 0.20: Only reject if truly identical
+      const matchResult = findBestFaceMatch(faceDescriptor, existingUsersWithFace as any, 0.20);
       if (matchResult.isMatch && matchResult.matchedUser) {
         const ownerName = matchResult.matchedUser.name || "Peserta Lain";
         const ownerClass = matchResult.matchedUser.studentClass || "-";
         return NextResponse.json(
           {
             success: false,
-            error: `❌ Perekaman Wajah Ditolak: Wajah ini sudah terdaftar pada akun "${ownerName}" (${ownerClass}) dengan kecocokan ${matchResult.similarity}%.`,
+            error: `❌ Perekaman Wajah Ditolak: Wajah ini terdeteksi identik dengan akun "${ownerName}" (${ownerClass}) dengan kecocokan ${matchResult.similarity}%.`,
           },
           { status: 409 }
         );

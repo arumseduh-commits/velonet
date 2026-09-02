@@ -45,15 +45,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Perform Biometric Euclidean Matching (Balanced threshold 0.56 for cross-device support)
-    const matchResult = findBestFaceMatch(faceDescriptor, candidateUsers as any, 0.56);
+    // 2. Perform Biometric Euclidean Matching (Strict threshold 0.40 to prevent A from logging into B's account)
+    const matchResult = findBestFaceMatch(faceDescriptor, candidateUsers as any, 0.40);
 
     if (!matchResult.isMatch || !matchResult.matchedUser) {
       return NextResponse.json(
         {
           success: false,
           code: "UNKNOWN_FACE",
-          error: "Wajah tidak dikenali atau belum terdaftar di sistem. Silakan login menggunakan WhatsApp atau Password.",
+          error: "Wajah tidak dapat diverifikasi secara akurat (ambang keamanan login). Silakan login menggunakan WhatsApp atau Password.",
         },
         { status: 401 }
       );

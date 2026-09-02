@@ -21,11 +21,13 @@ import { useDialog } from "@/components/ui/DialogProvider";
 import {
   loadFaceApiModels,
   detectFaceLivenessAndDescriptor,
+  detectFaceWithDescriptor,
   captureFrameBase64,
+  computeAverageDescriptor,
   getFaceApi,
 } from "@/lib/client-face-api";
 
-type LivenessStage = "CENTER" | "BLINK" | "SMILE" | "CAPTURING" | "DONE";
+type LivenessStage = "CENTER" | "BLINK" | "SMILE" | "SAMPLING" | "DONE";
 
 export default function StudentFaceRegisterPage() {
   const router = useRouter();
@@ -38,17 +40,20 @@ export default function StudentFaceRegisterPage() {
   const [modelsReady, setModelsReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Liveness State
+  // Liveness & Multi-Frame Sampling State
   const [livenessStage, setLivenessStage] = useState<LivenessStage>("CENTER");
   const [guideText, setGuideText] = useState("Posisikan wajah Anda tepat di dalam lingkaran oval");
   const [blinkProgress, setBlinkProgress] = useState(false);
   const [smileProgress, setSmileProgress] = useState(false);
+  const [samplingProgress, setSamplingProgress] = useState(0); // 0 to 5
   const [faceDescriptorCaptured, setFaceDescriptorCaptured] = useState<number[] | null>(null);
   const [photoBase64Captured, setPhotoBase64Captured] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const stableFramesRef = useRef(0);
+  const isSamplingRef = useRef(false);
 
   // 1. Fetch Student Auth State
   useEffect(() => {
@@ -96,6 +101,11 @@ export default function StudentFaceRegisterPage() {
         await videoRef.current.play();
         setCameraActive(true);
         setLivenessStage("CENTER");
+        setBlinkProgress(false);
+        setSmileProgress(false);
+        setSamplingProgress(0);
+        stableFramesRef.current = 0;
+        isSamplingRef.current = false;
         setGuideText("Posisikan wajah Anda tepat di dalam lingkaran oval");
       }
     } catch (err: any) {
@@ -117,53 +127,121 @@ export default function StudentFaceRegisterPage() {
       videoRef.current.srcObject = null;
     }
     setCameraActive(false);
+    isSamplingRef.current = false;
   }, []);
 
-  // 4. Run Liveness Detection Loop
+  // 4. Multi-Frame Burst Sampler (Cancels out sensor noise & blur on low-end cameras)
+  const startBurstCapture = useCallback(async () => {
+    if (!videoRef.current || isSamplingRef.current) return;
+    isSamplingRef.current = true;
+    setLivenessStage("SAMPLING");
+
+    const descriptors: number[][] = [];
+    let bestPhoto: string | null = null;
+    const TOTAL_SAMPLES = 5;
+
+    for (let i = 0; i < TOTAL_SAMPLES; i++) {
+      setSamplingProgress(i + 1);
+      setGuideText(`Mengambil sampel biometrik ${i + 1}/${TOTAL_SAMPLES} (Membersihkan noise kamera)...`);
+
+      try {
+        const detection = await detectFaceWithDescriptor(videoRef.current);
+        if (detection && detection.descriptor) {
+          descriptors.push(detection.descriptor);
+          if (!bestPhoto || (detection.score && detection.score > 0.6)) {
+            bestPhoto = captureFrameBase64(videoRef.current, detection.box);
+          }
+        }
+      } catch (err) {
+        // ignore single frame capture error
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+
+    if (descriptors.length === 0) {
+      toast.warning("Wajah tidak terdeteksi dengan jelas. Pastikan pencahayaan cukup dan coba lagi.");
+      isSamplingRef.current = false;
+      setLivenessStage("CENTER");
+      setSamplingProgress(0);
+      setGuideText("Posisikan wajah Anda tepat di dalam lingkaran oval");
+      return;
+    }
+
+    const averagedDescriptor = computeAverageDescriptor(descriptors);
+    setFaceDescriptorCaptured(averagedDescriptor);
+    if (bestPhoto) {
+      setPhotoBase64Captured(bestPhoto);
+    }
+    setBlinkProgress(true);
+    setSmileProgress(true);
+    setLivenessStage("DONE");
+    setGuideText("✅ Perekaman wajah selesai! Silakan simpan biometrik Anda.");
+    toast.success(`Berhasil merekam ${descriptors.length} sampel biometrik bebas noise!`);
+    isSamplingRef.current = false;
+  }, [toast]);
+
+  // 5. Run Relaxed Liveness & Auto-Capture Detection Loop
   const runLivenessDetection = useCallback(async () => {
-    if (!videoRef.current || !cameraActive || isSuccess) return;
+    if (
+      !videoRef.current ||
+      !cameraActive ||
+      isSuccess ||
+      isSamplingRef.current ||
+      livenessStage === "DONE" ||
+      livenessStage === "SAMPLING"
+    )
+      return;
 
     try {
       const liveness = await detectFaceLivenessAndDescriptor(videoRef.current);
 
       if (liveness.detected && liveness.descriptor && liveness.box) {
-        if (livenessStage === "CENTER") {
-          setGuideText("Wajah terdeteksi! Silakan KEDIPKAN MATA Anda 👀");
-          setLivenessStage("BLINK");
-        } else if (livenessStage === "BLINK") {
-          if (liveness.isBlinking) {
-            setBlinkProgress(true);
-            setGuideText("Hebat! Sekarang TERSENYUMLAH ke kamera 😊");
-            setLivenessStage("SMILE");
-          }
-        } else if (livenessStage === "SMILE") {
-          if (liveness.isSmiling || liveness.smileScore > 0.45) {
-            setSmileProgress(true);
-            setGuideText("Sempurna! Mengambil sampel biometrik...");
-            setLivenessStage("CAPTURING");
+        stableFramesRef.current += 1;
 
-            const photo = captureFrameBase64(videoRef.current, liveness.box);
-            setFaceDescriptorCaptured(liveness.descriptor);
-            setPhotoBase64Captured(photo);
-            setLivenessStage("DONE");
+        if (liveness.isBlinking) {
+          setBlinkProgress(true);
+        }
+
+        if (liveness.isSmiling || (liveness.smileScore && liveness.smileScore > 0.25)) {
+          setSmileProgress(true);
+        }
+
+        // Smart responsive guide texts
+        if (!blinkProgress && !smileProgress) {
+          if (stableFramesRef.current > 6) {
+            setGuideText("Kedipkan mata 👀 atau tersenyumlah sedikit 😊 (atau tahan sejenak)");
+          } else {
+            setGuideText("Wajah terdeteksi! Tahan posisi Anda...");
           }
+        } else if (blinkProgress && !smileProgress) {
+          setGuideText("Kedipan terdeteksi! Kedipkan lagi atau tersenyum 😊");
+        } else if (smileProgress && !blinkProgress) {
+          setGuideText("Senyuman terdeteksi! Tahan senyuman Anda 😊");
+        }
+
+        // Auto-Trigger burst capture:
+        // 1. If blink or smile is detected, OR
+        // 2. If face is centered & steady for ~2.5s (about 18 frames)
+        if (liveness.isBlinking || liveness.isSmiling || stableFramesRef.current >= 18) {
+          startBurstCapture();
+          return;
         }
       } else {
-        if (livenessStage !== "CAPTURING" && livenessStage !== "DONE") {
-          setGuideText("Posisikan wajah tepat di tengah kamera");
-        }
+        stableFramesRef.current = Math.max(0, stableFramesRef.current - 1);
+        setGuideText("Posisikan wajah tepat di tengah lingkaran oval");
       }
     } catch (e) {
       // ignore frame analysis error
     }
 
-    if (cameraActive && livenessStage !== "DONE" && !isSuccess) {
+    if (cameraActive && !isSuccess) {
       animationFrameRef.current = requestAnimationFrame(runLivenessDetection);
     }
-  }, [cameraActive, livenessStage, isSuccess]);
+  }, [cameraActive, livenessStage, isSuccess, blinkProgress, smileProgress, startBurstCapture]);
 
   useEffect(() => {
-    if (cameraActive && livenessStage !== "DONE" && !isSuccess) {
+    if (cameraActive && livenessStage !== "DONE" && livenessStage !== "SAMPLING" && !isSuccess) {
       animationFrameRef.current = requestAnimationFrame(runLivenessDetection);
     }
     return () => {
@@ -173,7 +251,7 @@ export default function StudentFaceRegisterPage() {
     };
   }, [cameraActive, livenessStage, isSuccess, runLivenessDetection]);
 
-  // 5. Submit Face Biometrics to API
+  // 6. Submit Face Biometrics to API
   const handleSaveFace = async () => {
     if (!faceDescriptorCaptured) {
       toast.warning("Silakan ikuti instruksi kamera untuk merekam wajah terlebih dahulu.");
@@ -206,32 +284,11 @@ export default function StudentFaceRegisterPage() {
     }
   };
 
-  // Manual Instant Capture Override
+  // Manual Instant Capture Override (Runs 5-frame burst immediately)
   const handleManualCapture = async () => {
     if (!videoRef.current) return;
-    setSubmitting(true);
-    toast.info("Menganalisis wajah...");
-
-    try {
-      const liveness = await detectFaceLivenessAndDescriptor(videoRef.current);
-      if (!liveness.detected || !liveness.descriptor) {
-        toast.warning("Wajah tidak terdeteksi! Pastikan pencahayaan cukup dan wajah di tengah.");
-        setSubmitting(false);
-        return;
-      }
-
-      const photo = captureFrameBase64(videoRef.current, liveness.box);
-      setFaceDescriptorCaptured(liveness.descriptor);
-      setPhotoBase64Captured(photo);
-      setBlinkProgress(true);
-      setSmileProgress(true);
-      setLivenessStage("DONE");
-      toast.success("Wajah berhasil diambil! Klik 'Simpan Biometrik Wajah' di bawah.");
-    } catch (e: any) {
-      toast.error("Gagal mendeteksi wajah: " + e.message);
-    } finally {
-      setSubmitting(false);
-    }
+    toast.info("Mengambil sampel biometrik...");
+    await startBurstCapture();
   };
 
   if (loading) {
@@ -326,10 +383,33 @@ export default function StudentFaceRegisterPage() {
                       className={`w-48 h-64 rounded-[50px] border-2 transition-all duration-300 ${
                         livenessStage === "DONE"
                           ? "border-emerald-400 bg-emerald-500/10 shadow-[0_0_30px_rgba(16,185,129,0.5)]"
+                          : livenessStage === "SAMPLING"
+                          ? "border-blue-400 bg-blue-500/10 shadow-[0_0_30px_rgba(59,130,246,0.5)]"
                           : "border-blue-400/80 shadow-[0_0_20px_rgba(59,130,246,0.3)] animate-pulse"
                       }`}
                     />
                   </div>
+
+                  {/* Sampling Burst Progress Overlay */}
+                  {livenessStage === "SAMPLING" && (
+                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
+                      <RefreshCw className="w-10 h-10 animate-spin text-blue-400" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-white">
+                          Mengambil Sampel Biometrik ({samplingProgress}/5)
+                        </p>
+                        <p className="text-xs text-slate-300">
+                          Membersihkan noise kamera & mengoptimalkan akurasi...
+                        </p>
+                      </div>
+                      <div className="w-48 bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700">
+                        <div
+                          className="bg-gradient-to-r from-blue-500 to-emerald-400 h-full transition-all duration-200"
+                          style={{ width: `${(samplingProgress / 5) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Dynamic Instruction Overlay Banner */}
                   <div className="absolute bottom-3 inset-x-3 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 py-2 px-3 rounded-2xl text-center shadow-lg">
@@ -355,7 +435,7 @@ export default function StudentFaceRegisterPage() {
                   <p className="text-xs text-slate-400 max-w-xs mx-auto">
                     {photoBase64Captured
                       ? "Wajah Anda sudah pernah terdaftar. Anda dapat merekam ulang wajah jika diinginkan."
-                      : "Kamera akan memverifikasi liveness wajah (kedipan & senyuman) untuk mencegah spoofing foto."}
+                      : "Kamera akan memverifikasi liveness (kedipan/senyuman atau tahan stabil) dengan pengambilan 5 sampel bebas noise."}
                   </p>
                 </div>
               )}
@@ -386,7 +466,7 @@ export default function StudentFaceRegisterPage() {
                 >
                   <Smile className="w-4 h-4 shrink-0" />
                   <span className="font-semibold">
-                    {smileProgress ? "Senyuman Terdeteksi ✅" : "2. Tersenyum"}
+                    {smileProgress ? "Senyuman Terdeteksi ✅" : "2. Tersenyum Santai"}
                   </span>
                 </div>
               </div>
@@ -428,11 +508,19 @@ export default function StudentFaceRegisterPage() {
                     <button
                       type="button"
                       onClick={handleManualCapture}
-                      disabled={submitting}
-                      className="w-full py-3 px-4 rounded-2xl bg-blue-600/80 hover:bg-blue-600 text-white font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border border-blue-500/40"
+                      disabled={submitting || livenessStage === "SAMPLING"}
+                      className="w-full py-3 px-4 rounded-2xl bg-blue-600/80 hover:bg-blue-600 text-white font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border border-blue-500/40 disabled:opacity-50"
                     >
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>Ambil Snapshot Wajah Sekarang</span>
+                      {livenessStage === "SAMPLING" ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                      )}
+                      <span>
+                        {livenessStage === "SAMPLING"
+                          ? `Mengambil Sampel (${samplingProgress}/5)...`
+                          : "Ambil Snapshot Langsung (Bypass Sensor)"}
+                      </span>
                     </button>
                   )}
 

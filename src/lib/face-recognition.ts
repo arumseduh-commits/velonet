@@ -22,14 +22,29 @@ export function calculateEuclideanDistance(
 }
 
 /**
- * Converts Euclidean distance to a friendly similarity percentage (0% - 100%).
- * Distance 0.0 -> 100%
- * Distance 0.25 -> 75%
- * Distance 0.50 -> 50%
+ * Converts Euclidean distance to a friendly calibrated similarity percentage (0% - 100%).
+ * Uses a non-linear biometric curve so that:
+ * - Distance <= 0.20 -> 94% - 100% (Identical / near-perfect)
+ * - Distance 0.35 -> ~85% - 90% (Very good match)
+ * - Distance 0.45 -> ~76% - 80% (Acceptable match for low-end cameras)
+ * - Distance 0.50 -> ~70% (Standard acceptance threshold)
+ * - Distance > 0.60 -> Rapidly drops below 50%
  */
 export function calculateSimilarityPercentage(distance: number): number {
-  const percentage = (1 - distance) * 100;
-  return Math.max(0, Math.min(100, Math.round(percentage * 10) / 10));
+  if (distance <= 0) return 100;
+
+  let score: number;
+  if (distance <= 0.20) {
+    score = 100 - (distance / 0.20) * 6; // 100% -> 94%
+  } else if (distance <= 0.50) {
+    score = 94 - ((distance - 0.20) / 0.30) * 24; // 94% -> 70%
+  } else if (distance <= 0.75) {
+    score = 70 - ((distance - 0.50) / 0.25) * 45; // 70% -> 25%
+  } else {
+    score = Math.max(0, 25 - ((distance - 0.75) / 0.25) * 25);
+  }
+
+  return Math.max(0, Math.min(100, Math.round(score * 10) / 10));
 }
 
 export interface CandidateUser {
@@ -239,70 +254,119 @@ export async function processFaceAttendance({
   photoBase64,
   threshold = 0.50,
 }: ProcessFaceAttendanceParams): Promise<ProcessFaceAttendanceResult> {
-  // 1. Fetch all candidate users who have registered their face
-  const enrolledUsers = await prisma.user.findMany({
-    where: {
-      faceDescriptor: { not: null },
-      isExcluded: false,
-    },
-    select: {
-      id: true,
-      name: true,
-      phoneNumber: true,
-      studentClass: true,
-      gender: true,
-      faceDescriptor: true,
-      facePhoto: true,
-    },
-  });
+  let detectedUser: {
+    id: string;
+    name: string | null;
+    phoneNumber: string;
+    studentClass: string | null;
+    gender: string | null;
+    facePhoto: string | null;
+  };
+  let detectedName: string;
+  let detectedClass: string;
+  let similarity: number;
 
-  if (enrolledUsers.length === 0) {
-    return {
-      success: false,
-      code: "NOT_ENROLLED",
-      message: "Belum ada data wajah peserta yang terdaftar di sistem. Silakan rekam wajah terlebih dahulu.",
-    };
-  }
-
-  // 2. Perform Biometric Face Matching
-  const matchResult = findBestFaceMatch(queryDescriptor, enrolledUsers, threshold);
-
-  if (!matchResult.isMatch || !matchResult.matchedUser) {
-    return {
-      success: false,
-      code: "UNKNOWN_FACE",
-      message: "Wajah Anda belum terdaftar di sistem. Silakan hubungi admin atau rekam wajah di menu profil.",
-    };
-  }
-
-  const detectedUser = matchResult.matchedUser;
-  const detectedName = detectedUser.name || "Peserta";
-  const detectedClass = detectedUser.studentClass || "-";
-  const similarity = matchResult.similarity;
-
-  // 3. Verify Account Ownership (Anti-Titip Absen)
-  if (loggedInUserId && loggedInUserId !== detectedUser.id) {
+  if (loggedInUserId) {
+    // 1:1 Direct Verification for logged-in student (eliminates false 1:N collisions on low-cost cameras)
     const loggedInUser = await prisma.user.findUnique({
       where: { id: loggedInUserId },
-      select: { name: true, studentClass: true },
+      select: {
+        id: true,
+        name: true,
+        phoneNumber: true,
+        studentClass: true,
+        gender: true,
+        faceDescriptor: true,
+        facePhoto: true,
+        isExcluded: true,
+      },
     });
 
-    const loggedInName = loggedInUser?.name || "Akun Anda";
+    if (!loggedInUser || !loggedInUser.faceDescriptor) {
+      return {
+        success: false,
+        code: "NOT_ENROLLED",
+        message: "Anda belum mendaftarkan biometrik wajah. Silakan rekam wajah terlebih dahulu di menu Perekaman Wajah.",
+      };
+    }
 
-    return {
-      success: false,
-      code: "ACCOUNT_MISMATCH",
-      message: `Wajah di kamera terdeteksi sebagai "${detectedName}", sedangkan akun yang aktif adalah "${loggedInName}". Titip absen tidak diperbolehkan.`,
-      detectedUser: {
-        id: detectedUser.id,
-        name: detectedName,
-        studentClass: detectedClass,
-        phoneNumber: detectedUser.phoneNumber,
-        facePhoto: detectedUser.facePhoto,
+    let enrolledDescriptor: number[];
+    try {
+      enrolledDescriptor = JSON.parse(loggedInUser.faceDescriptor);
+    } catch {
+      return {
+        success: false,
+        code: "ERROR",
+        message: "Format biometrik wajah akun Anda di sistem rusak. Silakan lakukan rekam ulang wajah.",
+      };
+    }
+
+    const dist = calculateEuclideanDistance(queryDescriptor, enrolledDescriptor);
+    // Student threshold: 0.52 for mobile phone tolerance in varying lighting conditions
+    const studentThreshold = Math.max(threshold, 0.52);
+    const isMatch = dist <= studentThreshold;
+    similarity = calculateSimilarityPercentage(dist);
+
+    if (!isMatch) {
+      return {
+        success: false,
+        code: "ACCOUNT_MISMATCH",
+        message: `Wajah di kamera tidak cocok dengan profil biometrik akun Anda (${similarity}%). Pastikan pencahayaan cukup dan wajah Anda sendiri yang menghadap kamera.`,
+        detectedUser: {
+          id: loggedInUser.id,
+          name: loggedInUser.name || "Peserta",
+          studentClass: loggedInUser.studentClass || "-",
+          phoneNumber: loggedInUser.phoneNumber,
+          facePhoto: loggedInUser.facePhoto,
+        },
+        loggedInName: loggedInUser.name || "Akun Anda",
+        similarity,
+      };
+    }
+
+    detectedUser = loggedInUser;
+    detectedName = loggedInUser.name || "Peserta";
+    detectedClass = loggedInUser.studentClass || "-";
+  } else {
+    // 1:N Global Search for Public Kiosk Terminal (admin/face-terminal)
+    const enrolledUsers = await prisma.user.findMany({
+      where: {
+        faceDescriptor: { not: null },
+        isExcluded: false,
       },
-      loggedInName,
-      similarity,
-    };
+      select: {
+        id: true,
+        name: true,
+        phoneNumber: true,
+        studentClass: true,
+        gender: true,
+        faceDescriptor: true,
+        facePhoto: true,
+      },
+    });
+
+    if (enrolledUsers.length === 0) {
+      return {
+        success: false,
+        code: "NOT_ENROLLED",
+        message: "Belum ada data wajah peserta yang terdaftar di sistem. Silakan rekam wajah terlebih dahulu.",
+      };
+    }
+
+    const matchResult = findBestFaceMatch(queryDescriptor, enrolledUsers, threshold);
+
+    if (!matchResult.isMatch || !matchResult.matchedUser) {
+      return {
+        success: false,
+        code: "UNKNOWN_FACE",
+        message: "Wajah Anda belum terdaftar di sistem. Silakan hubungi admin atau rekam wajah di menu profil.",
+      };
+    }
+
+    detectedUser = matchResult.matchedUser;
+    detectedName = detectedUser.name || "Peserta";
+    detectedClass = detectedUser.studentClass || "-";
+    similarity = matchResult.similarity;
   }
 
   // 4. Smart Auto-Location & Session Detection
