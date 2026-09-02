@@ -25,6 +25,10 @@ import {
   HelpCircle,
   FileText,
   Trash2,
+  Paperclip,
+  X,
+  ArrowLeft,
+  Layers,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -47,11 +51,20 @@ export default function AdminAITeacherAssistantPage() {
   // Publishing draft quiz state
   const [publishing, setPublishing] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Attached file state & API Key
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>("");
 
-  // 1. Initial Load: Sessions & Knowledge Base
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 1. Initial Load: Sessions & Knowledge Base & API Key
   useEffect(() => {
     fetchSessionsAndMaterials();
+    if (typeof window !== "undefined") {
+      const savedKey = localStorage.getItem("velonet_gemini_api_key") || "";
+      setGeminiApiKey(savedKey);
+    }
   }, []);
 
   const fetchSessionsAndMaterials = async () => {
@@ -123,30 +136,49 @@ export default function AdminAITeacherAssistantPage() {
   // Send message to AI Assistant
   const handleSendMessage = async (customPrompt?: string) => {
     const textToSend = customPrompt || inputMessage.trim();
-    if (!textToSend || !activeSessionId || sending) return;
+    if ((!textToSend && !attachedFile) || !activeSessionId || sending) return;
 
     setInputMessage("");
+    const currentFile = attachedFile;
+    setAttachedFile(null);
     setSending(true);
 
     // Optimistically append user message
     const tempUserMsg = {
       id: "temp-" + Date.now(),
       role: "user",
-      content: textToSend,
+      content: currentFile
+        ? `📎 [Lampiran: ${currentFile.name}]\n${textToSend || "Tolong analisa dokumen ini dan buatkan draf soal CBT."}`
+        : textToSend,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, tempUserMsg]);
 
     try {
-      const res = await fetch("/api/admin/ai/chat/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: activeSessionId,
-          content: textToSend,
-          contextTopicId: selectedTopicId || undefined,
-        }),
-      });
+      let res: Response;
+      if (currentFile) {
+        const formData = new FormData();
+        formData.append("sessionId", activeSessionId);
+        formData.append("content", textToSend);
+        formData.append("file", currentFile);
+        if (geminiApiKey) formData.append("apiKey", geminiApiKey);
+
+        res = await fetch("/api/admin/ai/chat/message", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        res = await fetch("/api/admin/ai/chat/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: activeSessionId,
+            content: textToSend,
+            apiKey: geminiApiKey || undefined,
+            contextTopicId: selectedTopicId || undefined,
+          }),
+        });
+      }
 
       const json = await res.json();
       if (json.success && json.data) {
@@ -155,6 +187,7 @@ export default function AdminAITeacherAssistantPage() {
           role: "assistant",
           content: json.data.reply,
           generatedQuizDraft: json.data.quizDraft ? JSON.stringify(json.data.quizDraft) : null,
+          adminAction: json.data.adminAction || null,
           createdAt: new Date().toISOString(),
         };
 
@@ -308,17 +341,25 @@ export default function AdminAITeacherAssistantPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                  AI Teacher Copilot
+                  VeloNet Master Copilot (Fullscreen)
                 </h1>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  Model Online
+                  {geminiApiKey ? "Gemini 2.0 Flash" : "Model Online"}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                Didukung basis data kurikulum MisterGuru & Generator Multi-Format CBT
+                Workspace Penuh: Ekstraksi Word/PDF ke CBT Multi-Format & Kontrol Admin
               </p>
             </div>
           </div>
+
+          <button
+            onClick={() => router.push("/admin")}
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Kembali ke Dashboard</span>
+          </button>
         </header>
 
         {/* Message Stream */}
@@ -491,6 +532,26 @@ export default function AdminAITeacherAssistantPage() {
           ))}
         </div>
 
+        {/* Attached File Preview Pill */}
+        {attachedFile && (
+          <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 flex items-center justify-between text-xs text-blue-900">
+            <div className="flex items-center gap-2 truncate">
+              <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="font-semibold truncate">{attachedFile.name}</span>
+              <span className="text-[10px] text-blue-500 shrink-0">
+                ({(attachedFile.size / 1024).toFixed(1)} KB)
+              </span>
+            </div>
+            <button
+              onClick={() => setAttachedFile(null)}
+              className="p-1 text-blue-500 hover:text-rose-600"
+              title="Hapus Lampiran"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Input Bar */}
         <form
           onSubmit={(e) => {
@@ -500,17 +561,46 @@ export default function AdminAITeacherAssistantPage() {
           className="p-4 border-t border-slate-100 flex items-center gap-3 bg-white"
         >
           <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                setAttachedFile(e.target.files[0]);
+              }
+            }}
+            accept=".docx,.pdf,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={`p-3 rounded-2xl border transition-colors cursor-pointer shrink-0 ${
+              attachedFile
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200"
+            }`}
+            title="Lampirkan Dokumen (Word .docx atau PDF)"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+
+          <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Ketik instruksi ke AI (contoh: Buatkan 5 soal pilihan ganda dan 2 uraian...)"
+            placeholder={
+              attachedFile
+                ? "Tulis instruksi tambahan untuk dokumen ini..."
+                : "Ketik instruksi ke AI (contoh: Buatkan 5 soal pilihan ganda dan 2 uraian...)"
+            }
             disabled={sending}
             className="flex-1 px-4 py-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden text-slate-900 placeholder-slate-400"
           />
 
           <button
             type="submit"
-            disabled={sending || !inputMessage.trim()}
+            disabled={sending || (!inputMessage.trim() && !attachedFile)}
             className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
           >
             <Send className="w-4 h-4" />

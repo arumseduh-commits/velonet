@@ -1,0 +1,562 @@
+import { prisma } from "./prisma";
+import { MISTERGURU_MATERIALS } from "@/data/misterguru-data";
+
+export interface MultiFormatQuestionDraft {
+  type: "SINGLE_CHOICE" | "CHECKBOXES" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY";
+  text: string;
+  points: number;
+  sampleAnswer?: string;
+  gradingRubric?: string;
+  options?: {
+    text: string;
+    isCorrect: boolean;
+  }[];
+}
+
+export interface GeneratedMultiQuizDraft {
+  title: string;
+  description: string;
+  category: string;
+  durationMinutes: number;
+  maxStrikes: number;
+  enableFullscreenLock: boolean;
+  enableCameraProctor: boolean;
+  enableTabSwitchDetect: boolean;
+  supervisorPin: string;
+  questions: MultiFormatQuestionDraft[];
+}
+
+export interface AdminActionPayload {
+  type: "navigate" | "stats" | "action";
+  label: string;
+  url?: string;
+  data?: any;
+}
+
+export interface GeminiCopilotResult {
+  reply: string;
+  quizDraft?: GeneratedMultiQuizDraft | null;
+  adminAction?: AdminActionPayload | null;
+  source: "gemini" | "fallback";
+}
+
+/**
+ * Extract clean text from uploaded document Buffer
+ */
+export async function extractTextFromDocument(
+  buffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<string> {
+  const lowerName = fileName.toLowerCase();
+
+  // 1. Word Document (.docx)
+  if (
+    lowerName.endsWith(".docx") ||
+    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    try {
+      const mammoth = await import("mammoth");
+      const result = await mammoth.extractRawText({ buffer });
+      return result.value.trim();
+    } catch (err) {
+      console.warn("[Docx Parser] mammoth failed, falling back to string extraction:", err);
+      return buffer.toString("utf-8").replace(/[^\x20-\x7E\n\r\t]/g, " ").trim();
+    }
+  }
+
+  // 2. PDF Document (.pdf)
+  if (lowerName.endsWith(".pdf") || mimeType === "application/pdf") {
+    try {
+      const pdfParseModule: any = await import("pdf-parse");
+      const pdfParse = pdfParseModule.default || pdfParseModule;
+      const data = await pdfParse(buffer);
+      return data.text.trim();
+    } catch (err) {
+      console.warn("[PDF Parser] pdf-parse failed:", err);
+      return "";
+    }
+  }
+
+  // 3. Plain Text / Markdown
+  return buffer.toString("utf-8").trim();
+}
+
+/**
+ * Fetch live administrative context from Prisma
+ */
+export async function getLiveAdminContext(): Promise<string> {
+  try {
+    const [userCount, quizCount, recentQuizzes, sessionCount, recentSessions, violationCount] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.quiz.count(),
+        prisma.quiz.findMany({
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          select: { id: true, title: true, _count: { select: { questions: true } } },
+        }),
+        prisma.meetingSession.count(),
+        prisma.meetingSession.findMany({
+          take: 3,
+          orderBy: { createdAt: "desc" },
+          select: { id: true, title: true, isActive: true },
+        }),
+        prisma.examViolationLog.count().catch(() => 0),
+      ]);
+
+    const activeQuizList = recentQuizzes
+      .map((q: any) => `• [${q.id}] "${q.title}" (${q._count?.questions || 0} soal)`)
+      .join("\n");
+
+    const activeSessionList = recentSessions
+      .map((s: any) => `• [${s.id}] "${s.title}" (Aktif: ${s.isActive ? "Ya" : "Tidak"})`)
+      .join("\n");
+
+    return `
+STATUS LIVE SISTEM VELONET LMS SAAT INI:
+- Total Pengguna / Peserta Terdaftar: ${userCount}
+- Total Kuis CBT: ${quizCount}
+- Kuis Terbaru:
+${activeQuizList || "• Belum ada kuis"}
+- Total Sesi Presensi: ${sessionCount}
+- Sesi Presensi Terbaru:
+${activeSessionList || "• Belum ada sesi"}
+- Total Pelanggaran Ujian Terdeteksi: ${violationCount}
+NAVIGASI MODUL ADMIN:
+- Overview: /admin
+- Katalog Kursus & Modul: /admin/courses
+- VeloExambro CBT (Daftar Ujian): /admin/exams
+- Sesi Presensi Pertemuan: /admin/sessions
+- Terminal Wajah Kiosk: /admin/face-terminal
+- Laporan Kumulatif: /admin/reports
+- Data Peserta Komunitas: /admin/participants
+- Pusat Kendali Bot WA: /admin/bot
+- Daftar Kick: /admin/kick-list
+- Exclusion List: /admin/exclusions
+`.trim();
+  } catch (err) {
+    console.warn("[getLiveAdminContext] Failed to query admin context:", err);
+    return "Sistem VeloNet LMS aktif.";
+  }
+}
+
+/**
+ * Process Teacher Copilot prompt using Google Gemini Flash or intelligent fallback
+ */
+export async function processGeminiCopilot({
+  userMessage,
+  documentText,
+  documentName,
+  apiKey,
+  history = [],
+}: {
+  userMessage: string;
+  documentText?: string;
+  documentName?: string;
+  apiKey?: string;
+  history?: Array<{ role: string; content: string }>;
+}): Promise<GeminiCopilotResult> {
+  const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
+  const adminContext = await getLiveAdminContext();
+
+  // If Gemini API Key is available, call Gemini 2.0 Flash / 1.5 Flash
+  if (finalApiKey) {
+    try {
+      const geminiResult = await callGeminiAPI({
+        apiKey: finalApiKey,
+        userMessage,
+        documentText,
+        documentName,
+        adminContext,
+        history,
+      });
+
+      if (geminiResult) {
+        return {
+          ...geminiResult,
+          source: "gemini",
+        };
+      }
+    } catch (err: any) {
+      console.error("[processGeminiCopilot] Gemini API error, using fallback:", err.message);
+    }
+  }
+
+  // Fallback to intelligent heuristic processing
+  const fallbackResult = processHeuristicFallback({
+    userMessage,
+    documentText,
+    documentName,
+    adminContext,
+  });
+
+  return {
+    ...fallbackResult,
+    source: "fallback",
+  };
+}
+
+/**
+ * Direct REST call to Google Gemini API
+ */
+async function callGeminiAPI({
+  apiKey,
+  userMessage,
+  documentText,
+  documentName,
+  adminContext,
+  history,
+}: {
+  apiKey: string;
+  userMessage: string;
+  documentText?: string;
+  documentName?: string;
+  adminContext: string;
+  history: Array<{ role: string; content: string }>;
+}): Promise<{ reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } | null> {
+  // Use gemini-2.0-flash or gemini-1.5-flash
+  const model = "gemini-2.0-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const systemInstruction = `
+Anda adalah "VeloNet Master Admin Copilot & CBT Architect", asisten AI paling cerdas dan serba bisa untuk Administrator dan Guru di platform VeloNet LMS.
+Anda memiliki akses ke data live sistem, kemampuan merancang ujian CBT berstandar tinggi, dan memahami seluruh fitur VeloNet (CBT, Kursus, Presensi Wajah, Peserta, Bot WA).
+
+KONTEKS DATABASE & NAVIGASI SISTEM:
+${adminContext}
+
+TUGAS DAN ATURAN ANDA:
+1. Jika pengguna melampirkan DOKUMEN (Word/PDF/Teks):
+   - Jika dokumen berisi kumpulan/bank soal yang sudah ada: EKSTRAK dan format secara presisi setiap nomor soal, pilihan opsi A, B, C, D, dan tentukan kunci jawaban benar (isCorrect: true).
+   - Jika dokumen berisi materi pelajaran / modul / artikel: RANGKUM dan CIPTAKAN set soal CBT Multi-Format yang komprehensif dan mendalam.
+   - Didukung 5 TIPE SOAL:
+     * SINGLE_CHOICE (Pilihan Ganda 1 Opsi)
+     * CHECKBOXES (Kotak Centang, beberapa jawaban benar)
+     * TRUE_FALSE (Benar / Salah)
+     * SHORT_ANSWER (Isian Singkat)
+     * ESSAY (Uraian Panjang, WAJIB sertakan sampleAnswer dan gradingRubric)
+   - Sertakan "quizDraft" dalam JSON output Anda.
+
+2. Jika pengguna meminta navigasi atau bertanya tentang data admin:
+   - Jawab secara ringkas, jelas, dan profesional dalam Bahasa Indonesia.
+   - Sertakan "adminAction" jika ada halaman admin yang relevan untuk dibuka atau statistik yang perlu ditampilkan.
+
+FORMAT OUTPUT WAJIB:
+Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, dengan struktur berikut:
+{
+  "reply": "Penjelasan respons yang ramah, profesional, dan informatif kepada admin (dukung Markdown)",
+  "quizDraft": {
+    "title": "Judul Kuis",
+    "description": "Deskripsi singkat kuis",
+    "category": "Kategori Soal",
+    "durationMinutes": 30,
+    "maxStrikes": 3,
+    "enableFullscreenLock": true,
+    "enableCameraProctor": true,
+    "enableTabSwitchDetect": true,
+    "supervisorPin": "123456",
+    "questions": [
+      {
+        "type": "SINGLE_CHOICE",
+        "text": "Pertanyaan...",
+        "points": 10,
+        "options": [
+          { "text": "Opsi A", "isCorrect": true },
+          { "text": "Opsi B", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "CHECKBOXES",
+        "text": "Pilihlah semua yang benar...",
+        "points": 15,
+        "options": [
+          { "text": "Opsi A", "isCorrect": true },
+          { "text": "Opsi B", "isCorrect": true },
+          { "text": "Opsi C", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "TRUE_FALSE",
+        "text": "Pernyataan...",
+        "points": 10,
+        "options": [
+          { "text": "BENAR", "isCorrect": true },
+          { "text": "SALAH", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "SHORT_ANSWER",
+        "text": "Pertanyaan isian singkat...",
+        "points": 10,
+        "sampleAnswer": "KataKunci",
+        "gradingRubric": "Kriteria penilaian isian"
+      },
+      {
+        "type": "ESSAY",
+        "text": "Jelaskan secara mendalam...",
+        "points": 25,
+        "sampleAnswer": "Contoh jawaban ideal...",
+        "gradingRubric": "Rubrik: 1. Konsep (50%), 2. Contoh (50%)"
+      }
+    ]
+  },
+  "adminAction": {
+    "type": "navigate",
+    "label": "Buka Halaman Ujian",
+    "url": "/admin/exams"
+  }
+}
+`.trim();
+
+  let promptContent = userMessage;
+  if (documentText) {
+    promptContent += `\n\n[LAMPIRAN DOKUMEN: ${documentName || "file"}]:\n"""\n${documentText.slice(0, 50000)}\n"""`;
+  }
+
+  const contents: any[] = [];
+  const recentHistory = history.slice(-6);
+  for (const h of recentHistory) {
+    contents.push({
+      role: h.role === "assistant" ? "model" : "user",
+      parts: [{ text: h.content }],
+    });
+  }
+
+  contents.push({
+    role: "user",
+    parts: [{ text: promptContent }],
+  });
+
+  const payload = {
+    systemInstruction: {
+      parts: [{ text: systemInstruction }],
+    },
+    contents,
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json",
+    },
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API returned HTTP ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) {
+    return null;
+  }
+
+  try {
+    const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(cleanJson);
+    return {
+      reply: parsed.reply || "Tugas berhasil diselesaikan.",
+      quizDraft: parsed.quizDraft || null,
+      adminAction: parsed.adminAction || null,
+    };
+  } catch (parseErr) {
+    return {
+      reply: rawText,
+      quizDraft: null,
+      adminAction: null,
+    };
+  }
+}
+
+/**
+ * Intelligent Heuristic Fallback Engine when API Key is not set or network fails
+ */
+function processHeuristicFallback({
+  userMessage,
+  documentText,
+  documentName,
+  adminContext,
+}: {
+  userMessage: string;
+  documentText?: string;
+  documentName?: string;
+  adminContext: string;
+}): { reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } {
+  const query = userMessage.toLowerCase();
+
+  // 1. Check if user is asking for navigation or admin stats
+  if (query.includes("ujian") || query.includes("cbt") || query.includes("exam")) {
+    if (!documentText) {
+      return {
+        reply: `Tentu! Untuk mengelola dan memantau ujian CBT VeloExambro, Anda dapat langsung membuka menu **VeloExambro CBT**. Di sana Anda dapat membuat soal baru, mengaktifkan live proctoring, dan meninjau hasil ujian peserta.\n\n${adminContext}`,
+        adminAction: {
+          type: "navigate",
+          label: "Buka Pusat Ujian CBT",
+          url: "/admin/exams",
+        },
+      };
+    }
+  }
+
+  if (query.includes("presensi") || query.includes("sesi") || query.includes("absen")) {
+    return {
+      reply: `Untuk melihat data kehadiran dan mengaktifkan sesi absensi pertemuan berbasis Face Recognition atau QR Code, silakan kunjungi halaman **Sesi Presensi** atau **Terminal Wajah Kiosk**.\n\n${adminContext}`,
+      adminAction: {
+        type: "navigate",
+        label: "Buka Sesi Presensi",
+        url: "/admin/sessions",
+      },
+    };
+  }
+
+  if (query.includes("peserta") || query.includes("user") || query.includes("siswa")) {
+    return {
+      reply: `Data peserta dan anggota komunitas dapat dikelola pada menu **Data Peserta**. Anda dapat melihat status keaktifan, nomor WhatsApp, serta riwayat kehadiran mereka.\n\n${adminContext}`,
+      adminAction: {
+        type: "navigate",
+        label: "Buka Data Peserta",
+        url: "/admin/participants",
+      },
+    };
+  }
+
+  // 2. If a document was attached or user requested quiz generation
+  if (documentText || query.includes("soal") || query.includes("kuis") || query.includes("buat")) {
+    const docTitle = documentName ? documentName.replace(/\.[^/.]+$/, "") : "Materi VeloNet";
+    const textToAnalyze = documentText || userMessage;
+
+    // Check if document has existing numbered multiple-choice questions
+    const questionRegex = /(\d+[\.\)]\s+[\s\S]+?(?=\d+[\.\)]\s+|$))/g;
+    const matches = textToAnalyze.match(questionRegex);
+
+    const questions: MultiFormatQuestionDraft[] = [];
+
+    if (matches && matches.length >= 2) {
+      for (let i = 0; i < Math.min(matches.length, 15); i++) {
+        const block = matches[i];
+        const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const questionText = lines[0].replace(/^\d+[\.\)]\s*/, "");
+
+        const optionLines = lines.filter((l) => /^[A-Ea-e][\.\)]\s+/.test(l));
+        if (optionLines.length >= 2) {
+          const options = optionLines.map((optLine, optIdx) => {
+            const cleanOpt = optLine.replace(/^[A-Ea-e][\.\)]\s*/, "");
+            const isKey =
+              block.toLowerCase().includes(`kunci: ${String.fromCharCode(65 + optIdx).toLowerCase()}`) ||
+              optLine.includes("*") ||
+              optIdx === 0;
+            return {
+              text: cleanOpt.replace(/\*/g, "").trim(),
+              isCorrect: isKey,
+            };
+          });
+
+          if (!options.some((o) => o.isCorrect)) {
+            options[0].isCorrect = true;
+          }
+
+          questions.push({
+            type: "SINGLE_CHOICE",
+            text: questionText,
+            points: 10,
+            options,
+          });
+        }
+      }
+    }
+
+    if (questions.length < 3) {
+      // Single Choice
+      questions.push({
+        type: "SINGLE_CHOICE",
+        text: `Berdasarkan dokumen "${docTitle}", manakah pernyataan di bawah ini yang paling tepat menggambarkan inti pembahasannya?`,
+        points: 10,
+        options: [
+          { text: `Konsep utama dan kaidah mendasar yang dijabarkan dalam ${docTitle}.`, isCorrect: true },
+          { text: "Pernyataan yang bertentangan dengan prinsip dasar dokumen.", isCorrect: false },
+          { text: "Penerapan prosedur yang belum diverifikasi secara resmi.", isCorrect: false },
+          { text: "Contoh kasus yang tidak memiliki relevansi terhadap materi.", isCorrect: false },
+        ],
+      });
+
+      // Checkboxes
+      questions.push({
+        type: "CHECKBOXES",
+        text: `Pilihlah SEMUA poin atau kesimpulan yang BENAR terkait materi "${docTitle}": (Pilihan jawaban bisa lebih dari 1)`,
+        points: 15,
+        options: [
+          { text: "Memiliki peranan penting dalam pencapaian kompetensi materi pembelajaran.", isCorrect: true },
+          { text: "Dapat diterapkan secara kontekstual dalam latihan dan evaluasi.", isCorrect: true },
+          { text: "Mengikuti sistematika dan kaidah yang terstandarisasi.", isCorrect: true },
+          { text: "Hanya berlaku jika tidak ada parameter acuan lain.", isCorrect: false },
+        ],
+      });
+
+      // True / False
+      questions.push({
+        type: "TRUE_FALSE",
+        text: `Pernyataan: "Pemahaman menyeluruh terhadap dokumen ${docTitle} menjadi prasyarat penting dalam menyelesaikan studi kasus praktis."`,
+        points: 10,
+        options: [
+          { text: "BENAR", isCorrect: true },
+          { text: "SALAH", isCorrect: false },
+        ],
+      });
+
+      // Short Answer
+      questions.push({
+        type: "SHORT_ANSWER",
+        text: `Sebutkan istilah atau kata kunci utama yang menjadi fokus penting dalam pembahasan "${docTitle}":`,
+        points: 10,
+        sampleAnswer: docTitle.split(" ")[0] || "Kompetensi",
+        gradingRubric: `Jawaban tepat yang berkaitan langsung dengan tema ${docTitle}.`,
+      });
+
+      // Essay
+      questions.push({
+        type: "ESSAY",
+        text: `Jelaskan secara komprehensif apa yang Anda pelajari dari dokumen "${docTitle}". Berikan analisis mendalam dan implementasi konkretnya!`,
+        points: 25,
+        sampleAnswer: `Dokumen ${docTitle} membahas prinsip fundamental yang dapat diterapkan secara praktis. Implementasinya meliputi perencanaan, evaluasi berkala, serta tindak lanjut yang terstruktur.`,
+        gradingRubric: `Rubrik Penilaian:
+1. Ketepatan analisis konsep (Bobot: 40%)
+2. Kelengkapan contoh implementasi (Bobot: 40%)
+3. Struktur penjelasan dan tata bahasa (Bobot: 20%)`,
+      });
+    }
+
+    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const quizDraft: GeneratedMultiQuizDraft = {
+      title: `Ujian CBT: ${docTitle}`,
+      description: `Kuis multi-format yang berhasil diekstrak & digenerate secara cerdas dari dokumen "${docTitle}". Dilengkapi pengamanan VeloExambro.`,
+      category: "Dokumen Pembelajaran",
+      durationMinutes: 30,
+      maxStrikes: 3,
+      enableFullscreenLock: true,
+      enableCameraProctor: true,
+      enableTabSwitchDetect: true,
+      supervisorPin: pin,
+      questions,
+    };
+
+    return {
+      reply: `Saya telah menganalisis isi dokumen **"${docTitle}"** (${documentText ? `${documentText.length} karakter diekstrak` : "berdasarkan teks lampiran"}).\n\nSaya berhasil menyusun draf ujian **Multi-Format** (${questions.length} soal) yang terdiri dari:\n- 🎯 **Pilihan Ganda (Single Choice)**\n- ☑️ **Kotak Centang (Multiple Checkboxes)**\n- ⚖️ **Benar / Salah (True/False)**\n- ✏️ **Isian Singkat (Short Answer)**\n- 📝 **Uraian (Essay)** lengkap dengan contoh jawaban ideal & rubrik pembobotan.\n\n*Tips: Masukkan Gemini API Key di tombol pengaturan (gear) jika ingin menggunakan model Gemini 2.0 Flash untuk pemahaman dokumen yang lebih mendalam.*`,
+      quizDraft,
+      adminAction: {
+        type: "action",
+        label: "Terbitkan Kuis Ini",
+      },
+    };
+  }
+
+  // Default conversational reply
+  return {
+    reply: `Halo! Saya adalah **VeloNet Master Admin Copilot**.\n\nSaya dapat membantu Anda mengelola seluruh ekosistem VeloNet LMS:\n1. 📂 **Attach File Word (.docx) & PDF (.pdf)**: Saya akan langsung membaca dokumen dan mengubahnya menjadi soal ujian CBT multi-format.\n2. 📝 **Membuat & Menambahkan Soal**: Buat draf kuis instan atau tambahkan soal ke ujian yang sudah ada.\n3. 📊 **Akses Seluruh Fitur Admin**: Cek jumlah peserta, pantau absensi/kiosk, cek strike ujian, atau navigasi instan ke modul mana pun.\n\nAda yang bisa saya bantu sekarang?`,
+  };
+}

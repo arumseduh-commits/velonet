@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/Sidebar";
 import { AdminHeader } from "@/components/admin/Header";
+import { AdminFloatingChat } from "@/components/admin/AdminFloatingChat";
 import { DialogProvider } from "@/components/ui/DialogProvider";
 
 export default function AdminLayout({
@@ -34,6 +35,7 @@ export default function AdminLayout({
             {children}
           </main>
         </div>
+        <AdminFloatingChat />
       </div>
     </DialogProvider>
   );
