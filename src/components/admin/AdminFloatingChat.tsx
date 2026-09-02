@@ -55,11 +55,6 @@ export function AdminFloatingChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // If already on full-screen /admin/ai-assistant page, do not render floating widget
-  if (pathname === "/admin/ai-assistant") {
-    return null;
-  }
-
   // Load API Key from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -302,6 +297,11 @@ export function AdminFloatingChat() {
     }
   };
 
+  // If on full-screen /admin/ai-assistant page, do not render floating widget
+  if (pathname === "/admin/ai-assistant") {
+    return null;
+  }
+
   return (
     <>
       {/* 1. FLOATING ACTION TRIGGER BUTTON */}
@@ -338,7 +338,7 @@ export function AdminFloatingChat() {
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-bold text-xs sm:text-sm text-white">VeloNet Copilot</h3>
                   <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {geminiApiKey ? "Gemini 2.0 Flash" : "AI Heuristic"}
+                    {geminiApiKey ? "Gemini 3.6 Flash" : "AI Heuristic"}
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400">Admin Control & Quiz Architect</p>

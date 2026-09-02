@@ -215,9 +215,8 @@ async function callGeminiAPI({
   adminContext: string;
   history: Array<{ role: string; content: string }>;
 }): Promise<{ reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } | null> {
-  // Use gemini-2.0-flash or gemini-1.5-flash
-  const model = "gemini-2.0-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  // Prioritize gemini-3.6-flash with resilient fallback to other flash versions
+  const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
   const systemInstruction = `
 Anda adalah "VeloNet Master Admin Copilot & CBT Architect", asisten AI paling cerdas dan serba bisa untuk Administrator dan Guru di platform VeloNet LMS.
@@ -340,38 +339,58 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
     },
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  let lastError: any = null;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API returned HTTP ${response.status}: ${errorText}`);
+  for (const model of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 404) {
+          console.warn(`[Gemini API] Model ${model} not available, attempting next candidate...`);
+          lastError = new Error(`Model ${model} returned 404`);
+          continue;
+        }
+        throw new Error(`Gemini API returned HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) {
+        return null;
+      }
+
+      try {
+        const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+        const parsed = JSON.parse(cleanJson);
+        return {
+          reply: parsed.reply || "Tugas berhasil diselesaikan.",
+          quizDraft: parsed.quizDraft || null,
+          adminAction: parsed.adminAction || null,
+        };
+      } catch (parseErr) {
+        return {
+          reply: rawText,
+          quizDraft: null,
+          adminAction: null,
+        };
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Gemini API] Attempt with ${model} failed:`, err.message);
+    }
   }
 
-  const data = await response.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) {
-    return null;
+  if (lastError) {
+    throw lastError;
   }
-
-  try {
-    const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
-    const parsed = JSON.parse(cleanJson);
-    return {
-      reply: parsed.reply || "Tugas berhasil diselesaikan.",
-      quizDraft: parsed.quizDraft || null,
-      adminAction: parsed.adminAction || null,
-    };
-  } catch (parseErr) {
-    return {
-      reply: rawText,
-      quizDraft: null,
-      adminAction: null,
-    };
-  }
+  return null;
 }
 
 /**

@@ -344,7 +344,7 @@ export default function AdminAITeacherAssistantPage() {
                   VeloNet Master Copilot (Fullscreen)
                 </h1>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  {geminiApiKey ? "Gemini 2.0 Flash" : "Model Online"}
+                  {geminiApiKey ? "Gemini 3.6 Flash" : "Model Online"}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
