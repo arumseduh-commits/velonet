@@ -410,9 +410,35 @@ export default function AdminAITeacherAssistantPage() {
           {messages.map((msg) => {
             const isAI = msg.role === "assistant";
             let parsedDraft: any = null;
+            let displayContent = msg.content;
+
             if (msg.generatedQuizDraft) {
               try {
                 parsedDraft = JSON.parse(msg.generatedQuizDraft);
+              } catch (e) {}
+            }
+
+            // Auto-clean raw JSON if leaked into content
+            if (isAI && msg.content && (msg.content.includes('"reply":') || msg.content.includes('"quizDraft":'))) {
+              try {
+                const clean = msg.content.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+                let parsedObj: any = null;
+                for (const sfx of ["", "}", '"}', '"]}', '"}]}', '"}]}}', '}]}', '}]}}', ']}}']) {
+                  try {
+                    parsedObj = JSON.parse(clean + sfx);
+                    if (parsedObj) break;
+                  } catch (e) {}
+                }
+
+                if (parsedObj) {
+                  if (parsedObj.reply) displayContent = parsedObj.reply;
+                  if (parsedObj.quizDraft && !parsedDraft) parsedDraft = parsedObj.quizDraft;
+                } else {
+                  const rMatch = clean.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
+                  if (rMatch && rMatch[1]) {
+                    displayContent = rMatch[1].replace(/\\n/g, "\n").replace(/\\"/g, '"');
+                  }
+                }
               } catch (e) {}
             }
 
@@ -441,7 +467,7 @@ export default function AdminAITeacherAssistantPage() {
                         : "bg-blue-600 text-white font-medium"
                     }`}
                   >
-                    {msg.content}
+                    {displayContent}
                   </div>
 
                   {/* Render Generated Quiz Draft Card if present */}

@@ -382,8 +382,11 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
     contents,
     generationConfig: {
       temperature: 0.3,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 32768,
       responseMimeType: "application/json",
+      thinkingConfig: {
+        thinkingBudget: 0,
+      },
     },
   };
 
@@ -420,6 +423,11 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
           adminAction: parsed.adminAction || null,
         };
       } catch (parseErr) {
+        console.warn("[Gemini API] Direct JSON parse failed, attempting resilient recovery...");
+        const recovered = recoverQuizFromTruncatedJson(rawText);
+        if (recovered) {
+          return recovered;
+        }
         return {
           reply: rawText,
           quizDraft: null,
@@ -435,6 +443,95 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
   if (lastError) {
     throw lastError;
   }
+  return null;
+}
+
+/**
+ * Salvage reply and valid questions from slightly truncated or malformed JSON
+ */
+export function recoverQuizFromTruncatedJson(rawText: string): {
+  reply: string;
+  quizDraft?: GeneratedMultiQuizDraft | null;
+  adminAction?: AdminActionPayload | null;
+} | null {
+  const clean = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+
+  // 1. Try closing brackets progressively
+  const suffixes = ["}", '"}', '"]}', '"}]}', '"}]}}', '}]}', '}]}}', ']}}'];
+  for (const suffix of suffixes) {
+    try {
+      const fixed = JSON.parse(clean + suffix);
+      if (fixed && (fixed.reply || fixed.quizDraft)) {
+        return {
+          reply: fixed.reply || "Draf kuis berhasil disusun dari dokumen Anda.",
+          quizDraft: fixed.quizDraft || null,
+          adminAction: fixed.adminAction || null,
+        };
+      }
+    } catch (e) {
+      // try next
+    }
+  }
+
+  // 2. Extract reply via regex
+  let reply = "Saya telah menganalisis dokumen dan menyusun draf soal CBT.";
+  const replyMatch = clean.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
+  if (replyMatch && replyMatch[1]) {
+    try {
+      reply = JSON.parse('"' + replyMatch[1].replace(/"$/, "") + '"');
+    } catch (e) {
+      reply = replyMatch[1].replace(/\\n/g, "\n").replace(/\\"/g, '"');
+    }
+  }
+
+  // 3. Extract title
+  let title = "Ujian CBT dari Dokumen";
+  const titleMatch = clean.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (titleMatch) title = titleMatch[1];
+
+  // 4. Extract description
+  let description = "Draf kuis hasil analisis dokumen";
+  const descMatch = clean.match(/"description"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (descMatch) description = descMatch[1];
+
+  // 5. Extract question objects by splitting on { "type":
+  const questions: MultiFormatQuestionDraft[] = [];
+  const questionBlocks = clean.split(/(?=\{\s*"type"\s*:)/);
+  for (const block of questionBlocks) {
+    if (!block.includes('"type"')) continue;
+    for (const suffix of ["", "}", '"}', '"]}', '"}]}', '}]}', ']}']) {
+      try {
+        const trimmedBlock = block.replace(/,\s*$/, "").trim();
+        const parsedQ = JSON.parse(trimmedBlock + suffix);
+        if (parsedQ.type && parsedQ.text) {
+          questions.push(parsedQ);
+          break;
+        }
+      } catch (e) {
+        // continue
+      }
+    }
+  }
+
+  if (questions.length > 0) {
+    return {
+      reply,
+      quizDraft: {
+        title,
+        description,
+        category: "Bahasa Inggris",
+        durationMinutes: Math.max(30, questions.length * 2),
+        maxStrikes: 3,
+        enableFullscreenLock: true,
+        enableCameraProctor: false,
+        enableTabSwitchDetect: true,
+        supervisorPin: "123456",
+        questions,
+      },
+      adminAction: null,
+    };
+  }
+
   return null;
 }
 
