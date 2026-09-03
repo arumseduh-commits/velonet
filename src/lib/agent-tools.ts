@@ -224,3 +224,65 @@ export function executeGenerateSvg({
     data: { svg: svgContent },
   };
 }
+
+/**
+ * Run diagnostic cognitive analysis and identify failed concepts for a quiz
+ */
+export async function executeClassRemedialAnalysis({
+  quizId,
+}: {
+  quizId: string;
+}): Promise<AgentToolResult> {
+  try {
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: { questions: true },
+    });
+
+    if (!quiz) {
+      return { tool: "class_remedial_analysis", success: false, error: "Kuis tidak ditemukan." };
+    }
+
+    const attempts = await prisma.quizAttempt.findMany({
+      where: { quizId, status: { in: ["SUBMITTED", "GRADED"] } },
+      include: { detailedAnswers: true },
+    });
+
+    if (attempts.length === 0) {
+      return {
+        tool: "class_remedial_analysis",
+        success: true,
+        data: { message: "Belum ada siswa yang menyelesaikan kuis ini." },
+      };
+    }
+
+    const questionStats = quiz.questions.map((q, idx) => {
+      let totalAnswered = 0;
+      let wrongCount = 0;
+      attempts.forEach((att) => {
+        const ans = att.detailedAnswers?.find((a: any) => a.questionId === q.id);
+        if (ans) {
+          totalAnswered++;
+          if (ans.earnedPoints === 0 && q.points > 0) wrongCount++;
+        }
+      });
+      const errorRate = totalAnswered > 0 ? Math.round((wrongCount / totalAnswered) * 100) : 0;
+      return { number: idx + 1, text: q.text, errorRate };
+    });
+
+    const failed = questionStats.sort((a, b) => b.errorRate - a.errorRate).slice(0, 3);
+
+    return {
+      tool: "class_remedial_analysis",
+      success: true,
+      data: {
+        quizTitle: quiz.title,
+        totalAttempts: attempts.length,
+        mostFailedQuestions: failed,
+      },
+    };
+  } catch (err: any) {
+    return { tool: "class_remedial_analysis", success: false, error: err.message };
+  }
+}
+

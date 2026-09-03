@@ -278,6 +278,11 @@ TUGAS DAN ATURAN ANDA:
    - Jawab secara ringkas, jelas, dan profesional dalam Bahasa Indonesia.
    - Sertakan "adminAction" jika ada halaman admin yang relevan untuk dibuka atau statistik yang perlu ditampilkan.
 
+4. Jika pengguna meminta ANALISIS KELEMAHAN KUIS atau REMEDIAL:
+   - Identifikasi kuis terkait dari daftar kuis terbaru di sistem.
+   - Buatkan draf set soal penguatan konsep remedial ("quizDraft") yang berfokus pada materi yang sering salah.
+   - Arahkan admin via "adminAction" untuk membuka Buku Nilai & Koreksi Uraian di "/admin/exams/{quizId}/grading".
+
 FORMAT OUTPUT WAJIB:
 Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, dengan struktur berikut:
 {
