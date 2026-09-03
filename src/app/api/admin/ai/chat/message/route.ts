@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
 import { processGeminiCopilot, extractTextFromDocument } from "@/lib/gemini-copilot";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 120;
+
 export async function POST(req: Request) {
   try {
     const admin = await getLoggedInAdmin();

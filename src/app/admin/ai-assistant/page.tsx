@@ -29,6 +29,7 @@ import {
   X,
   ArrowLeft,
   Layers,
+  Upload,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -43,6 +44,9 @@ export default function AdminAITeacherAssistantPage() {
   const [inputMessage, setInputMessage] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sending, setSending] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadFileName, setUploadFileName] = useState<string>("");
+  const [uploadFileSizeMB, setUploadFileSizeMB] = useState<string>("");
 
   // Knowledge base topics
   const [materials, setMaterials] = useState<any[]>([]);
@@ -167,20 +171,46 @@ export default function AdminAITeacherAssistantPage() {
     setMessages((prev) => [...prev, tempUserMsg]);
 
     try {
-      let res: Response;
+      let json: any;
+
       if (currentFile) {
+        setUploadFileName(currentFile.name);
+        setUploadFileSizeMB((currentFile.size / (1024 * 1024)).toFixed(1));
+        setUploadProgress(0);
+
         const formData = new FormData();
         formData.append("sessionId", activeSessionId);
         formData.append("content", textToSend);
         formData.append("file", currentFile);
         if (geminiApiKey) formData.append("apiKey", geminiApiKey);
 
-        res = await fetch("/api/admin/ai/chat/message", {
-          method: "POST",
-          body: formData,
+        json = await new Promise<any>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", "/api/admin/ai/chat/message");
+
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              setUploadProgress(percent);
+            }
+          };
+
+          xhr.onload = () => {
+            try {
+              const parsed = JSON.parse(xhr.responseText);
+              resolve(parsed);
+            } catch (e) {
+              reject(new Error("Gagal membaca respon server."));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error("Koneksi gagal saat mengunggah berkas."));
+          xhr.send(formData);
         });
+
+        setUploadProgress(null);
       } else {
-        res = await fetch("/api/admin/ai/chat/message", {
+        const res = await fetch("/api/admin/ai/chat/message", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -190,9 +220,9 @@ export default function AdminAITeacherAssistantPage() {
             contextTopicId: selectedTopicId || undefined,
           }),
         });
+        json = await res.json();
       }
 
-      const json = await res.json();
       if (json.success && json.data) {
         const aiMsg = {
           id: json.data.messageId || "ai-" + Date.now(),
@@ -216,9 +246,10 @@ export default function AdminAITeacherAssistantPage() {
       } else {
         toast.error(json.error || "Gagal mendapatkan balasan dari AI.");
       }
-    } catch (err) {
-      toast.error("Terjadi kesalahan koneksi ke AI.");
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan koneksi ke AI.");
     } finally {
+      setUploadProgress(null);
       setSending(false);
     }
   };
@@ -538,9 +569,49 @@ export default function AdminAITeacherAssistantPage() {
               <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="p-4 rounded-3xl bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                <span>AI Assistant sedang memproses & menyusun jawaban...</span>
+              <div className="p-4 rounded-3xl bg-slate-50 border border-slate-200 text-xs text-slate-700 shadow-xs space-y-2">
+                {uploadProgress !== null ? (
+                  <div className="space-y-1.5 min-w-[240px] sm:min-w-[300px]">
+                    <div className="flex items-center justify-between text-[11px] font-bold">
+                      <span className="text-slate-800 truncate max-w-[200px]">
+                        {uploadProgress < 100
+                          ? `Mengunggah berkas (${uploadFileSizeMB} MB)...`
+                          : "Gemini Membaca Dokumen..."}
+                      </span>
+                      <span className="text-blue-600 font-mono font-black">{uploadProgress}%</span>
+                    </div>
+
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden border border-slate-300/60">
+                      <div
+                        className={`h-full transition-all duration-150 ${
+                          uploadProgress === 100
+                            ? "bg-emerald-500 animate-pulse"
+                            : "bg-blue-600"
+                        }`}
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+
+                    <div className="text-[10px] text-slate-500 flex items-center gap-1.5 pt-0.5 font-medium">
+                      {uploadProgress < 100 ? (
+                        <>
+                          <Upload className="w-3.5 h-3.5 text-blue-500 animate-bounce" />
+                          <span className="truncate">Mengirim {uploadFileName}...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                          <span>Gemini 3.6 Flash sedang menganalisis isi & merancang soal...</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                    <span>AI Assistant sedang memproses & menyusun jawaban...</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
