@@ -174,7 +174,13 @@ FORMAT JSON OUTPUT WAJIB (tanpa markdown pembungkus):
 }
 `.trim();
 
-        const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+        const candidateModels = [
+          "gemini-3.5-flash",
+          "gemini-3.5-flash-lite",
+          "gemini-flash-lite-latest",
+          "gemini-3.6-flash",
+          "gemini-flash-latest",
+        ];
         for (const model of candidateModels) {
           try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${finalApiKey}`;

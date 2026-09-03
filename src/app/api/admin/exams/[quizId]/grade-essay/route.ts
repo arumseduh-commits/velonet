@@ -69,7 +69,13 @@ KEMBALIKAN HANYA FORMAT JSON VALID:
 }
 `.trim();
 
-  const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  const candidateModels = [
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+  ];
 
   for (const model of candidateModels) {
     try {
@@ -87,8 +93,7 @@ KEMBALIKAN HANYA FORMAT JSON VALID:
       });
 
       if (!response.ok) {
-        if (response.status === 404) continue;
-        throw new Error(`HTTP ${response.status}`);
+        continue;
       }
 
       const json = await response.json();

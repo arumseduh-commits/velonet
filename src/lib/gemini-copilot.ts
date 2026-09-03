@@ -251,8 +251,14 @@ async function callGeminiAPI({
   adminContext: string;
   history: Array<{ role: string; content: string }>;
 }): Promise<{ reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } | null> {
-  // Prioritize gemini-3.6-flash with resilient fallback to other flash versions
-  const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  // Prioritize active and available models (gemini-3.5-flash) with resilient fallbacks
+  const candidateModels = [
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+  ];
 
   const questionCountInstruction = requestedCount
     ? `\n⚠️ PERINGATAN MUTLAK JUMLAH BUTIR SOAL:
@@ -394,12 +400,9 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
 
       if (!response.ok) {
         const errorText = await response.text();
-        if (response.status === 404) {
-          console.warn(`[Gemini API] Model ${model} not available, attempting next candidate...`);
-          lastError = new Error(`Model ${model} returned 404`);
-          continue;
-        }
-        throw new Error(`Gemini API returned HTTP ${response.status}: ${errorText}`);
+        console.warn(`[Gemini API] Model ${model} returned HTTP ${response.status}: ${errorText.slice(0, 100)}`);
+        lastError = new Error(`Model ${model} returned HTTP ${response.status}`);
+        continue;
       }
 
       const data = await response.json();
