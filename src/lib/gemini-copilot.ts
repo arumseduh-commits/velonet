@@ -1,10 +1,14 @@
 import { prisma } from "./prisma";
 import { MISTERGURU_MATERIALS } from "@/data/misterguru-data";
+import { executeGenerateSvg } from "./agent-tools";
 
 export interface MultiFormatQuestionDraft {
   type: "SINGLE_CHOICE" | "CHECKBOXES" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY";
   text: string;
   points: number;
+  bloomLevel?: "C1" | "C2" | "C3" | "C4" | "C5" | "C6";
+  diagramSvg?: string;
+  explanation?: string;
   sampleAnswer?: string;
   gradingRubric?: string;
   options?: {
@@ -78,7 +82,18 @@ export async function extractTextFromDocument(
     }
   }
 
-  // 3. Plain Text / Markdown
+  // 3. Image File (PNG, JPG, WEBP)
+  if (
+    lowerName.endsWith(".png") ||
+    lowerName.endsWith(".jpg") ||
+    lowerName.endsWith(".jpeg") ||
+    lowerName.endsWith(".webp") ||
+    mimeType.startsWith("image/")
+  ) {
+    return `[GAMBAR TERLAMPIR: File ${fileName} (${mimeType}) akan di-OCR dan dianalisis secara visual oleh Vision AI]`;
+  }
+
+  // 4. Plain Text / Markdown
   return buffer.toString("utf-8").trim();
 }
 
@@ -148,19 +163,23 @@ export async function processGeminiCopilot({
   userMessage,
   documentText,
   documentName,
+  imageBase64,
+  imageMimeType,
   apiKey,
   history = [],
 }: {
   userMessage: string;
   documentText?: string;
   documentName?: string;
+  imageBase64?: string;
+  imageMimeType?: string;
   apiKey?: string;
   history?: Array<{ role: string; content: string }>;
 }): Promise<GeminiCopilotResult> {
   const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
   const adminContext = await getLiveAdminContext();
 
-  // If Gemini API Key is available, call Gemini 2.0 Flash / 1.5 Flash
+  // If Gemini API Key is available, call Gemini 3.6 Flash / Candidate Models
   if (finalApiKey) {
     try {
       const geminiResult = await callGeminiAPI({
@@ -168,6 +187,8 @@ export async function processGeminiCopilot({
         userMessage,
         documentText,
         documentName,
+        imageBase64,
+        imageMimeType,
         adminContext,
         history,
       });
@@ -205,6 +226,8 @@ async function callGeminiAPI({
   userMessage,
   documentText,
   documentName,
+  imageBase64,
+  imageMimeType,
   adminContext,
   history,
 }: {
@@ -212,6 +235,8 @@ async function callGeminiAPI({
   userMessage: string;
   documentText?: string;
   documentName?: string;
+  imageBase64?: string;
+  imageMimeType?: string;
   adminContext: string;
   history: Array<{ role: string; content: string }>;
 }): Promise<{ reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } | null> {
@@ -226,8 +251,8 @@ KONTEKS DATABASE & NAVIGASI SISTEM:
 ${adminContext}
 
 TUGAS DAN ATURAN ANDA:
-1. Jika pengguna melampirkan DOKUMEN (Word/PDF/Teks):
-   - Jika dokumen berisi kumpulan/bank soal yang sudah ada: EKSTRAK dan format secara presisi setiap nomor soal, pilihan opsi A, B, C, D, dan tentukan kunci jawaban benar (isCorrect: true).
+1. Jika pengguna melampirkan DOKUMEN (Word/PDF/Teks) atau GAMBAR (Foto Soal / Scan Ujian):
+   - Jika dokumen/gambar berisi kumpulan/bank soal yang sudah ada: EKSTRAK dan format secara presisi setiap nomor soal, teks pertanyaan, pilihan opsi A, B, C, D, dan tentukan kunci jawaban benar (isCorrect: true).
    - Jika dokumen berisi materi pelajaran / modul / artikel: RANGKUM dan CIPTAKAN set soal CBT Multi-Format yang komprehensif dan mendalam.
    - Didukung 5 TIPE SOAL:
      * SINGLE_CHOICE (Pilihan Ganda 1 Opsi)
@@ -237,7 +262,19 @@ TUGAS DAN ATURAN ANDA:
      * ESSAY (Uraian Panjang, WAJIB sertakan sampleAnswer dan gradingRubric)
    - Sertakan "quizDraft" dalam JSON output Anda.
 
-2. Jika pengguna meminta navigasi atau bertanya tentang data admin:
+2. PANDUAN KOGNITIF TAKSONOMI BLOOM & FORMULA ILMIAH:
+   - Setiap butir soal WAJIB menyertakan properti "bloomLevel": "C1" | "C2" | "C3" | "C4" | "C5" | "C6".
+     * C1 (Mengingat): Menghafal fakta, istilah baku, definisi, tanggal.
+     * C2 (Memahami): Menjelaskan prinsip, ide pokok, perbandingan konsep.
+     * C3 (Menerapkan): Menggunakan rumus hitungan, studi kasus terapan.
+     * C4 (Menganalisis): Mengurai masalah kompleks, menelaah sebab-akibat.
+     * C5 (Mengevaluasi): Menilai keabsahan argumen, uji kelayakan hipotesis.
+     * C6 (Mencipta): Merancang solusi baru, sintesis ide komprehensif.
+   - Penulisan rumus matematika/fisika/kimia WAJIB diformat dengan sintaks KaTeX/LaTeX ($...$ atau $$...$$).
+   - Jika pengguna meminta soal visual atau diagram sains (misal: grafik koordinat, diagram alur, rangkaian listrik), sertakan kode SVG murni pada properti "diagramSvg" (<svg ...>...</svg>).
+   - Jika pengguna melampirkan GAMBAR SOAL / FOTO SCAN: Gunakan kemampuan Vision Anda untuk membaca seluruh teks soal, opsi jawaban, dan diagramnya secara teliti.
+
+3. Jika pengguna meminta navigasi atau bertanya tentang data admin:
    - Jawab secara ringkas, jelas, dan profesional dalam Bahasa Indonesia.
    - Sertakan "adminAction" jika ada halaman admin yang relevan untuk dibuka atau statistik yang perlu ditampilkan.
 
@@ -260,6 +297,9 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
         "type": "SINGLE_CHOICE",
         "text": "Pertanyaan...",
         "points": 10,
+        "bloomLevel": "C2",
+        "diagramSvg": "<svg ...>...</svg> (opsional jika diagram)",
+        "explanation": "Penjelasan kunci benar...",
         "options": [
           { "text": "Opsi A", "isCorrect": true },
           { "text": "Opsi B", "isCorrect": false }
@@ -269,6 +309,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
         "type": "CHECKBOXES",
         "text": "Pilihlah semua yang benar...",
         "points": 15,
+        "bloomLevel": "C4",
         "options": [
           { "text": "Opsi A", "isCorrect": true },
           { "text": "Opsi B", "isCorrect": true },
@@ -279,6 +320,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
         "type": "TRUE_FALSE",
         "text": "Pernyataan...",
         "points": 10,
+        "bloomLevel": "C2",
         "options": [
           { "text": "BENAR", "isCorrect": true },
           { "text": "SALAH", "isCorrect": false }
@@ -288,6 +330,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
         "type": "SHORT_ANSWER",
         "text": "Pertanyaan isian singkat...",
         "points": 10,
+        "bloomLevel": "C1",
         "sampleAnswer": "KataKunci",
         "gradingRubric": "Kriteria penilaian isian"
       },
@@ -295,6 +338,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
         "type": "ESSAY",
         "text": "Jelaskan secara mendalam...",
         "points": 25,
+        "bloomLevel": "C5",
         "sampleAnswer": "Contoh jawaban ideal...",
         "gradingRubric": "Rubrik: 1. Konsep (50%), 2. Contoh (50%)"
       }
@@ -322,9 +366,20 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
     });
   }
 
+  const userParts: any[] = [];
+  if (imageBase64) {
+    userParts.push({
+      inlineData: {
+        mimeType: imageMimeType || "image/jpeg",
+        data: imageBase64,
+      },
+    });
+  }
+  userParts.push({ text: promptContent });
+
   contents.push({
     role: "user",
-    parts: [{ text: promptContent }],
+    parts: userParts,
   });
 
   const payload = {
@@ -491,11 +546,14 @@ function processHeuristicFallback({
     }
 
     if (questions.length < 3) {
-      // Single Choice
+      // Single Choice (C2 - Memahami)
       questions.push({
         type: "SINGLE_CHOICE",
         text: `Berdasarkan dokumen "${docTitle}", manakah pernyataan di bawah ini yang paling tepat menggambarkan inti pembahasannya?`,
         points: 10,
+        bloomLevel: "C2",
+        diagramSvg: executeGenerateSvg({ type: "coordinate", title: `Grafik Konsep: ${docTitle}` }).data?.svg,
+        explanation: `Pernyataan ini mencerminkan prinsip fundamental dan kaidah baku yang diuraikan dalam dokumen ${docTitle}.`,
         options: [
           { text: `Konsep utama dan kaidah mendasar yang dijabarkan dalam ${docTitle}.`, isCorrect: true },
           { text: "Pernyataan yang bertentangan dengan prinsip dasar dokumen.", isCorrect: false },
@@ -504,11 +562,12 @@ function processHeuristicFallback({
         ],
       });
 
-      // Checkboxes
+      // Checkboxes (C4 - Menganalisis)
       questions.push({
         type: "CHECKBOXES",
         text: `Pilihlah SEMUA poin atau kesimpulan yang BENAR terkait materi "${docTitle}": (Pilihan jawaban bisa lebih dari 1)`,
         points: 15,
+        bloomLevel: "C4",
         options: [
           { text: "Memiliki peranan penting dalam pencapaian kompetensi materi pembelajaran.", isCorrect: true },
           { text: "Dapat diterapkan secara kontekstual dalam latihan dan evaluasi.", isCorrect: true },
@@ -517,31 +576,34 @@ function processHeuristicFallback({
         ],
       });
 
-      // True / False
+      // True / False (C2 - Memahami)
       questions.push({
         type: "TRUE_FALSE",
         text: `Pernyataan: "Pemahaman menyeluruh terhadap dokumen ${docTitle} menjadi prasyarat penting dalam menyelesaikan studi kasus praktis."`,
         points: 10,
+        bloomLevel: "C2",
         options: [
           { text: "BENAR", isCorrect: true },
           { text: "SALAH", isCorrect: false },
         ],
       });
 
-      // Short Answer
+      // Short Answer (C1 - Mengingat)
       questions.push({
         type: "SHORT_ANSWER",
         text: `Sebutkan istilah atau kata kunci utama yang menjadi fokus penting dalam pembahasan "${docTitle}":`,
         points: 10,
+        bloomLevel: "C1",
         sampleAnswer: docTitle.split(" ")[0] || "Kompetensi",
         gradingRubric: `Jawaban tepat yang berkaitan langsung dengan tema ${docTitle}.`,
       });
 
-      // Essay
+      // Essay (C5 - Mengevaluasi)
       questions.push({
         type: "ESSAY",
         text: `Jelaskan secara komprehensif apa yang Anda pelajari dari dokumen "${docTitle}". Berikan analisis mendalam dan implementasi konkretnya!`,
         points: 25,
+        bloomLevel: "C5",
         sampleAnswer: `Dokumen ${docTitle} membahas prinsip fundamental yang dapat diterapkan secara praktis. Implementasinya meliputi perencanaan, evaluasi berkala, serta tindak lanjut yang terstruktur.`,
         gradingRubric: `Rubrik Penilaian:
 1. Ketepatan analisis konsep (Bobot: 40%)

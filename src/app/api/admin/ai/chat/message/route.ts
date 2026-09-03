@@ -17,6 +17,8 @@ export async function POST(req: Request) {
     let apiKey: string | undefined = undefined;
     let documentText: string | undefined = undefined;
     let documentName: string | undefined = undefined;
+    let imageBase64: string | undefined = undefined;
+    let imageMimeType: string | undefined = undefined;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
@@ -29,7 +31,15 @@ export async function POST(req: Request) {
         documentName = file.name;
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        documentText = await extractTextFromDocument(buffer, file.name, file.type);
+
+        const isImg = file.type.startsWith("image/") || /\.(png|jpg|jpeg|webp)$/i.test(file.name);
+        if (isImg) {
+          imageBase64 = buffer.toString("base64");
+          imageMimeType = file.type || "image/jpeg";
+          documentText = `[FOTO / SCAN SOAL: ${file.name}]`;
+        } else {
+          documentText = await extractTextFromDocument(buffer, file.name, file.type);
+        }
       }
     } else {
       const body = await req.json();
@@ -38,6 +48,8 @@ export async function POST(req: Request) {
       apiKey = body.apiKey;
       documentText = body.documentText;
       documentName = body.documentName;
+      imageBase64 = body.imageBase64;
+      imageMimeType = body.imageMimeType;
     }
 
     if (!sessionId || (!content && !documentText)) {
@@ -71,6 +83,8 @@ export async function POST(req: Request) {
       userMessage: userPromptText,
       documentText,
       documentName,
+      imageBase64,
+      imageMimeType,
       apiKey,
       history: history.map((h) => ({ role: h.role, content: h.content })),
     });

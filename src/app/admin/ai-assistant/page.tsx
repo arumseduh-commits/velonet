@@ -53,10 +53,22 @@ export default function AdminAITeacherAssistantPage() {
 
   // Attached file state & API Key
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
   const [geminiApiKey, setGeminiApiKey] = useState<string>("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Generate thumbnail preview when attachedFile is an image
+  useEffect(() => {
+    if (attachedFile && (attachedFile.type.startsWith("image/") || /\.(png|jpg|jpeg|webp)$/i.test(attachedFile.name))) {
+      const url = URL.createObjectURL(attachedFile);
+      setPreviewImageSrc(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewImageSrc(null);
+    }
+  }, [attachedFile]);
 
   // 1. Initial Load: Sessions & Knowledge Base & API Key
   useEffect(() => {
@@ -433,18 +445,40 @@ export default function AdminAITeacherAssistantPage() {
                             className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-xs space-y-2.5"
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-blue-400 flex items-center gap-1.5">
-                                <span className="w-5 h-5 rounded-md bg-blue-600/30 border border-blue-500/40 text-blue-300 flex items-center justify-center text-[10px]">
-                                  {qIdx + 1}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-blue-400 flex items-center gap-1.5">
+                                  <span className="w-5 h-5 rounded-md bg-blue-600/30 border border-blue-500/40 text-blue-300 flex items-center justify-center text-[10px]">
+                                    {qIdx + 1}
+                                  </span>
+                                  <span>Tipe: {q.type}</span>
                                 </span>
-                                <span>Tipe: {q.type}</span>
-                              </span>
+                                {q.bloomLevel && (
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                    q.bloomLevel === "C1" ? "bg-blue-600/70 text-blue-100" :
+                                    q.bloomLevel === "C2" ? "bg-cyan-600/70 text-cyan-100" :
+                                    q.bloomLevel === "C3" ? "bg-emerald-600/70 text-emerald-100" :
+                                    q.bloomLevel === "C4" ? "bg-amber-600/70 text-amber-100" :
+                                    q.bloomLevel === "C5" ? "bg-purple-600/70 text-purple-100" :
+                                    "bg-rose-600/70 text-rose-100"
+                                  }`}>
+                                    Bloom {q.bloomLevel}
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-slate-400 font-mono">
                                 {q.points} Poin
                               </span>
                             </div>
 
                             <p className="font-semibold text-slate-100 whitespace-pre-line">{q.text}</p>
+
+                            {/* Scientific / Visual Diagram if generated */}
+                            {q.diagramSvg && (
+                              <div
+                                className="my-2 p-2 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto"
+                                dangerouslySetInnerHTML={{ __html: q.diagramSvg }}
+                              />
+                            )}
 
                             {/* Options for Choice / Checkbox / True False */}
                             {q.options && q.options.length > 0 && (
@@ -536,15 +570,25 @@ export default function AdminAITeacherAssistantPage() {
         {attachedFile && (
           <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 flex items-center justify-between text-xs text-blue-900">
             <div className="flex items-center gap-2 truncate">
-              <FileText className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="font-semibold truncate">{attachedFile.name}</span>
-              <span className="text-[10px] text-blue-500 shrink-0">
-                ({(attachedFile.size / 1024).toFixed(1)} KB)
-              </span>
+              {previewImageSrc ? (
+                <img
+                  src={previewImageSrc}
+                  alt="Preview"
+                  className="w-9 h-9 rounded-lg object-cover border border-blue-300 shrink-0 shadow-xs"
+                />
+              ) : (
+                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+              )}
+              <div className="truncate">
+                <span className="font-semibold truncate block">{attachedFile.name}</span>
+                <span className="text-[10px] text-blue-500">
+                  ({(attachedFile.size / 1024).toFixed(1)} KB) {previewImageSrc && "• Foto / Scan OCR"}
+                </span>
+              </div>
             </div>
             <button
               onClick={() => setAttachedFile(null)}
-              className="p-1 text-blue-500 hover:text-rose-600"
+              className="p-1 text-blue-500 hover:text-rose-600 cursor-pointer"
               title="Hapus Lampiran"
             >
               <X className="w-4 h-4" />
@@ -568,7 +612,7 @@ export default function AdminAITeacherAssistantPage() {
                 setAttachedFile(e.target.files[0]);
               }
             }}
-            accept=".docx,.pdf,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".docx,.pdf,.png,.jpg,.jpeg,.webp,.txt,.md,image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="hidden"
           />
 
@@ -580,7 +624,7 @@ export default function AdminAITeacherAssistantPage() {
                 ? "bg-blue-600 text-white border-blue-600"
                 : "bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200"
             }`}
-            title="Lampirkan Dokumen (Word .docx atau PDF)"
+            title="Lampirkan Dokumen (Word, PDF) atau Gambar (Foto Soal / Scan OCR)"
           >
             <Paperclip className="w-4 h-4" />
           </button>

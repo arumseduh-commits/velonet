@@ -22,6 +22,9 @@ import {
   Key,
   ShieldAlert,
   Layers,
+  Image as ImageIcon,
+  ChevronDown,
+  Brain,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -51,9 +54,22 @@ export function AdminFloatingChat() {
   const [selectedExistingQuizId, setSelectedExistingQuizId] = useState<string>("");
   const [isAppendModalOpen, setIsAppendModalOpen] = useState(false);
   const [draftToAppend, setDraftToAppend] = useState<any>(null);
+  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+  const [previewImageSrc, setPreviewImageSrc] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Generate thumbnail preview when attachedFile is an image
+  useEffect(() => {
+    if (attachedFile && (attachedFile.type.startsWith("image/") || /\.(png|jpg|jpeg|webp)$/i.test(attachedFile.name))) {
+      const url = URL.createObjectURL(attachedFile);
+      setPreviewImageSrc(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewImageSrc(null);
+    }
+  }, [attachedFile]);
 
   // Load API Key from localStorage
   useEffect(() => {
@@ -546,19 +562,96 @@ export function AdminFloatingChat() {
                           </div>
                         </div>
 
-                        {/* Questions count pills */}
-                        <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-[11px] space-y-1">
-                          <div className="font-semibold text-slate-300">Komposisi Soal:</div>
+                        {/* Questions count pills & Bloom preview */}
+                        <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-[11px] space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                              <Brain className="w-3.5 h-3.5 text-cyan-400" />
+                              <span>Komposisi & Taksonomi Bloom:</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedQuizId(expandedQuizId === msg.id ? null : msg.id)}
+                              className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer font-bold"
+                            >
+                              <span>{expandedQuizId === msg.id ? "Tutup Detail" : "Buka Detail Soal"}</span>
+                              <ChevronDown className={`w-3 h-3 transition-transform ${expandedQuizId === msg.id ? "rotate-180" : ""}`} />
+                            </button>
+                          </div>
+
                           <div className="flex flex-wrap gap-1 text-[10px]">
                             {parsedDraft.questions?.map((q: any, qIdx: number) => (
-                              <span
+                              <div
                                 key={qIdx}
-                                className="px-1.5 py-0.5 rounded-md bg-slate-700 text-slate-200 font-medium"
+                                className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-700 text-slate-200"
                               >
-                                #{qIdx + 1}: {q.type}
-                              </span>
+                                <span className="font-bold">#{qIdx + 1}</span>
+                                <span>{q.type}</span>
+                                {q.bloomLevel && (
+                                  <span className={`px-1 rounded text-[8px] font-black uppercase ${
+                                    q.bloomLevel === "C1" ? "bg-blue-600/70 text-blue-100" :
+                                    q.bloomLevel === "C2" ? "bg-cyan-600/70 text-cyan-100" :
+                                    q.bloomLevel === "C3" ? "bg-emerald-600/70 text-emerald-100" :
+                                    q.bloomLevel === "C4" ? "bg-amber-600/70 text-amber-100" :
+                                    q.bloomLevel === "C5" ? "bg-purple-600/70 text-purple-100" :
+                                    "bg-rose-600/70 text-rose-100"
+                                  }`}>
+                                    {q.bloomLevel}
+                                  </span>
+                                )}
+                              </div>
                             ))}
                           </div>
+
+                          {/* Expanded Questions Detail */}
+                          {expandedQuizId === msg.id && (
+                            <div className="mt-2 pt-2 border-t border-slate-700/80 space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                              {parsedDraft.questions?.map((q: any, qIdx: number) => (
+                                <div key={qIdx} className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 space-y-1.5">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="font-bold text-amber-300">Soal #{qIdx + 1} ({q.type})</span>
+                                    <div className="flex items-center gap-1">
+                                      {q.bloomLevel && (
+                                        <span className="px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 text-[9px] font-bold">
+                                          Bloom {q.bloomLevel}
+                                        </span>
+                                      )}
+                                      <span className="text-slate-400 font-mono">{q.points || 10} pt</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-slate-200 text-xs font-medium whitespace-pre-line">{q.text}</p>
+                                  {q.diagramSvg && (
+                                    <div
+                                      className="my-1.5 p-1.5 rounded-lg bg-slate-950 border border-slate-800 overflow-x-auto"
+                                      dangerouslySetInnerHTML={{ __html: q.diagramSvg }}
+                                    />
+                                  )}
+                                  {q.options && q.options.length > 0 && (
+                                    <div className="grid grid-cols-1 gap-1 pt-1">
+                                      {q.options.map((opt: any, oIdx: number) => (
+                                        <div
+                                          key={oIdx}
+                                          className={`px-2 py-1 rounded-lg text-[10px] flex items-center justify-between ${
+                                            opt.isCorrect
+                                              ? "bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold"
+                                              : "bg-slate-800/60 text-slate-400"
+                                          }`}
+                                        >
+                                          <span>{String.fromCharCode(65 + oIdx)}. {opt.text}</span>
+                                          {opt.isCorrect && <span className="text-[9px] text-emerald-400">✓ Kunci</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {q.sampleAnswer && (
+                                    <div className="text-[10px] text-slate-300 italic pt-1 border-t border-slate-800">
+                                      <strong>Contoh:</strong> {q.sampleAnswer}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Action Buttons */}
@@ -595,7 +688,7 @@ export function AdminFloatingChat() {
                 </div>
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 text-xs text-slate-500 flex items-center gap-2 shadow-xs">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                  <span>AI sedang menganalisis & merumuskan respons...</span>
+                  <span>AI sedang menganalisis dokumen/gambar & merumuskan respons...</span>
                 </div>
               </div>
             )}
@@ -607,8 +700,8 @@ export function AdminFloatingChat() {
           <div className="px-3 py-1.5 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0">
             {[
               "Berapa total peserta terdaftar?",
+              "Buat kuis dari foto/dokumen ini",
               "Arahkan ke pusat ujian CBT",
-              "Buat kuis dari materi yang dilampirkan",
             ].map((chip, idx) => (
               <button
                 key={idx}
@@ -624,15 +717,25 @@ export function AdminFloatingChat() {
           {attachedFile && (
             <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 flex items-center justify-between text-xs text-blue-900 shrink-0">
               <div className="flex items-center gap-2 truncate">
-                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
-                <span className="font-semibold truncate">{attachedFile.name}</span>
-                <span className="text-[10px] text-blue-500 shrink-0">
-                  ({(attachedFile.size / 1024).toFixed(1)} KB)
-                </span>
+                {previewImageSrc ? (
+                  <img
+                    src={previewImageSrc}
+                    alt="Preview"
+                    className="w-8 h-8 rounded-lg object-cover border border-blue-300 shrink-0 shadow-xs"
+                  />
+                ) : (
+                  <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                )}
+                <div className="truncate">
+                  <span className="font-semibold truncate block">{attachedFile.name}</span>
+                  <span className="text-[10px] text-blue-500">
+                    {(attachedFile.size / 1024).toFixed(1)} KB {previewImageSrc && "• Foto / Scan OCR"}
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setAttachedFile(null)}
-                className="p-1 text-blue-500 hover:text-rose-600"
+                className="p-1 text-blue-500 hover:text-rose-600 cursor-pointer"
                 title="Hapus Lampiran"
               >
                 <X className="w-4 h-4" />
@@ -642,7 +745,7 @@ export function AdminFloatingChat() {
 
           {/* Input Bar */}
           <footer className="p-3 bg-white border-t border-slate-200 flex items-center gap-2 shrink-0">
-            {/* Hidden file input */}
+            {/* Hidden file input supporting Word, PDF, and Images */}
             <input
               type="file"
               ref={fileInputRef}
@@ -651,7 +754,7 @@ export function AdminFloatingChat() {
                   setAttachedFile(e.target.files[0]);
                 }
               }}
-              accept=".docx,.pdf,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".docx,.pdf,.png,.jpg,.jpeg,.webp,.txt,.md,image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="hidden"
             />
 
@@ -663,7 +766,7 @@ export function AdminFloatingChat() {
                   ? "bg-blue-600 text-white border-blue-600"
                   : "bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200"
               }`}
-              title="Lampirkan Dokumen (Word .docx atau PDF)"
+              title="Lampirkan Dokumen (Word, PDF) atau Gambar (Foto Soal / Scan OCR)"
             >
               <Paperclip className="w-4 h-4" />
             </button>
