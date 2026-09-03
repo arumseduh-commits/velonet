@@ -47,6 +47,7 @@ export default function AdminAITeacherAssistantPage() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadFileName, setUploadFileName] = useState<string>("");
   const [uploadFileSizeMB, setUploadFileSizeMB] = useState<string>("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Knowledge base topics
   const [materials, setMaterials] = useState<any[]>([]);
@@ -82,6 +83,22 @@ export default function AdminAITeacherAssistantPage() {
       setGeminiApiKey(savedKey);
     }
   }, []);
+
+  // Track elapsed seconds during send/analysis
+  useEffect(() => {
+    let timer: any = null;
+    if (sending) {
+      setElapsedSeconds(0);
+      timer = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [sending]);
 
   const fetchSessionsAndMaterials = async () => {
     setLoadingSessions(true);
@@ -618,24 +635,33 @@ export default function AdminAITeacherAssistantPage() {
                       />
                     </div>
 
-                    <div className="text-[10px] text-slate-500 flex items-center gap-1.5 pt-0.5 font-medium">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 font-medium gap-2">
                       {uploadProgress < 100 ? (
                         <>
-                          <Upload className="w-3.5 h-3.5 text-blue-500 animate-bounce" />
-                          <span className="truncate">Mengirim {uploadFileName}...</span>
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Upload className="w-3.5 h-3.5 text-blue-500 animate-bounce shrink-0" />
+                            <span className="truncate">Mengirim {uploadFileName}...</span>
+                          </div>
+                          <span className="shrink-0 text-slate-400 font-mono">{elapsedSeconds}s</span>
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin" />
-                          <span>Gemini 3.6 Flash sedang menganalisis isi & merancang soal...</span>
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin shrink-0" />
+                            <span className="truncate">Gemini 3.5 Flash menganalisis & merancang soal...</span>
+                          </div>
+                          <span className="shrink-0 text-blue-600 font-mono font-bold">{elapsedSeconds}s</span>
                         </>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                    <span>AI Assistant sedang memproses & menyusun jawaban...</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                      <span>AI Assistant sedang memproses & menyusun jawaban...</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono font-semibold">{elapsedSeconds}s</span>
                   </div>
                 )}
               </div>
