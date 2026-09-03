@@ -17,8 +17,8 @@ export async function POST(req: Request) {
     let apiKey: string | undefined = undefined;
     let documentText: string | undefined = undefined;
     let documentName: string | undefined = undefined;
-    let imageBase64: string | undefined = undefined;
-    let imageMimeType: string | undefined = undefined;
+    let fileBase64: string | undefined = undefined;
+    let fileMimeType: string | undefined = undefined;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
@@ -32,10 +32,19 @@ export async function POST(req: Request) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        const isImg = file.type.startsWith("image/") || /\.(png|jpg|jpeg|webp)$/i.test(file.name);
-        if (isImg) {
-          imageBase64 = buffer.toString("base64");
-          imageMimeType = file.type || "image/jpeg";
+        const lowerName = file.name.toLowerCase();
+        const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
+        const isImg = file.type.startsWith("image/") || /\.(png|jpg|jpeg|webp)$/i.test(lowerName);
+
+        if (isPdf) {
+          // Send raw PDF directly to Gemini 3.6 Flash Native Multimodal Vision
+          fileBase64 = buffer.toString("base64");
+          fileMimeType = "application/pdf";
+          documentText = `[DOKUMEN PDF: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)]`;
+        } else if (isImg) {
+          // Send raw image to Gemini 3.6 Flash Native Multimodal Vision
+          fileBase64 = buffer.toString("base64");
+          fileMimeType = file.type || "image/jpeg";
           documentText = `[FOTO / SCAN SOAL: ${file.name}]`;
         } else {
           documentText = await extractTextFromDocument(buffer, file.name, file.type);
@@ -48,8 +57,8 @@ export async function POST(req: Request) {
       apiKey = body.apiKey;
       documentText = body.documentText;
       documentName = body.documentName;
-      imageBase64 = body.imageBase64;
-      imageMimeType = body.imageMimeType;
+      fileBase64 = body.fileBase64 || body.imageBase64;
+      fileMimeType = body.fileMimeType || body.imageMimeType;
     }
 
     if (!sessionId || (!content && !documentText)) {
@@ -83,8 +92,8 @@ export async function POST(req: Request) {
       userMessage: userPromptText,
       documentText,
       documentName,
-      imageBase64,
-      imageMimeType,
+      fileBase64,
+      fileMimeType,
       apiKey,
       history: history.map((h) => ({ role: h.role, content: h.content })),
     });

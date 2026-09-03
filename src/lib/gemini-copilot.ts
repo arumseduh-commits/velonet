@@ -71,15 +71,7 @@ export async function extractTextFromDocument(
 
   // 2. PDF Document (.pdf)
   if (lowerName.endsWith(".pdf") || mimeType === "application/pdf") {
-    try {
-      const pdfParseModule: any = await import("pdf-parse");
-      const pdfParse = pdfParseModule.default || pdfParseModule;
-      const data = await pdfParse(buffer);
-      return data.text.trim();
-    } catch (err) {
-      console.warn("[PDF Parser] pdf-parse failed:", err);
-      return "";
-    }
+    return `[DOKUMEN PDF: ${fileName} - Diproses langsung via Gemini Multimodal Native]`;
   }
 
   // 3. Image File (PNG, JPG, WEBP)
@@ -163,6 +155,8 @@ export async function processGeminiCopilot({
   userMessage,
   documentText,
   documentName,
+  fileBase64,
+  fileMimeType,
   imageBase64,
   imageMimeType,
   apiKey,
@@ -171,6 +165,8 @@ export async function processGeminiCopilot({
   userMessage: string;
   documentText?: string;
   documentName?: string;
+  fileBase64?: string;
+  fileMimeType?: string;
   imageBase64?: string;
   imageMimeType?: string;
   apiKey?: string;
@@ -179,7 +175,15 @@ export async function processGeminiCopilot({
   const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
   const adminContext = await getLiveAdminContext();
 
-  // If Gemini API Key is available, call Gemini 3.6 Flash / Candidate Models
+  const rawBase64 = fileBase64 || imageBase64;
+  const rawMime = fileMimeType || imageMimeType;
+
+  // Extract user requested question count
+  const countMatch = userMessage.match(/(\d+)\s*(?:butir\s*)?(?:soal|pertanyaan|questions?)/i);
+  const requestedCount = countMatch ? parseInt(countMatch[1], 10) : undefined;
+
+  let geminiError: string | null = null;
+
   if (finalApiKey) {
     try {
       const geminiResult = await callGeminiAPI({
@@ -187,8 +191,9 @@ export async function processGeminiCopilot({
         userMessage,
         documentText,
         documentName,
-        imageBase64,
-        imageMimeType,
+        fileBase64: rawBase64,
+        fileMimeType: rawMime,
+        requestedCount,
         adminContext,
         history,
       });
@@ -200,7 +205,8 @@ export async function processGeminiCopilot({
         };
       }
     } catch (err: any) {
-      console.error("[processGeminiCopilot] Gemini API error, using fallback:", err.message);
+      console.error("[processGeminiCopilot] Gemini API error:", err.message);
+      geminiError = err.message || "Gagal memproses via Gemini API";
     }
   }
 
@@ -214,6 +220,9 @@ export async function processGeminiCopilot({
 
   return {
     ...fallbackResult,
+    reply: geminiError
+      ? `⚠️ **Catatan Sistem:** Terjadi kendala saat membaca dokumen via Gemini API (${geminiError}). Menampilkan draf darurat.\n\n${fallbackResult.reply}`
+      : fallbackResult.reply,
     source: "fallback",
   };
 }
@@ -226,8 +235,9 @@ async function callGeminiAPI({
   userMessage,
   documentText,
   documentName,
-  imageBase64,
-  imageMimeType,
+  fileBase64,
+  fileMimeType,
+  requestedCount,
   adminContext,
   history,
 }: {
@@ -235,13 +245,21 @@ async function callGeminiAPI({
   userMessage: string;
   documentText?: string;
   documentName?: string;
-  imageBase64?: string;
-  imageMimeType?: string;
+  fileBase64?: string;
+  fileMimeType?: string;
+  requestedCount?: number;
   adminContext: string;
   history: Array<{ role: string; content: string }>;
 }): Promise<{ reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } | null> {
   // Prioritize gemini-3.6-flash with resilient fallback to other flash versions
   const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+
+  const questionCountInstruction = requestedCount
+    ? `\n⚠️ PERINGATAN MUTLAK JUMLAH BUTIR SOAL:
+Pengguna secara eksplisit meminta ${requestedCount} BUTIR SOAL.
+Anda WAJIB menghasilkan TEPAT ${requestedCount} butir soal di dalam array "questions" pada "quizDraft"!
+DILARANG KERAS hanya membuat 5 butir soal jika pengguna meminta ${requestedCount} soal. Buatlah variasi soal yang kaya (Single Choice, Checkboxes, True/False, Short Answer, Essay) hingga mencapai tepat ${requestedCount} butir soal!`
+    : `\nJika pengguna melampirkan modul atau dokumen materi, rancanglah setidaknya 10-15 butir soal yang komprehensif dan bervariasi mencakup seluruh bab/topik dalam dokumen!`;
 
   const systemInstruction = `
 Anda adalah "VeloNet Master Admin Copilot & CBT Architect", asisten AI paling cerdas dan serba bisa untuk Administrator dan Guru di platform VeloNet LMS.
@@ -251,7 +269,7 @@ KONTEKS DATABASE & NAVIGASI SISTEM:
 ${adminContext}
 
 TUGAS DAN ATURAN ANDA:
-1. Jika pengguna melampirkan DOKUMEN (Word/PDF/Teks) atau GAMBAR (Foto Soal / Scan Ujian):
+1. Jika pengguna melampirkan DOKUMEN (PDF/Word/Teks) atau GAMBAR (Foto Soal / Scan Ujian):
    - Jika dokumen/gambar berisi kumpulan/bank soal yang sudah ada: EKSTRAK dan format secara presisi setiap nomor soal, teks pertanyaan, pilihan opsi A, B, C, D, dan tentukan kunci jawaban benar (isCorrect: true).
    - Jika dokumen berisi materi pelajaran / modul / artikel: RANGKUM dan CIPTAKAN set soal CBT Multi-Format yang komprehensif dan mendalam.
    - Didukung 5 TIPE SOAL:
@@ -261,6 +279,7 @@ TUGAS DAN ATURAN ANDA:
      * SHORT_ANSWER (Isian Singkat)
      * ESSAY (Uraian Panjang, WAJIB sertakan sampleAnswer dan gradingRubric)
    - Sertakan "quizDraft" dalam JSON output Anda.
+   ${questionCountInstruction}
 
 2. PANDUAN KOGNITIF TAKSONOMI BLOOM & FORMULA ILMIAH:
    - Setiap butir soal WAJIB menyertakan properti "bloomLevel": "C1" | "C2" | "C3" | "C4" | "C5" | "C6".
@@ -272,7 +291,7 @@ TUGAS DAN ATURAN ANDA:
      * C6 (Mencipta): Merancang solusi baru, sintesis ide komprehensif.
    - Penulisan rumus matematika/fisika/kimia WAJIB diformat dengan sintaks KaTeX/LaTeX ($...$ atau $$...$$).
    - Jika pengguna meminta soal visual atau diagram sains (misal: grafik koordinat, diagram alur, rangkaian listrik), sertakan kode SVG murni pada properti "diagramSvg" (<svg ...>...</svg>).
-   - Jika pengguna melampirkan GAMBAR SOAL / FOTO SCAN: Gunakan kemampuan Vision Anda untuk membaca seluruh teks soal, opsi jawaban, dan diagramnya secara teliti.
+   - Jika pengguna melampirkan DOKUMEN PDF atau GAMBAR SCAN: Anda memiliki kemampuan Multimodal Vision penuh untuk membaca seluruh halaman teks soal, tabel, formula, dan diagramnya secara mendalam.
 
 3. Jika pengguna meminta navigasi atau bertanya tentang data admin:
    - Jawab secara ringkas, jelas, dan profesional dalam Bahasa Indonesia.
@@ -294,7 +313,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
     "durationMinutes": 30,
     "maxStrikes": 3,
     "enableFullscreenLock": true,
-    "enableCameraProctor": true,
+    "enableCameraProctor": false,
     "enableTabSwitchDetect": true,
     "supervisorPin": "123456",
     "questions": [
@@ -309,43 +328,6 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
           { "text": "Opsi A", "isCorrect": true },
           { "text": "Opsi B", "isCorrect": false }
         ]
-      },
-      {
-        "type": "CHECKBOXES",
-        "text": "Pilihlah semua yang benar...",
-        "points": 15,
-        "bloomLevel": "C4",
-        "options": [
-          { "text": "Opsi A", "isCorrect": true },
-          { "text": "Opsi B", "isCorrect": true },
-          { "text": "Opsi C", "isCorrect": false }
-        ]
-      },
-      {
-        "type": "TRUE_FALSE",
-        "text": "Pernyataan...",
-        "points": 10,
-        "bloomLevel": "C2",
-        "options": [
-          { "text": "BENAR", "isCorrect": true },
-          { "text": "SALAH", "isCorrect": false }
-        ]
-      },
-      {
-        "type": "SHORT_ANSWER",
-        "text": "Pertanyaan isian singkat...",
-        "points": 10,
-        "bloomLevel": "C1",
-        "sampleAnswer": "KataKunci",
-        "gradingRubric": "Kriteria penilaian isian"
-      },
-      {
-        "type": "ESSAY",
-        "text": "Jelaskan secara mendalam...",
-        "points": 25,
-        "bloomLevel": "C5",
-        "sampleAnswer": "Contoh jawaban ideal...",
-        "gradingRubric": "Rubrik: 1. Konsep (50%), 2. Contoh (50%)"
       }
     ]
   },
@@ -359,7 +341,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
 
   let promptContent = userMessage;
   if (documentText) {
-    promptContent += `\n\n[LAMPIRAN DOKUMEN: ${documentName || "file"}]:\n"""\n${documentText.slice(0, 50000)}\n"""`;
+    promptContent += `\n\n[INFORMASI LAMPIRAN: ${documentName || "file"}]:\n${documentText.slice(0, 50000)}`;
   }
 
   const contents: any[] = [];
@@ -372,11 +354,11 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
   }
 
   const userParts: any[] = [];
-  if (imageBase64) {
+  if (fileBase64 && fileMimeType) {
     userParts.push({
       inlineData: {
-        mimeType: imageMimeType || "image/jpeg",
-        data: imageBase64,
+        mimeType: fileMimeType,
+        data: fileBase64,
       },
     });
   }
@@ -461,11 +443,13 @@ function processHeuristicFallback({
   documentText,
   documentName,
   adminContext,
+  requestedCount,
 }: {
   userMessage: string;
   documentText?: string;
   documentName?: string;
   adminContext: string;
+  requestedCount?: number;
 }): { reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } {
   const query = userMessage.toLowerCase();
 
@@ -517,7 +501,7 @@ function processHeuristicFallback({
     const questions: MultiFormatQuestionDraft[] = [];
 
     if (matches && matches.length >= 2) {
-      for (let i = 0; i < Math.min(matches.length, 15); i++) {
+      for (let i = 0; i < Math.min(matches.length, requestedCount || 15); i++) {
         const block = matches[i];
         const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
         const questionText = lines[0].replace(/^\d+[\.\)]\s*/, "");
@@ -544,77 +528,89 @@ function processHeuristicFallback({
             type: "SINGLE_CHOICE",
             text: questionText,
             points: 10,
+            bloomLevel: i % 2 === 0 ? "C2" : "C3",
             options,
           });
         }
       }
     }
 
-    if (questions.length < 3) {
-      // Single Choice (C2 - Memahami)
-      questions.push({
-        type: "SINGLE_CHOICE",
-        text: `Berdasarkan dokumen "${docTitle}", manakah pernyataan di bawah ini yang paling tepat menggambarkan inti pembahasannya?`,
-        points: 10,
-        bloomLevel: "C2",
-        diagramSvg: executeGenerateSvg({ type: "coordinate", title: `Grafik Konsep: ${docTitle}` }).data?.svg,
-        explanation: `Pernyataan ini mencerminkan prinsip fundamental dan kaidah baku yang diuraikan dalam dokumen ${docTitle}.`,
-        options: [
-          { text: `Konsep utama dan kaidah mendasar yang dijabarkan dalam ${docTitle}.`, isCorrect: true },
-          { text: "Pernyataan yang bertentangan dengan prinsip dasar dokumen.", isCorrect: false },
-          { text: "Penerapan prosedur yang belum diverifikasi secara resmi.", isCorrect: false },
-          { text: "Contoh kasus yang tidak memiliki relevansi terhadap materi.", isCorrect: false },
-        ],
-      });
+    const targetCount = requestedCount && requestedCount > 0 ? Math.min(requestedCount, 30) : 5;
 
-      // Checkboxes (C4 - Menganalisis)
-      questions.push({
-        type: "CHECKBOXES",
-        text: `Pilihlah SEMUA poin atau kesimpulan yang BENAR terkait materi "${docTitle}": (Pilihan jawaban bisa lebih dari 1)`,
-        points: 15,
-        bloomLevel: "C4",
-        options: [
-          { text: "Memiliki peranan penting dalam pencapaian kompetensi materi pembelajaran.", isCorrect: true },
-          { text: "Dapat diterapkan secara kontekstual dalam latihan dan evaluasi.", isCorrect: true },
-          { text: "Mengikuti sistematika dan kaidah yang terstandarisasi.", isCorrect: true },
-          { text: "Hanya berlaku jika tidak ada parameter acuan lain.", isCorrect: false },
-        ],
-      });
+    while (questions.length < targetCount) {
+      const idx = questions.length + 1;
+      const typeList: Array<"SINGLE_CHOICE" | "CHECKBOXES" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY"> = [
+        "SINGLE_CHOICE",
+        "CHECKBOXES",
+        "TRUE_FALSE",
+        "SHORT_ANSWER",
+        "ESSAY",
+      ];
+      const qType = typeList[(idx - 1) % typeList.length];
+      const bloomLevels: Array<"C1" | "C2" | "C3" | "C4" | "C5" | "C6"> = ["C1", "C2", "C3", "C4", "C5", "C6"];
+      const bLevel = bloomLevels[(idx - 1) % bloomLevels.length];
 
-      // True / False (C2 - Memahami)
-      questions.push({
-        type: "TRUE_FALSE",
-        text: `Pernyataan: "Pemahaman menyeluruh terhadap dokumen ${docTitle} menjadi prasyarat penting dalam menyelesaikan studi kasus praktis."`,
-        points: 10,
-        bloomLevel: "C2",
-        options: [
-          { text: "BENAR", isCorrect: true },
-          { text: "SALAH", isCorrect: false },
-        ],
-      });
-
-      // Short Answer (C1 - Mengingat)
-      questions.push({
-        type: "SHORT_ANSWER",
-        text: `Sebutkan istilah atau kata kunci utama yang menjadi fokus penting dalam pembahasan "${docTitle}":`,
-        points: 10,
-        bloomLevel: "C1",
-        sampleAnswer: docTitle.split(" ")[0] || "Kompetensi",
-        gradingRubric: `Jawaban tepat yang berkaitan langsung dengan tema ${docTitle}.`,
-      });
-
-      // Essay (C5 - Mengevaluasi)
-      questions.push({
-        type: "ESSAY",
-        text: `Jelaskan secara komprehensif apa yang Anda pelajari dari dokumen "${docTitle}". Berikan analisis mendalam dan implementasi konkretnya!`,
-        points: 25,
-        bloomLevel: "C5",
-        sampleAnswer: `Dokumen ${docTitle} membahas prinsip fundamental yang dapat diterapkan secara praktis. Implementasinya meliputi perencanaan, evaluasi berkala, serta tindak lanjut yang terstruktur.`,
-        gradingRubric: `Rubrik Penilaian:
+      if (qType === "SINGLE_CHOICE") {
+        questions.push({
+          type: "SINGLE_CHOICE",
+          text: `Butir Soal #${idx}: Berdasarkan pembahasan "${docTitle}", analisis manakah pernyataan yang paling akurat terkait sub-topik ke-${idx}?`,
+          points: 10,
+          bloomLevel: bLevel,
+          diagramSvg: idx === 1 ? executeGenerateSvg({ type: "coordinate", title: `Grafik Konsep: ${docTitle}` }).data?.svg : undefined,
+          explanation: `Pernyataan ini mencerminkan prinsip fundamental dan kaidah baku yang diuraikan dalam dokumen ${docTitle}.`,
+          options: [
+            { text: `Prinsip utama dan kaidah mendasar yang dijabarkan dalam ${docTitle}.`, isCorrect: true },
+            { text: `Pernyataan alternatif yang tidak relevan dengan ${docTitle}.`, isCorrect: false },
+            { text: "Penerapan prosedur yang belum diverifikasi dalam materi ajar.", isCorrect: false },
+            { text: "Contoh kasus yang berlawanan dengan kaidah materi.", isCorrect: false },
+          ],
+        });
+      } else if (qType === "CHECKBOXES") {
+        questions.push({
+          type: "CHECKBOXES",
+          text: `Butir Soal #${idx}: Pilihlah SEMUA poin atau kesimpulan yang BENAR terkait materi "${docTitle}" pada evaluasi ke-${idx}: (Pilihan jawaban bisa lebih dari 1)`,
+          points: 15,
+          bloomLevel: bLevel,
+          options: [
+            { text: "Memiliki peranan penting dalam pencapaian kompetensi materi pembelajaran.", isCorrect: true },
+            { text: "Dapat diterapkan secara kontekstual dalam latihan dan evaluasi.", isCorrect: true },
+            { text: "Mengikuti sistematika dan kaidah yang terstandarisasi.", isCorrect: true },
+            { text: "Hanya berlaku jika tidak ada parameter acuan lain.", isCorrect: false },
+          ],
+        });
+      } else if (qType === "TRUE_FALSE") {
+        questions.push({
+          type: "TRUE_FALSE",
+          text: `Butir Soal #${idx}: Pernyataan: "Pemahaman menyeluruh pada aspek ke-${idx} dari dokumen ${docTitle} menjadi prasyarat penting dalam menyelesaikan studi kasus praktis."`,
+          points: 10,
+          bloomLevel: bLevel,
+          options: [
+            { text: "BENAR", isCorrect: true },
+            { text: "SALAH", isCorrect: false },
+          ],
+        });
+      } else if (qType === "SHORT_ANSWER") {
+        questions.push({
+          type: "SHORT_ANSWER",
+          text: `Butir Soal #${idx}: Sebutkan istilah atau kata kunci utama pada bagian ke-${idx} pembahasan "${docTitle}":`,
+          points: 10,
+          bloomLevel: bLevel,
+          sampleAnswer: docTitle.split(" ")[0] || "Kompetensi",
+          gradingRubric: `Jawaban tepat yang berkaitan langsung dengan tema ${docTitle}.`,
+        });
+      } else {
+        questions.push({
+          type: "ESSAY",
+          text: `Butir Soal #${idx}: Jelaskan secara komprehensif apa yang Anda pelajari dari materi ke-${idx} pada "${docTitle}". Berikan analisis mendalam dan implementasi konkretnya!`,
+          points: 25,
+          bloomLevel: bLevel,
+          sampleAnswer: `Dokumen ${docTitle} membahas prinsip fundamental yang dapat diterapkan secara praktis. Implementasinya meliputi perencanaan, evaluasi berkala, serta tindak lanjut yang terstruktur.`,
+          gradingRubric: `Rubrik Penilaian:
 1. Ketepatan analisis konsep (Bobot: 40%)
 2. Kelengkapan contoh implementasi (Bobot: 40%)
 3. Struktur penjelasan dan tata bahasa (Bobot: 20%)`,
-      });
+        });
+      }
     }
 
     const pin = Math.floor(100000 + Math.random() * 900000).toString();
