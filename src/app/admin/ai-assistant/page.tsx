@@ -32,9 +32,10 @@ import {
   Upload,
   Menu,
   History,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
-import { parseQuestionContent } from "@/lib/question-utils";
+import { parseQuestionContent, parseChatMessageAttachment } from "@/lib/question-utils";
 
 export default function AdminAITeacherAssistantPage() {
   const router = useRouter();
@@ -243,15 +244,19 @@ export default function AdminAITeacherAssistantPage() {
 
     setInputMessage("");
     const currentFile = attachedFile;
+    const currentPreviewUrl = previewImageSrc;
+    const isImg = currentFile && (currentFile.type.startsWith("image/") || /\.(png|jpg|jpeg|webp)$/i.test(currentFile.name));
     setAttachedFile(null);
     setSending(true);
 
-    // Optimistically append user message
+    // Optimistically append user message (including image preview URL if image)
     const tempUserMsg = {
       id: "temp-" + Date.now(),
       role: "user",
       content: currentFile
-        ? `📎 [Lampiran: ${currentFile.name}]\n${textToSend || "Tolong analisa dokumen ini dan buatkan draf soal CBT."}`
+        ? isImg
+          ? `📷 [Gambar: ${currentFile.name}|${currentPreviewUrl || ""}]\n${textToSend || "Tolong analisa gambar ini dan buatkan draf soal CBT."}`
+          : `📎 [Lampiran: ${currentFile.name}]\n${textToSend || "Tolong analisa dokumen ini dan buatkan draf soal CBT."}`
         : textToSend,
       createdAt: new Date().toISOString(),
     };
@@ -311,6 +316,17 @@ export default function AdminAITeacherAssistantPage() {
       }
 
       if (json.success && json.data) {
+        // Sync persistent user message from server (with real /uploads/questions/... url)
+        if (json.data.userMessage) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === tempUserMsg.id
+                ? { ...m, id: json.data.userMessage.id, content: json.data.userMessage.content }
+                : m
+            )
+          );
+        }
+
         const aiMsg = {
           id: json.data.messageId || "ai-" + Date.now(),
           role: "assistant",
@@ -326,7 +342,14 @@ export default function AdminAITeacherAssistantPage() {
         setSessions((prev) =>
           prev.map((s) =>
             s.id === activeSessionId
-              ? { ...s, messages: [...(s.messages || []), tempUserMsg, aiMsg] }
+              ? {
+                  ...s,
+                  messages: [
+                    ...(s.messages || []),
+                    json.data.userMessage || tempUserMsg,
+                    aiMsg,
+                  ],
+                }
               : s
           )
         );
@@ -608,7 +631,40 @@ export default function AdminAITeacherAssistantPage() {
                         : "bg-blue-600 text-white font-medium"
                     }`}
                   >
-                    {displayContent}
+                    {isAI ? (
+                      displayContent
+                    ) : (() => {
+                      const { cleanText, attachmentName, attachmentUrl, isImage } = parseChatMessageAttachment(displayContent);
+                      return (
+                        <div className="space-y-2">
+                          {attachmentName && (
+                            <div className="space-y-1.5">
+                              {isImage && attachmentUrl ? (
+                                <div className="rounded-2xl overflow-hidden border border-white/20 bg-black/25 p-1.5">
+                                  <img
+                                    src={attachmentUrl}
+                                    alt={attachmentName}
+                                    className="max-h-56 w-auto max-w-full rounded-xl object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => window.open(attachmentUrl, "_blank")}
+                                    title="Klik untuk melihat ukuran penuh"
+                                  />
+                                  <div className="flex items-center gap-1.5 mt-1.5 px-1 text-xs text-blue-100 font-normal truncate">
+                                    <ImageIcon className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate">{attachmentName}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/20 text-xs text-blue-100 border border-white/20">
+                                  <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                                  <span className="truncate max-w-xs">{attachmentName}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {cleanText && <div>{cleanText}</div>}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Render Generated Quiz Draft Card if present */}
@@ -675,7 +731,16 @@ export default function AdminAITeacherAssistantPage() {
                                   <p className="font-semibold text-slate-100 whitespace-pre-line">{cleanText}</p>
                                   {imageUrl && (
                                     <div className="my-2 max-w-sm rounded-xl overflow-hidden border border-slate-700 bg-slate-950 p-1.5">
-                                      <img src={imageUrl} alt="Ilustrasi Soal" className="w-full max-h-48 object-contain rounded-lg" />
+                                      <img
+                                        src={imageUrl}
+                                        alt="Ilustrasi Soal"
+                                        className="w-full max-h-48 object-contain rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                        onClick={() => window.open(imageUrl, "_blank")}
+                                        title="Klik untuk memperbesar gambar"
+                                        onError={(e) => {
+                                          (e.currentTarget.parentElement as HTMLElement)?.classList.add("hidden");
+                                        }}
+                                      />
                                     </div>
                                   )}
                                 </>

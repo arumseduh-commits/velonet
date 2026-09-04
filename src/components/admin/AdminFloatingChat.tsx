@@ -31,7 +31,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
-import { parseQuestionContent } from "@/lib/question-utils";
+import { parseQuestionContent, parseChatMessageAttachment } from "@/lib/question-utils";
 
 export function AdminFloatingChat() {
   const router = useRouter();
@@ -253,15 +253,19 @@ export function AdminFloatingChat() {
 
     setInputText("");
     const currentFile = attachedFile;
+    const currentPreviewUrl = previewImageSrc;
+    const isImg = currentFile && (currentFile.type.startsWith("image/") || /\.(png|jpg|jpeg|webp)$/i.test(currentFile.name));
     setAttachedFile(null);
     setSending(true);
 
-    // Optimistically show user message
+    // Optimistically show user message (including image preview URL if image)
     const tempUserMsg = {
       id: "temp-" + Date.now(),
       role: "user",
       content: currentFile
-        ? `📎 [Lampiran: ${currentFile.name}]\n${textToSend || "Tolong analisa dokumen ini dan jadikan soal CBT."}`
+        ? isImg
+          ? `📷 [Gambar: ${currentFile.name}|${currentPreviewUrl || ""}]\n${textToSend || "Tolong analisa gambar ini dan buatkan draf soal CBT."}`
+          : `📎 [Lampiran: ${currentFile.name}]\n${textToSend || "Tolong analisa dokumen ini dan jadikan soal CBT."}`
         : textToSend,
       createdAt: new Date().toISOString(),
     };
@@ -321,6 +325,17 @@ export function AdminFloatingChat() {
       }
 
       if (json.success && json.data) {
+        // Sync persistent user message from server (with real /uploads/questions/... url)
+        if (json.data.userMessage) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === tempUserMsg.id
+                ? { ...m, id: json.data.userMessage.id, content: json.data.userMessage.content }
+                : m
+            )
+          );
+        }
+
         const aiMsg = {
           id: json.data.messageId || "ai-" + Date.now(),
           role: "assistant",
@@ -772,7 +787,41 @@ export function AdminFloatingChat() {
                           : "bg-blue-600 text-white font-medium"
                       }`}
                     >
-                      {displayContent}
+                      {isAI ? (
+                        displayContent
+                      ) : (() => {
+                        const { cleanText, attachmentName, attachmentUrl, isImage } = parseChatMessageAttachment(displayContent);
+                        return (
+                          <div className="space-y-2">
+                            {/* Attachment Box */}
+                            {attachmentName && (
+                              <div className="space-y-1.5">
+                                {isImage && attachmentUrl ? (
+                                  <div className="rounded-xl overflow-hidden border border-white/20 bg-black/25 p-1">
+                                    <img
+                                      src={attachmentUrl}
+                                      alt={attachmentName}
+                                      className="max-h-48 w-auto max-w-full rounded-lg object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                      onClick={() => window.open(attachmentUrl, "_blank")}
+                                      title="Klik untuk melihat ukuran penuh"
+                                    />
+                                    <div className="flex items-center gap-1 mt-1 px-1 text-[10px] text-blue-100 font-normal truncate">
+                                      <ImageIcon className="w-3 h-3 shrink-0" />
+                                      <span className="truncate">{attachmentName}</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 text-[11px] text-blue-100 border border-white/20">
+                                    <Paperclip className="w-3 h-3 shrink-0" />
+                                    <span className="truncate max-w-[200px]">{attachmentName}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {cleanText && <div>{cleanText}</div>}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Admin Action Button Card */}
@@ -882,7 +931,16 @@ export function AdminFloatingChat() {
                                         <p className="text-slate-200 text-xs font-medium whitespace-pre-line">{cleanText}</p>
                                         {imageUrl && (
                                           <div className="my-1.5 max-w-xs rounded-lg overflow-hidden border border-slate-700 bg-slate-950 p-1">
-                                            <img src={imageUrl} alt="Ilustrasi Soal" className="w-full max-h-36 object-contain rounded" />
+                                            <img
+                                              src={imageUrl}
+                                              alt="Ilustrasi Soal"
+                                              className="w-full max-h-36 object-contain rounded cursor-pointer hover:opacity-90 transition-opacity"
+                                              onClick={() => window.open(imageUrl, "_blank")}
+                                              title="Klik untuk memperbesar gambar"
+                                              onError={(e) => {
+                                                (e.currentTarget.parentElement as HTMLElement)?.classList.add("hidden");
+                                              }}
+                                            />
                                           </div>
                                         )}
                                       </>

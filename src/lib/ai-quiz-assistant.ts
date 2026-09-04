@@ -214,7 +214,7 @@ export async function generateQuizWithAI({
     durationMinutes,
     maxStrikes: 3,
     enableFullscreenLock: true,
-    enableCameraProctor: true,
+    enableCameraProctor: false,
     enableTabSwitchDetect: true,
     supervisorPin,
     questions: finalQuestions,

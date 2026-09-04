@@ -157,7 +157,7 @@ export async function processTeacherChat({
       durationMinutes: 30,
       maxStrikes: 3,
       enableFullscreenLock: true,
-      enableCameraProctor: true,
+      enableCameraProctor: false,
       enableTabSwitchDetect: true,
       supervisorPin,
       questions,

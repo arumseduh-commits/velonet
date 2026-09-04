@@ -161,6 +161,7 @@ export async function processGeminiCopilot({
   fileMimeType,
   imageBase64,
   imageMimeType,
+  uploadedImageUrl,
   apiKey,
   history = [],
 }: {
@@ -171,6 +172,7 @@ export async function processGeminiCopilot({
   fileMimeType?: string;
   imageBase64?: string;
   imageMimeType?: string;
+  uploadedImageUrl?: string;
   apiKey?: string;
   history?: Array<{ role: string; content: string }>;
 }): Promise<GeminiCopilotResult> {
@@ -195,6 +197,7 @@ export async function processGeminiCopilot({
         documentName,
         fileBase64: rawBase64,
         fileMimeType: rawMime,
+        uploadedImageUrl,
         requestedCount,
         adminContext,
         history,
@@ -217,7 +220,9 @@ export async function processGeminiCopilot({
     userMessage,
     documentText,
     documentName,
+    uploadedImageUrl,
     adminContext,
+    requestedCount,
   });
 
   return {
@@ -239,6 +244,7 @@ async function callGeminiAPI({
   documentName,
   fileBase64,
   fileMimeType,
+  uploadedImageUrl,
   requestedCount,
   adminContext,
   history,
@@ -249,6 +255,7 @@ async function callGeminiAPI({
   documentName?: string;
   fileBase64?: string;
   fileMimeType?: string;
+  uploadedImageUrl?: string;
   requestedCount?: number;
   adminContext: string;
   history: Array<{ role: string; content: string }>;
@@ -268,6 +275,14 @@ Pengguna secara eksplisit meminta ${requestedCount} BUTIR SOAL.
 Anda WAJIB menghasilkan TEPAT ${requestedCount} butir soal di dalam array "questions" pada "quizDraft"!
 DILARANG KERAS hanya membuat 5 butir soal jika pengguna meminta ${requestedCount} soal. Buatlah variasi soal yang kaya (Single Choice, Checkboxes, True/False, Short Answer, Essay) hingga mencapai tepat ${requestedCount} butir soal!`
     : `\nJika pengguna melampirkan modul atau dokumen materi, rancanglah setidaknya 10-15 butir soal yang komprehensif dan bervariasi mencakup seluruh bab/topik dalam dokumen!`;
+
+  const uploadedImageInstruction = uploadedImageUrl
+    ? `\n⚠️ PERINGATAN MUTLAK LAMPIRAN GAMBAR DARI PENGGUNA:
+Pengguna telah melampirkan berkas gambar dengan URL lokal: "${uploadedImageUrl}".
+Jika pengguna meminta membuat soal berdasarkan gambar ini, atau meminta menambahkan gambar pada setiap/sebagian butir soal:
+Anda WAJIB menyertakan properti "imageUrl": "${uploadedImageUrl}" pada soal terkait (atau pada SEMUA butir soal jika diminta)!
+DILARANG KERAS mengarang (hallucinate) URL eksternal fiktif seperti unsplash.com, placeholder, atau domain lain. Gunakan HANYA URL lokal: "${uploadedImageUrl}".`
+    : `\nDILARANG KERAS mengarang/menciptakan URL gambar eksternal palsu (seperti unsplash, placeholder, atau domain fiktif). Jika tidak ada URL gambar yang valid atau diunggah, kosongkan saja properti "imageUrl" (jangan berikan properti imageUrl).`;
 
   const systemInstruction = `
 Anda adalah "VeloNet Master Admin Copilot & CBT Architect", asisten AI paling cerdas dan serba bisa untuk Administrator dan Guru di platform VeloNet LMS.
@@ -301,7 +316,7 @@ TUGAS DAN ATURAN ANDA:
    - Jika pengguna meminta soal visual atau diagram sains (misal: grafik koordinat, diagram alur, rangkaian listrik), sertakan kode SVG murni pada properti "diagramSvg" (<svg ...>...</svg>).
    - ATURAN MUTLAK GAMBAR & ILUSTRASI SOAL:
      * DILARANG KERAS menyisipkan tag HTML mentah seperti <img src="..."> atau <div style="..."> ke dalam properti "text"! Properti "text" HANYA boleh berisi teks kalimat pertanyaan murni.
-     * Jika pengguna meminta menambahkan gambar/foto/infografis pada soal, atau jika soal memerlukan gambar referensi: Masukkan URL gambar valid secara terpisah pada properti "imageUrl": "https://..." (misalnya dari Unsplash, Wikimedia, atau URL gambar edukasi valid). Sistem VeloNet otomatis merender gambar tersebut secara elegan dengan kartu gambar interaktif dan fitur perbesar (zoom).
+     ${uploadedImageInstruction}
    - Jika pengguna melampirkan DOKUMEN PDF atau GAMBAR SCAN: Anda memiliki kemampuan Multimodal Vision penuh untuk membaca seluruh halaman teks soal, tabel, formula, dan diagramnya secara mendalam.
 
 3. Jika pengguna meminta navigasi atau bertanya tentang data admin:
@@ -331,7 +346,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
       {
         "type": "SINGLE_CHOICE",
         "text": "Teks pertanyaan murni tanpa tag HTML...",
-        "imageUrl": "https://... (opsional, jika soal membutuhkan gambar/foto)",
+        "imageUrl": "${uploadedImageUrl || "https://... (opsional jika ada gambar)"}",
         "points": 10,
         "bloomLevel": "C2",
         "diagramSvg": "<svg ...>...</svg> (opsional jika diagram)",
@@ -398,6 +413,16 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
 
   let lastError: any = null;
 
+  const userWantsAllImages =
+    !!uploadedImageUrl &&
+    (userMessage.toLowerCase().includes("gambar") ||
+      userMessage.toLowerCase().includes("foto") ||
+      userMessage.toLowerCase().includes("lampiran") ||
+      userMessage.toLowerCase().includes("setiap soal") ||
+      userMessage.toLowerCase().includes("soal ini") ||
+      userMessage.toLowerCase().includes("pakai ininya") ||
+      userMessage.toLowerCase().includes("seperti ini"));
+
   for (const model of candidateModels) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -425,11 +450,24 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
         const parsed = JSON.parse(cleanJson);
         if (parsed.quizDraft && Array.isArray(parsed.quizDraft.questions)) {
           parsed.quizDraft.questions = parsed.quizDraft.questions.map((q: any) => {
-            const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+            let { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+
+            // Strip hallucinated external URLs (e.g. unsplash)
+            const isHallucinatedUrl =
+              imageUrl &&
+              (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) &&
+              !imageUrl.includes(process.env.NEXT_PUBLIC_APP_URL || "velonet");
+
+            if (uploadedImageUrl && (isHallucinatedUrl || userWantsAllImages || !imageUrl)) {
+              imageUrl = uploadedImageUrl;
+            } else if (isHallucinatedUrl) {
+              imageUrl = null;
+            }
+
             return {
               ...q,
               text: cleanText,
-              imageUrl: imageUrl || q.imageUrl || undefined,
+              imageUrl: imageUrl || undefined,
             };
           });
         }
@@ -440,7 +478,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
         };
       } catch (parseErr) {
         console.warn("[Gemini API] Direct JSON parse failed, attempting resilient recovery...");
-        const recovered = recoverQuizFromTruncatedJson(rawText);
+        const recovered = recoverQuizFromTruncatedJson(rawText, uploadedImageUrl, userWantsAllImages);
         if (recovered) {
           return recovered;
         }
@@ -465,12 +503,38 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
 /**
  * Salvage reply and valid questions from slightly truncated or malformed JSON
  */
-export function recoverQuizFromTruncatedJson(rawText: string): {
+export function recoverQuizFromTruncatedJson(
+  rawText: string,
+  uploadedImageUrl?: string,
+  userWantsImages?: boolean
+): {
   reply: string;
   quizDraft?: GeneratedMultiQuizDraft | null;
   adminAction?: AdminActionPayload | null;
 } | null {
   const clean = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+
+  const sanitizeQuestionsList = (qList: any[]) => {
+    return qList.map((q: any) => {
+      let { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+      const isHallucinatedUrl =
+        imageUrl &&
+        (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) &&
+        !imageUrl.includes(process.env.NEXT_PUBLIC_APP_URL || "velonet");
+
+      if (uploadedImageUrl && (isHallucinatedUrl || userWantsImages || !imageUrl)) {
+        imageUrl = uploadedImageUrl;
+      } else if (isHallucinatedUrl) {
+        imageUrl = null;
+      }
+
+      return {
+        ...q,
+        text: cleanText,
+        imageUrl: imageUrl || undefined,
+      };
+    });
+  };
 
   // 1. Try closing brackets progressively
   const suffixes = ["}", '"}', '"]}', '"}]}', '"}]}}', '}]}', '}]}}', ']}}'];
@@ -478,6 +542,9 @@ export function recoverQuizFromTruncatedJson(rawText: string): {
     try {
       const fixed = JSON.parse(clean + suffix);
       if (fixed && (fixed.reply || fixed.quizDraft)) {
+        if (fixed.quizDraft && Array.isArray(fixed.quizDraft.questions)) {
+          fixed.quizDraft.questions = sanitizeQuestionsList(fixed.quizDraft.questions);
+        }
         return {
           reply: fixed.reply || "Draf kuis berhasil disusun dari dokumen Anda.",
           quizDraft: fixed.quizDraft || null,
@@ -530,14 +597,7 @@ export function recoverQuizFromTruncatedJson(rawText: string): {
   }
 
   if (questions.length > 0) {
-    const sanitizedQuestions = questions.map((q: any) => {
-      const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
-      return {
-        ...q,
-        text: cleanText,
-        imageUrl: imageUrl || q.imageUrl || undefined,
-      };
-    });
+    const sanitizedQuestions = sanitizeQuestionsList(questions);
 
     return {
       reply,
@@ -567,12 +627,14 @@ function processHeuristicFallback({
   userMessage,
   documentText,
   documentName,
+  uploadedImageUrl,
   adminContext,
   requestedCount,
 }: {
   userMessage: string;
   documentText?: string;
   documentName?: string;
+  uploadedImageUrl?: string;
   adminContext: string;
   requestedCount?: number;
 }): { reply: string; quizDraft?: GeneratedMultiQuizDraft | null; adminAction?: AdminActionPayload | null } {
@@ -652,6 +714,7 @@ function processHeuristicFallback({
           questions.push({
             type: "SINGLE_CHOICE",
             text: questionText,
+            imageUrl: uploadedImageUrl,
             points: 10,
             bloomLevel: i % 2 === 0 ? "C2" : "C3",
             options,
@@ -679,6 +742,7 @@ function processHeuristicFallback({
         questions.push({
           type: "SINGLE_CHOICE",
           text: `Butir Soal #${idx}: Berdasarkan pembahasan "${docTitle}", analisis manakah pernyataan yang paling akurat terkait sub-topik ke-${idx}?`,
+          imageUrl: uploadedImageUrl,
           points: 10,
           bloomLevel: bLevel,
           diagramSvg: idx === 1 ? executeGenerateSvg({ type: "coordinate", title: `Grafik Konsep: ${docTitle}` }).data?.svg : undefined,
@@ -694,6 +758,7 @@ function processHeuristicFallback({
         questions.push({
           type: "CHECKBOXES",
           text: `Butir Soal #${idx}: Pilihlah SEMUA poin atau kesimpulan yang BENAR terkait materi "${docTitle}" pada evaluasi ke-${idx}: (Pilihan jawaban bisa lebih dari 1)`,
+          imageUrl: uploadedImageUrl,
           points: 15,
           bloomLevel: bLevel,
           options: [
@@ -707,6 +772,7 @@ function processHeuristicFallback({
         questions.push({
           type: "TRUE_FALSE",
           text: `Butir Soal #${idx}: Pernyataan: "Pemahaman menyeluruh pada aspek ke-${idx} dari dokumen ${docTitle} menjadi prasyarat penting dalam menyelesaikan studi kasus praktis."`,
+          imageUrl: uploadedImageUrl,
           points: 10,
           bloomLevel: bLevel,
           options: [
@@ -718,6 +784,7 @@ function processHeuristicFallback({
         questions.push({
           type: "SHORT_ANSWER",
           text: `Butir Soal #${idx}: Sebutkan istilah atau kata kunci utama pada bagian ke-${idx} pembahasan "${docTitle}":`,
+          imageUrl: uploadedImageUrl,
           points: 10,
           bloomLevel: bLevel,
           sampleAnswer: docTitle.split(" ")[0] || "Kompetensi",
@@ -727,6 +794,7 @@ function processHeuristicFallback({
         questions.push({
           type: "ESSAY",
           text: `Butir Soal #${idx}: Jelaskan secara komprehensif apa yang Anda pelajari dari materi ke-${idx} pada "${docTitle}". Berikan analisis mendalam dan implementasi konkretnya!`,
+          imageUrl: uploadedImageUrl,
           points: 25,
           bloomLevel: bLevel,
           sampleAnswer: `Dokumen ${docTitle} membahas prinsip fundamental yang dapat diterapkan secara praktis. Implementasinya meliputi perencanaan, evaluasi berkala, serta tindak lanjut yang terstruktur.`,
@@ -746,7 +814,7 @@ function processHeuristicFallback({
       durationMinutes: 30,
       maxStrikes: 3,
       enableFullscreenLock: true,
-      enableCameraProctor: true,
+      enableCameraProctor: false,
       enableTabSwitchDetect: true,
       supervisorPin: pin,
       questions,

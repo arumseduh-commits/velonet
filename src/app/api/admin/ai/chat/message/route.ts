@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
 import { processGeminiCopilot, extractTextFromDocument } from "@/lib/gemini-copilot";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -22,6 +24,7 @@ export async function POST(req: Request) {
     let documentName: string | undefined = undefined;
     let fileBase64: string | undefined = undefined;
     let fileMimeType: string | undefined = undefined;
+    let uploadedImageUrl: string | undefined = undefined;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
@@ -45,6 +48,22 @@ export async function POST(req: Request) {
           fileMimeType = "application/pdf";
           documentText = `[DOKUMEN PDF: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)]`;
         } else if (isImg) {
+          // Save image to public/uploads/questions/ so it has a persistent local URL
+          try {
+            const uploadDir = path.join(process.cwd(), "public", "uploads", "questions");
+            if (!fs.existsSync(uploadDir)) {
+              fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            const isWebP = file.type === "image/webp" || lowerName.endsWith(".webp");
+            const ext = isWebP ? ".webp" : path.extname(file.name) || ".png";
+            const filename = `ai_upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
+            const filePath = path.join(uploadDir, filename);
+            fs.writeFileSync(filePath, buffer);
+            uploadedImageUrl = `/uploads/questions/${filename}`;
+          } catch (saveErr) {
+            console.warn("[AI Chat] Failed to save uploaded image to disk:", saveErr);
+          }
+
           // Send raw image to Gemini 3.6 Flash Native Multimodal Vision
           fileBase64 = buffer.toString("base64");
           fileMimeType = file.type || "image/jpeg";
@@ -62,6 +81,7 @@ export async function POST(req: Request) {
       documentName = body.documentName;
       fileBase64 = body.fileBase64 || body.imageBase64;
       fileMimeType = body.fileMimeType || body.imageMimeType;
+      uploadedImageUrl = body.uploadedImageUrl;
     }
 
     if (!sessionId || (!content && !documentText)) {
@@ -74,12 +94,19 @@ export async function POST(req: Request) {
     // Default message content if user only attached a file without typing text
     const userPromptText = content.trim() || (documentName ? `Tolong analisa dokumen "${documentName}" dan buatkan draf soal ujian CBT.` : "Halo AI");
 
-    // 1. Save User Message to Database
+    // 1. Save User Message to Database with Image/Attachment Tag
+    let savedContent = userPromptText;
+    if (uploadedImageUrl && documentName) {
+      savedContent = `📷 [Gambar: ${documentName}|${uploadedImageUrl}]\n${userPromptText}`;
+    } else if (documentName) {
+      savedContent = `📎 [Lampiran: ${documentName}]\n${userPromptText}`;
+    }
+
     const savedUserMsg = await prisma.aIChatMessage.create({
       data: {
         sessionId,
         role: "user",
-        content: documentName ? `📎 [Lampiran: ${documentName}]\n${userPromptText}` : userPromptText,
+        content: savedContent,
       },
     });
 
@@ -97,6 +124,7 @@ export async function POST(req: Request) {
       documentName,
       fileBase64,
       fileMimeType,
+      uploadedImageUrl,
       apiKey,
       history: history.map((h) => ({ role: h.role, content: h.content })),
     });
@@ -125,6 +153,10 @@ export async function POST(req: Request) {
         adminAction: aiResult.adminAction || null,
         source: aiResult.source,
         messageId: aiMessage.id,
+        userMessage: {
+          id: savedUserMsg.id,
+          content: savedUserMsg.content,
+        },
       },
     });
   } catch (err: any) {
