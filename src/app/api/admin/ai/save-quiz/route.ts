@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 export async function POST(req: Request) {
   try {
@@ -46,18 +47,30 @@ export async function POST(req: Request) {
         },
       });
 
+      let order = 0;
       for (const q of questions) {
+        order += 1;
+        const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
         await tx.question.create({
           data: {
             quizId: createdQuiz.id,
-            text: q.text,
+            type: q.type || "SINGLE_CHOICE",
+            text: cleanText,
+            imageUrl: imageUrl || null,
             points: Number(q.points) || 10,
-            options: {
-              create: (q.options || []).map((opt: any) => ({
-                text: opt.text,
-                isCorrect: Boolean(opt.isCorrect),
-              })),
-            },
+            order,
+            explanation: q.explanation || null,
+            sampleAnswer: q.sampleAnswer || null,
+            gradingRubric: q.gradingRubric || null,
+            options:
+              q.options && q.options.length > 0
+                ? {
+                    create: q.options.map((opt: any) => ({
+                      text: opt.text,
+                      isCorrect: Boolean(opt.isCorrect),
+                    })),
+                  }
+                : undefined,
           },
         });
       }

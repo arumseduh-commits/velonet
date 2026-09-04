@@ -1,10 +1,12 @@
 import { prisma } from "./prisma";
 import { MISTERGURU_MATERIALS } from "@/data/misterguru-data";
 import { executeGenerateSvg } from "./agent-tools";
+import { parseQuestionContent } from "./question-utils";
 
 export interface MultiFormatQuestionDraft {
   type: "SINGLE_CHOICE" | "CHECKBOXES" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY";
   text: string;
+  imageUrl?: string;
   points: number;
   bloomLevel?: "C1" | "C2" | "C3" | "C4" | "C5" | "C6";
   diagramSvg?: string;
@@ -297,6 +299,9 @@ TUGAS DAN ATURAN ANDA:
      * C6 (Mencipta): Merancang solusi baru, sintesis ide komprehensif.
    - Penulisan rumus matematika/fisika/kimia WAJIB diformat dengan sintaks KaTeX/LaTeX ($...$ atau $$...$$).
    - Jika pengguna meminta soal visual atau diagram sains (misal: grafik koordinat, diagram alur, rangkaian listrik), sertakan kode SVG murni pada properti "diagramSvg" (<svg ...>...</svg>).
+   - ATURAN MUTLAK GAMBAR & ILUSTRASI SOAL:
+     * DILARANG KERAS menyisipkan tag HTML mentah seperti <img src="..."> atau <div style="..."> ke dalam properti "text"! Properti "text" HANYA boleh berisi teks kalimat pertanyaan murni.
+     * Jika pengguna meminta menambahkan gambar/foto/infografis pada soal, atau jika soal memerlukan gambar referensi: Masukkan URL gambar valid secara terpisah pada properti "imageUrl": "https://..." (misalnya dari Unsplash, Wikimedia, atau URL gambar edukasi valid). Sistem VeloNet otomatis merender gambar tersebut secara elegan dengan kartu gambar interaktif dan fitur perbesar (zoom).
    - Jika pengguna melampirkan DOKUMEN PDF atau GAMBAR SCAN: Anda memiliki kemampuan Multimodal Vision penuh untuk membaca seluruh halaman teks soal, tabel, formula, dan diagramnya secara mendalam.
 
 3. Jika pengguna meminta navigasi atau bertanya tentang data admin:
@@ -325,7 +330,8 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
     "questions": [
       {
         "type": "SINGLE_CHOICE",
-        "text": "Pertanyaan...",
+        "text": "Teks pertanyaan murni tanpa tag HTML...",
+        "imageUrl": "https://... (opsional, jika soal membutuhkan gambar/foto)",
         "points": 10,
         "bloomLevel": "C2",
         "diagramSvg": "<svg ...>...</svg> (opsional jika diagram)",
@@ -417,6 +423,16 @@ Kembalikan HANYA format JSON valid tanpa format markdown \`\`\`json pembungkus, 
       try {
         const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
         const parsed = JSON.parse(cleanJson);
+        if (parsed.quizDraft && Array.isArray(parsed.quizDraft.questions)) {
+          parsed.quizDraft.questions = parsed.quizDraft.questions.map((q: any) => {
+            const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+            return {
+              ...q,
+              text: cleanText,
+              imageUrl: imageUrl || q.imageUrl || undefined,
+            };
+          });
+        }
         return {
           reply: parsed.reply || "Tugas berhasil diselesaikan.",
           quizDraft: parsed.quizDraft || null,
@@ -514,19 +530,28 @@ export function recoverQuizFromTruncatedJson(rawText: string): {
   }
 
   if (questions.length > 0) {
+    const sanitizedQuestions = questions.map((q: any) => {
+      const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+      return {
+        ...q,
+        text: cleanText,
+        imageUrl: imageUrl || q.imageUrl || undefined,
+      };
+    });
+
     return {
       reply,
       quizDraft: {
         title,
         description,
         category: "Bahasa Inggris",
-        durationMinutes: Math.max(30, questions.length * 2),
+        durationMinutes: Math.max(30, sanitizedQuestions.length * 2),
         maxStrikes: 3,
         enableFullscreenLock: true,
         enableCameraProctor: false,
         enableTabSwitchDetect: true,
         supervisorPin: "123456",
-        questions,
+        questions: sanitizedQuestions,
       },
       adminAction: null,
     };

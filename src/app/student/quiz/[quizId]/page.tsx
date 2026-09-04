@@ -44,6 +44,7 @@ import ExamLockedScreen from "@/components/exam/ExamLockedScreen";
 import ExamTutorialModal from "@/components/exam/ExamTutorialModal";
 import ExamDiscussionReviewModal from "@/components/exam/ExamDiscussionReviewModal";
 import ExamLeaderboardModal from "@/components/exam/ExamLeaderboardModal";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 interface StudentAnswerState {
   optionId?: string;
@@ -949,7 +950,18 @@ export default function QuizTakingPage() {
     );
   }
 
-  const currentQuestion = quiz.questions[currentIndex];
+  const rawQuestion = quiz.questions[currentIndex];
+  const { cleanText: parsedQuestionText, imageUrl: parsedQuestionImage } = parseQuestionContent(
+    rawQuestion?.text || "",
+    rawQuestion?.imageUrl
+  );
+  const currentQuestion = rawQuestion
+    ? {
+        ...rawQuestion,
+        text: parsedQuestionText,
+        imageUrl: parsedQuestionImage,
+      }
+    : null;
   const isLastQuestion = currentIndex === quiz.questions.length - 1;
   const answeredTotal = Object.keys(answers).filter((k) => {
     const a = answers[k];

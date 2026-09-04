@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
 import { MultiFormatQuestionDraft } from "@/lib/gemini-copilot";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 export async function POST(req: Request) {
   try {
@@ -36,11 +37,13 @@ export async function POST(req: Request) {
       await prisma.$transaction(async (tx) => {
         for (const q of questions as MultiFormatQuestionDraft[]) {
           currentMaxOrder += 1;
+          const { cleanText, imageUrl } = parseQuestionContent(q.text, (q as any).imageUrl);
           await tx.question.create({
             data: {
               quizId,
               type: q.type,
-              text: q.text,
+              text: cleanText,
+              imageUrl: imageUrl || null,
               points: q.points || 10,
               order: currentMaxOrder,
               sampleAnswer: q.sampleAnswer,

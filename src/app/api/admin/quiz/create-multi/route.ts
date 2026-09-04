@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 export async function POST(req: Request) {
   try {
@@ -48,12 +49,14 @@ export async function POST(req: Request) {
       for (let idx = 0; idx < questions.length; idx++) {
         const q = questions[idx];
         const questionType = q.type || "SINGLE_CHOICE";
+        const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
 
         await tx.question.create({
           data: {
             quizId: createdQuiz.id,
             type: questionType,
-            text: q.text,
+            text: cleanText,
+            imageUrl: imageUrl || null,
             points: Number(q.points) || 10,
             order: idx,
             sampleAnswer: q.sampleAnswer || null,

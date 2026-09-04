@@ -31,6 +31,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 export function AdminFloatingChat() {
   const router = useRouter();
@@ -874,7 +875,19 @@ export function AdminFloatingChat() {
                                       <span className="text-slate-400 font-mono">{q.points || 10} pt</span>
                                     </div>
                                   </div>
-                                  <p className="text-slate-200 text-xs font-medium whitespace-pre-line">{q.text}</p>
+                                  {(() => {
+                                    const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+                                    return (
+                                      <>
+                                        <p className="text-slate-200 text-xs font-medium whitespace-pre-line">{cleanText}</p>
+                                        {imageUrl && (
+                                          <div className="my-1.5 max-w-xs rounded-lg overflow-hidden border border-slate-700 bg-slate-950 p-1">
+                                            <img src={imageUrl} alt="Ilustrasi Soal" className="w-full max-h-36 object-contain rounded" />
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                   {q.diagramSvg && (
                                     <div
                                       className="my-1.5 p-1.5 rounded-lg bg-slate-950 border border-slate-800 overflow-x-auto"

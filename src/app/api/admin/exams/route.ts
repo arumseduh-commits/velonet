@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 export async function GET(req: Request) {
   try {
@@ -166,23 +167,26 @@ export async function POST(req: Request) {
         scoreReleaseAt: scoreReleaseAt ? new Date(scoreReleaseAt) : null,
         showDiscussion: Boolean(showDiscussion),
         questions: {
-          create: questions.map((q: any, idx: number) => ({
-            type: q.type || "SINGLE_CHOICE",
-            text: q.text || `Soal #${idx + 1}`,
-            imageUrl: q.imageUrl || null,
-            points: Number(q.points) || 10,
-            order: q.order !== undefined ? q.order : idx,
-            explanation: q.explanation?.trim() || null,
-            sampleAnswer: q.sampleAnswer || null,
-            gradingRubric: q.gradingRubric || null,
-            caseSensitive: Boolean(q.caseSensitive),
-            options: {
-              create: (q.options || []).map((opt: any) => ({
-                text: opt.text || "",
-                isCorrect: Boolean(opt.isCorrect),
-              })),
-            },
-          })),
+          create: questions.map((q: any, idx: number) => {
+            const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+            return {
+              type: q.type || "SINGLE_CHOICE",
+              text: cleanText || `Soal #${idx + 1}`,
+              imageUrl: imageUrl || null,
+              points: Number(q.points) || 10,
+              order: q.order !== undefined ? q.order : idx,
+              explanation: q.explanation?.trim() || null,
+              sampleAnswer: q.sampleAnswer || null,
+              gradingRubric: q.gradingRubric || null,
+              caseSensitive: Boolean(q.caseSensitive),
+              options: {
+                create: (q.options || []).map((opt: any) => ({
+                  text: opt.text || "",
+                  isCorrect: Boolean(opt.isCorrect),
+                })),
+              },
+            };
+          }),
         },
       },
       include: {

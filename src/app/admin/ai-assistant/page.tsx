@@ -34,6 +34,7 @@ import {
   History,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 export default function AdminAITeacherAssistantPage() {
   const router = useRouter();
@@ -667,7 +668,19 @@ export default function AdminAITeacherAssistantPage() {
                               </span>
                             </div>
 
-                            <p className="font-semibold text-slate-100 whitespace-pre-line">{q.text}</p>
+                            {(() => {
+                              const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+                              return (
+                                <>
+                                  <p className="font-semibold text-slate-100 whitespace-pre-line">{cleanText}</p>
+                                  {imageUrl && (
+                                    <div className="my-2 max-w-sm rounded-xl overflow-hidden border border-slate-700 bg-slate-950 p-1.5">
+                                      <img src={imageUrl} alt="Ilustrasi Soal" className="w-full max-h-48 object-contain rounded-lg" />
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
 
                             {/* Scientific / Visual Diagram if generated */}
                             {q.diagramSvg && (

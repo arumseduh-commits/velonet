@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 interface OptionReview {
   id: string;
@@ -200,21 +201,27 @@ export default function ExamDiscussionReviewModal({
                     </div>
                   </div>
 
-                  {/* Question Text */}
-                  <p className="text-sm font-semibold text-slate-100 whitespace-pre-line leading-relaxed">
-                    {q.text}
-                  </p>
+                  {/* Question Text & Media Sanitization */}
+                  {(() => {
+                    const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
+                    return (
+                      <>
+                        <p className="text-sm font-semibold text-slate-100 whitespace-pre-line leading-relaxed">
+                          {cleanText}
+                        </p>
 
-                  {/* Image Attachment (if any) */}
-                  {q.imageUrl && (
-                    <div className="my-3 max-w-md rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2">
-                      <img
-                        src={q.imageUrl}
-                        alt="Gambar Soal"
-                        className="w-full max-h-56 object-contain rounded-xl"
-                      />
-                    </div>
-                  )}
+                        {imageUrl && (
+                          <div className="my-3 max-w-md rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2">
+                            <img
+                              src={imageUrl}
+                              alt="Gambar Soal"
+                              className="w-full max-h-56 object-contain rounded-xl"
+                            />
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* Multiple Choice Options Breakdown */}
                   {q.options && q.options.length > 0 && (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLoggedInAdmin } from "@/lib/admin-auth";
+import { parseQuestionContent } from "@/lib/question-utils";
 
 export async function GET(
   req: NextRequest,
@@ -142,12 +143,13 @@ export async function PATCH(
         // Insert new questions with options
         for (let i = 0; i < questions.length; i++) {
           const q = questions[i];
+          const { cleanText, imageUrl } = parseQuestionContent(q.text, q.imageUrl);
           await tx.question.create({
             data: {
               quizId,
               type: q.type || "SINGLE_CHOICE",
-              text: q.text || `Soal #${i + 1}`,
-              imageUrl: q.imageUrl || null,
+              text: cleanText || `Soal #${i + 1}`,
+              imageUrl: imageUrl || null,
               points: Number(q.points) || 10,
               order: q.order !== undefined ? q.order : i,
               explanation: q.explanation?.trim() || null,
