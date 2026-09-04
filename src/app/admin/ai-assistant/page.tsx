@@ -30,6 +30,8 @@ import {
   ArrowLeft,
   Layers,
   Upload,
+  Menu,
+  History,
 } from "lucide-react";
 import { useDialog } from "@/components/ui/DialogProvider";
 
@@ -48,6 +50,7 @@ export default function AdminAITeacherAssistantPage() {
   const [uploadFileName, setUploadFileName] = useState<string>("");
   const [uploadFileSizeMB, setUploadFileSizeMB] = useState<string>("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   // Knowledge base topics
   const [materials, setMaterials] = useState<any[]>([]);
@@ -142,6 +145,72 @@ export default function AdminAITeacherAssistantPage() {
       setActiveSessionId(session.id);
       setMessages(session.messages || []);
       setSelectedTopicId(session.contextTopicId || "");
+    }
+  };
+
+  // Delete single session
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string, sessionTitle: string) => {
+    e.stopPropagation();
+
+    const ok = await confirm({
+      title: "Hapus Sesi Percakapan?",
+      message: `Hapus riwayat sesi "${sessionTitle}" beserta seluruh riwayat pesannya secara permanen?`,
+      variant: "danger",
+      confirmText: "Ya, Hapus",
+      cancelText: "Batal",
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/admin/ai/chat/session?id=${sessionId}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message || "Sesi berhasil dihapus");
+        const remaining = sessions.filter((s) => s.id !== sessionId);
+        setSessions(remaining);
+
+        if (activeSessionId === sessionId) {
+          if (remaining.length > 0) {
+            handleSelectSession(remaining[0].id);
+          } else {
+            handleCreateNewSession("Sesi Konsultasi Guru #1");
+          }
+        }
+      } else {
+        toast.error(json.error || "Gagal menghapus sesi.");
+      }
+    } catch (err) {
+      toast.error("Terjadi kendala koneksi.");
+    }
+  };
+
+  // Clear all sessions
+  const handleClearAllSessions = async () => {
+    const ok = await confirm({
+      title: "Hapus Seluruh Riwayat Sesi?",
+      message: "Seluruh riwayat obrolan AI akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+      variant: "danger",
+      confirmText: "Hapus Semua",
+      cancelText: "Batal",
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/admin/ai/chat/session?all=true", {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Seluruh riwayat sesi berhasil dibersihkan!");
+        setSessions([]);
+        await handleCreateNewSession("Sesi Konsultasi Guru #1");
+      } else {
+        toast.error(json.error || "Gagal membersihkan riwayat sesi.");
+      }
+    } catch (err) {
+      toast.error("Terjadi kendala koneksi.");
     }
   };
 
@@ -306,22 +375,56 @@ export default function AdminAITeacherAssistantPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-5rem)] flex flex-col md:flex-row gap-4 pb-6 text-slate-900">
+    <div className="h-[calc(100vh-5rem)] flex flex-col md:flex-row gap-4 pb-6 text-slate-900 relative">
+      {/* Mobile Sidebar Backdrop */}
+      {showMobileSidebar && (
+        <div
+          onClick={() => setShowMobileSidebar(false)}
+          className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-xs md:hidden animate-in fade-in duration-150"
+        />
+      )}
+
       {/* 1. SIDEBAR SESSIONS & KNOWLEDGE BASE (Desktop 3 Cols, Mobile Drawer) */}
-      <aside className="w-full md:w-80 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between overflow-hidden shrink-0">
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-80 bg-white shadow-2xl transition-transform duration-200 md:static md:w-80 md:shadow-sm md:rounded-3xl md:border md:border-slate-200 flex flex-col justify-between overflow-hidden shrink-0 ${
+          showMobileSidebar ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-blue-600" />
-            <h2 className="font-extrabold text-slate-900 text-sm">Sesi Konsultasi Guru</h2>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <Bot className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="font-extrabold text-slate-900 text-sm">Sesi Percakapan</h2>
+              <span className="text-[10px] text-slate-400 font-medium">{sessions.length} riwayat</span>
+            </div>
           </div>
 
-          <button
-            onClick={() => handleCreateNewSession(`Sesi #${sessions.length + 1}`)}
-            className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition-colors cursor-pointer"
-            title="Mulai Sesi Chat Baru"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {sessions.length > 0 && (
+              <button
+                onClick={handleClearAllSessions}
+                className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer"
+                title="Hapus Semua Riwayat Sesi"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => handleCreateNewSession(`Sesi #${sessions.length + 1}`)}
+              className="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition-colors cursor-pointer"
+              title="Mulai Sesi Chat Baru"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setShowMobileSidebar(false)}
+              className="md:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-700 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Knowledge Base Grounding Dropdown */}
@@ -347,35 +450,48 @@ export default function AdminAITeacherAssistantPage() {
         {/* Sessions List */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {loadingSessions ? (
-            <div className="p-4 text-center text-xs text-slate-400">
+            <div className="p-6 text-center text-xs text-slate-400">
               <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1 text-blue-600" />
               Memuat sesi...
             </div>
           ) : sessions.length === 0 ? (
-            <div className="p-4 text-center text-xs text-slate-400">
-              Belum ada riwayat sesi.
+            <div className="p-6 text-center text-xs text-slate-400 space-y-2">
+              <MessageSquare className="w-8 h-8 mx-auto text-slate-300" />
+              <p>Belum ada riwayat sesi.</p>
             </div>
           ) : (
             sessions.map((s) => {
               const isActive = s.id === activeSessionId;
               return (
-                <button
+                <div
                   key={s.id}
-                  onClick={() => handleSelectSession(s.id)}
-                  className={`w-full p-3 rounded-2xl text-left text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                  onClick={() => {
+                    handleSelectSession(s.id);
+                    setShowMobileSidebar(false);
+                  }}
+                  className={`group w-full p-2.5 rounded-2xl text-left text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${
                     isActive
-                      ? "bg-blue-50 border border-blue-300 text-blue-900 font-bold shadow-xs"
-                      : "hover:bg-slate-50 text-slate-700"
+                      ? "bg-blue-50/90 border border-blue-300 text-blue-900 font-bold shadow-xs"
+                      : "hover:bg-slate-50 text-slate-700 border border-transparent"
                   }`}
                 >
-                  <div className="truncate flex items-center gap-2">
+                  <div className="truncate flex items-center gap-2 flex-1">
                     <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
                     <span className="truncate">{s.title}</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">
-                    {s.messages?.length || 0} pesan
-                  </span>
-                </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${isActive ? "bg-blue-200/80 text-blue-800" : "bg-slate-100 text-slate-500"}`}>
+                      {s.messages?.length || 0}
+                    </span>
+                    <button
+                      onClick={(e) => handleDeleteSession(e, s.id, s.title)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-70 group-hover:opacity-100 cursor-pointer"
+                      title="Hapus sesi ini"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               );
             })
           )}
@@ -395,7 +511,14 @@ export default function AdminAITeacherAssistantPage() {
         {/* Chat Header */}
         <header className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+            <button
+              onClick={() => setShowMobileSidebar(true)}
+              className="md:hidden p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+              title="Buka Riwayat Sesi"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
               <Sparkles className="w-5 h-5 text-amber-300" />
             </div>
             <div>

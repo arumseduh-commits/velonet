@@ -58,3 +58,47 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const admin = await getLoggedInAdmin();
+    if (!admin) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const idFromQuery = searchParams.get("id");
+    const allFromQuery = searchParams.get("all") === "true";
+
+    let id = idFromQuery;
+    let isAll = allFromQuery;
+
+    if (!id && !isAll) {
+      try {
+        const body = await req.json();
+        id = body?.id;
+        isAll = body?.all === true;
+      } catch (e) {
+        // empty body is fine
+      }
+    }
+
+    if (isAll) {
+      await prisma.aIChatSession.deleteMany();
+      return NextResponse.json({ success: true, message: "Semua riwayat sesi berhasil dibersihkan." });
+    }
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "ID sesi wajib disertakan." }, { status: 400 });
+    }
+
+    await prisma.aIChatSession.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true, message: "Sesi percakapan berhasil dihapus." });
+  } catch (err: any) {
+    console.error("[AI Chat Sessions DELETE]", err);
+    return NextResponse.json({ success: false, error: "Gagal menghapus sesi." }, { status: 500 });
+  }
+}
